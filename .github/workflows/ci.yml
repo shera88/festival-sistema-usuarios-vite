@@ -40,3 +40,49 @@ jobs:
       - run: npm ci --legacy-peer-deps --no-audit --no-fund
       - run: npm run build
       - run: npm run test
+
+  e2e:
+    runs-on: ubuntu-latest
+    # Skip e2e si no hay secrets configurados (devs en forks no rompen)
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, mbstring, json
+      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Generate php-backend/config.php
+        run: |
+          cat > php-backend/config.php <<'EOF'
+          <?php
+          return [
+              'supabase_url' => '${{ secrets.SUPABASE_URL }}',
+              'supabase_service_role_key' => '${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}',
+              'session_name' => 'fdz_session',
+              'session_lifetime' => 604800,
+              'cookie_secure' => false,
+              'cookie_samesite' => 'Lax',
+              'cookie_domain' => '',
+              'cors_origin' => 'http://127.0.0.1:5173',
+              'debug' => false,
+          ];
+          EOF
+      - run: npm run test:e2e
+        env:
+          CI: 'true'
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
