@@ -55,55 +55,29 @@
   --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
 
   /* Tipografía */
-  --font-display: 'Syne', sans-serif;
-  --font-body: 'Outfit', sans-serif;
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
 }
 
 html, body {
   background-color: var(--bg-base);
   color: var(--text-90);
   font-family: var(--font-body);
-  font-weight: 200;
-  letter-spacing: 0.01em;
+  font-weight: 400;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, h5 {
   font-family: var(--font-display);
-  font-weight: 300;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text-white);
 }
 
-/* Fondo global: gradientes radiales + dots dorados */
 body {
   position: relative;
   min-height: 100vh;
-}
-
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 15% 15%, rgba(255, 31, 168, 0.22), transparent 50%),
-    radial-gradient(ellipse 75% 50% at 85% 85%, rgba(0, 229, 255, 0.18), transparent 50%),
-    radial-gradient(ellipse 60% 45% at 50% 110%, rgba(99, 32, 255, 0.15), transparent 55%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 12% 18%, rgba(232, 208, 152, 0.6) 0.5px, transparent 1px),
-    radial-gradient(circle at 88% 92%, rgba(232, 208, 152, 0.5) 0.5px, transparent 1px),
-    radial-gradient(circle at 75% 35%, rgba(232, 208, 152, 0.4) 0.5px, transparent 1px);
-  background-size: 800px 800px, 900px 900px, 700px 700px;
-  opacity: 0.35;
-  pointer-events: none;
-  z-index: 0;
 }
 
 #root {

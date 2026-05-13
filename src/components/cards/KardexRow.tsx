@@ -14,28 +14,39 @@ export function KardexRow({ row }: Props) {
   const wa = whatsappLink(row.telefono);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-glass-border bg-base/40">
-      <div className="flex items-center gap-3 p-2.5">
+    <div className="border-b border-glass-border transition last:border-b-0 hover:bg-fuchsia/[0.02]">
+      <div className="flex items-center gap-3 px-4 py-3">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="flex flex-1 items-center gap-3 text-left"
         >
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-glass-border">
+          <div
+            className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-glass-border"
+            style={{ background: 'var(--bg-elevated)' }}
+          >
             {row.foto ? (
               <img src={row.foto} alt={nombre} className="h-full w-full object-cover" />
             ) : (
-              <div
-                className="h-full w-full flex items-center justify-center text-white text-sm font-semibold"
-                style={{ background: 'linear-gradient(135deg,var(--cyan),var(--fuchsia))' }}
+              <span
+                className="flex h-full w-full items-center justify-center font-display text-base font-bold text-fuchsia"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(255,31,168,0.15) 0%, rgba(255,31,168,0.05) 100%)',
+                }}
               >
                 {initial}
-              </div>
+              </span>
             )}
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-text-90 text-sm truncate">{nombre}</div>
-            <div className="text-text-45 text-xs truncate">{row.cargo || '—'}</div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-medium text-text-white">{nombre}</div>
+            <div
+              className="mt-0.5 truncate text-[10px] uppercase text-text-45"
+              style={{ letterSpacing: '0.4px' }}
+            >
+              {row.cargo || '—'}
+            </div>
           </div>
         </button>
         {wa && (
@@ -44,45 +55,49 @@ export function KardexRow({ row }: Props) {
             target="_blank"
             rel="noopener"
             aria-label="WhatsApp"
-            className="rounded-full p-1.5 text-green-400 hover:bg-green-400/10"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-glass-border text-text-65 transition hover:border-green hover:text-green"
           >
             <MessageCircle className="h-4 w-4" />
           </a>
         )}
         <ChevronDown
-          className={`h-4 w-4 text-text-45 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 transition-transform duration-300 ${
+            open ? 'rotate-180 text-fuchsia' : 'text-text-45'
+          }`}
         />
       </div>
       {open && (
-        <div className="border-t border-glass-border p-3 space-y-2 text-xs">
+        <div className="space-y-1.5 border-t border-glass-border bg-black/20 px-4 py-3 text-[11px] anim-fade-in">
           <Detail label="Teléfono" value={row.telefono} />
           <Detail label="Correo" value={row.correo_electronico} />
           <Detail label="CI" value={row.ci} />
           <Detail label="Ciudad" value={row.ciudad} />
           <Detail label="Edad" value={row.edad} />
           <Detail label="Estado" value={row.estado} />
-          <div className="flex gap-2 pt-1">
-            {row.enlace_del_credencial && (
-              <a
-                href={row.enlace_del_credencial}
-                target="_blank"
-                rel="noopener"
-                className="rounded border border-cyan/40 px-2 py-1 text-xs text-cyan hover:bg-cyan/10"
-              >
-                Credencial
-              </a>
-            )}
-            {row.enlace_del_certificado && (
-              <a
-                href={row.enlace_del_certificado}
-                target="_blank"
-                rel="noopener"
-                className="rounded border border-fuchsia/40 px-2 py-1 text-xs text-fuchsia hover:bg-fuchsia/10"
-              >
-                Certificado
-              </a>
-            )}
-          </div>
+          {(row.enlace_del_credencial || row.enlace_del_certificado) && (
+            <div className="mt-2 flex flex-wrap gap-2 pt-1">
+              {row.enlace_del_credencial && (
+                <a
+                  href={row.enlace_del_credencial}
+                  target="_blank"
+                  rel="noopener"
+                  className="rounded-md border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[11px] font-medium text-cyan transition hover:bg-cyan/20"
+                >
+                  Credencial
+                </a>
+              )}
+              {row.enlace_del_certificado && (
+                <a
+                  href={row.enlace_del_certificado}
+                  target="_blank"
+                  rel="noopener"
+                  className="rounded-md border border-fuchsia/40 bg-fuchsia/10 px-2.5 py-1 text-[11px] font-medium text-fuchsia transition hover:bg-fuchsia/20"
+                >
+                  Certificado
+                </a>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -92,9 +107,14 @@ export function KardexRow({ row }: Props) {
 function Detail({ label, value }: { label: string; value: string | number | null }) {
   if (!value) return null;
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <span className="text-text-45 text-[10px] uppercase">{label}</span>
-      <span className="text-text-90 truncate">{value}</span>
+    <div className="flex items-baseline justify-between gap-3">
+      <span
+        className="text-[9px] uppercase text-text-45"
+        style={{ letterSpacing: '0.5px' }}
+      >
+        {label}
+      </span>
+      <span className="truncate text-text-white">{value}</span>
     </div>
   );
 }

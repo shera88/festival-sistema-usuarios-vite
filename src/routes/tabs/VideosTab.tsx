@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
+import { StatsCards } from '@/components/shared/StatsCards';
+import { DayGroup } from '@/components/shared/DayGroup';
 import { VideoCard } from '@/components/cards/VideoCard';
 import { VideoModal } from '@/components/media/VideoModal';
 import { useVideos } from '@/hooks/queries';
@@ -28,26 +30,46 @@ export function VideosTab() {
     return result;
   }, [q.data]);
 
+  const stats = useMemo(() => {
+    const total = byYear.reduce((sum, y) => sum + y.items.length, 0);
+    const yearsWithVideo = byYear.length;
+    const yearMax = byYear.reduce(
+      (best, y) => (y.items.length > (best?.items.length ?? -1) ? y : best),
+      null as null | (typeof byYear)[number],
+    );
+    return [
+      { label: 'Total Videos', value: total, accent: 'cyan' as const },
+      { label: 'Años con Video', value: yearsWithVideo, accent: 'fuchsia' as const },
+      {
+        label: 'Año con Más',
+        value: yearMax ? `${yearMax.year} (${yearMax.items.length})` : '—',
+        accent: 'gold' as const,
+      },
+    ];
+  }, [byYear]);
+
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 sm:p-6">
+      <StatsCards stats={stats} />
+
       {q.isLoading && <LoadingSkeleton rows={3} />}
       {!q.isLoading && byYear.length === 0 && <EmptyState>Sin videos disponibles.</EmptyState>}
 
-      {byYear.map(({ year, items }) => (
-        <section key={year} className="space-y-2">
-          <h3 className="flex items-baseline gap-2 px-1 text-xs uppercase tracking-wider text-text-45">
-            <span className="font-semibold text-text-90">{year}</span>
-            <span>
-              {items.length} video{items.length > 1 ? 's' : ''}
-            </span>
-          </h3>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((v) => (
-              <VideoCard key={v.id_inscripcion} video={v} onClick={() => setActive(v)} />
-            ))}
-          </div>
-        </section>
-      ))}
+      <div className="space-y-4">
+        {byYear.map(({ year, items }) => (
+          <DayGroup
+            key={year}
+            label={year}
+            count={`${items.length} video${items.length > 1 ? 's' : ''}`}
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((v) => (
+                <VideoCard key={v.id_inscripcion} video={v} onClick={() => setActive(v)} />
+              ))}
+            </div>
+          </DayGroup>
+        ))}
+      </div>
 
       <VideoModal video={active} onClose={() => setActive(null)} />
     </div>

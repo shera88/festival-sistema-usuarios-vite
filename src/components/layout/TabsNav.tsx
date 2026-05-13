@@ -1,43 +1,49 @@
 import { NavLink } from 'react-router-dom';
 
 const TABS = [
-  { to: '/inscripciones', label: 'Inscripciones' },
-  { to: '/kardex', label: 'Kardex' },
-  { to: '/calificaciones', label: 'Calificaciones' },
-  { to: '/videos', label: 'Videos' },
-  { to: '/pagos', label: 'Pagos' },
+  { to: '/inscripciones', label: 'Inscripciones', color: 'var(--cyan)' },
+  { to: '/kardex', label: 'Kardex', color: 'var(--fuchsia)' },
+  { to: '/calificaciones', label: 'Calificaciones', color: 'var(--gold)' },
+  { to: '/videos', label: 'Videos', color: 'var(--purple)' },
+  { to: '/pagos', label: 'Pagos', color: 'var(--green)' },
 ] as const;
 
 export function TabsNav() {
   return (
-    <nav className="sticky top-[60px] z-10 border-b border-glass-border bg-base/80 backdrop-blur-md">
-      <div className="flex gap-1 overflow-x-auto px-2 py-2 no-scrollbar">
-        {TABS.map((t) => (
-          <NavLink
-            key={t.to}
-            to={t.to}
-            className={({ isActive }) =>
-              `relative whitespace-nowrap rounded-lg px-4 py-2 text-sm transition ${
-                isActive
-                  ? 'text-text-90'
-                  : 'text-text-45 hover:text-text-90 hover:bg-glass-bg'
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <span>{t.label}</span>
-                {isActive && (
-                  <span
-                    className="absolute inset-x-2 bottom-0 h-[3px] rounded-full"
-                    style={{ background: 'linear-gradient(90deg, var(--cyan), var(--fuchsia))' }}
-                  />
-                )}
-              </>
-            )}
-          </NavLink>
-        ))}
-      </div>
+    <nav
+      className="sticky top-[60px] z-10 flex overflow-x-auto border-b border-glass-border backdrop-blur-md no-scrollbar"
+      style={{
+        background:
+          'linear-gradient(90deg, rgba(14,9,40,0.85) 0%, rgba(18,10,48,0.92) 100%)',
+      }}
+    >
+      {TABS.map((t) => (
+        <NavLink
+          key={t.to}
+          to={t.to}
+          className={({ isActive }) =>
+            `relative flex-1 min-w-[110px] whitespace-nowrap px-3 py-3 text-center text-[10px] font-light uppercase transition-all duration-300 ${
+              isActive ? '' : 'text-text-45 hover:bg-cyan/[0.05]'
+            }`
+          }
+          style={({ isActive }) =>
+            isActive
+              ? {
+                  color: t.color,
+                  letterSpacing: '0.5px',
+                  borderBottom: `3px solid ${t.color}`,
+                  textShadow: `0 0 12px ${t.color}55`,
+                }
+              : {
+                  letterSpacing: '0.5px',
+                  borderBottom: '3px solid transparent',
+                  ['--hover-color' as string]: t.color,
+                }
+          }
+        >
+          {t.label}
+        </NavLink>
+      ))}
     </nav>
   );
 }

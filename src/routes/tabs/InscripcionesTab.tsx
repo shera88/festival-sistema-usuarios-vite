@@ -3,6 +3,8 @@ import { YearPills } from '@/components/filters/YearPills';
 import { SearchInput } from '@/components/filters/SearchInput';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
+import { StatsCards } from '@/components/shared/StatsCards';
+import { DayGroup } from '@/components/shared/DayGroup';
 import { InscripcionCard } from '@/components/cards/InscripcionCard';
 import { useInscripciones, useCalificaciones } from '@/hooks/queries';
 import { dayOrderIndex } from '@/lib/utils/days';
@@ -58,10 +60,32 @@ export function InscripcionesTab() {
 
   const days = Object.keys(byDay).sort((a, b) => dayOrderIndex(a) - dayOrderIndex(b));
 
+  const stats = useMemo(() => {
+    const totalObras = inscripciones.length;
+    const diasUnicos = new Set(
+      inscripciones.map((i) => (i.dia || 'SIN DÍA').toUpperCase()),
+    ).size;
+    const modalidades = new Set(
+      inscripciones.map((i) => i.modalidad).filter(Boolean),
+    ).size;
+    return [
+      { label: `Obras ${year}`, value: totalObras, accent: 'cyan' as const },
+      { label: 'Días en cartelera', value: diasUnicos, accent: 'fuchsia' as const },
+      { label: 'Modalidades', value: modalidades, accent: 'gold' as const },
+    ];
+  }, [inscripciones, year]);
+
   return (
-    <div className="space-y-4 p-4">
-      <div className="space-y-2">
-        <div className="text-xs uppercase text-text-45 tracking-wide">Filtrar por año</div>
+    <div className="space-y-4 p-4 sm:p-6">
+      <StatsCards stats={stats} />
+
+      <div className="space-y-3 rounded-2xl border border-glass-border bg-glass-bg p-4 backdrop-blur-md">
+        <div
+          className="text-[10px] uppercase text-text-45"
+          style={{ letterSpacing: '1px' }}
+        >
+          Filtrar por año
+        </div>
         <YearPills years={YEARS} value={year} onChange={setYear} />
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar obra o agrupación..." />
       </div>
@@ -72,15 +96,13 @@ export function InscripcionesTab() {
         <EmptyState>Sin inscripciones en {year}</EmptyState>
       )}
 
-      {days.map((dia) => (
-        <section key={dia} className="space-y-2">
-          <h3 className="flex items-baseline gap-2 px-1 text-xs uppercase tracking-wider text-text-45">
-            <span className="font-semibold text-text-90">{dia}</span>
-            <span>
-              {byDay[dia].length} obra{byDay[dia].length > 1 ? 's' : ''}
-            </span>
-          </h3>
-          <div className="space-y-2">
+      <div className="space-y-4">
+        {days.map((dia) => (
+          <DayGroup
+            key={dia}
+            label={dia}
+            count={`${byDay[dia].length} obra${byDay[dia].length > 1 ? 's' : ''}`}
+          >
             {byDay[dia].map((it) => (
               <InscripcionCard
                 key={it.id_inscripcion}
@@ -88,9 +110,9 @@ export function InscripcionesTab() {
                 notas={notasByInsc[it.id_inscripcion] || []}
               />
             ))}
-          </div>
-        </section>
-      ))}
+          </DayGroup>
+        ))}
+      </div>
     </div>
   );
 }

@@ -14,41 +14,69 @@ export function KardexGroup({ agrupacion, logo, rows }: Props) {
   const initial = agrupacion.charAt(0).toUpperCase();
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-glass-border bg-glass-bg backdrop-blur-md">
+    <article
+      className={`overflow-hidden rounded-xl border transition anim-fade-in-up ${
+        open
+          ? 'border-fuchsia/30'
+          : 'border-fuchsia/15 hover:border-fuchsia/30 hover:shadow-[0_8px_24px_rgba(255,31,168,0.08)]'
+      }`}
+      style={{
+        background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(0,0,0,0.2) 100%)',
+      }}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 p-3 text-left hover:bg-white/5"
+        className="flex w-full items-center gap-3 p-4 text-left transition"
+        style={{
+          background: open
+            ? 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%)'
+            : 'transparent',
+          borderBottom: open ? '1px solid var(--border)' : 'none',
+        }}
       >
-        <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-glass-border">
+        <div
+          className="h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 border-fuchsia"
+          style={{
+            background: 'var(--bg-elevated)',
+            boxShadow: '0 0 16px rgba(255,31,168,0.15)',
+          }}
+        >
           {logo ? (
             <img src={logo} alt={agrupacion} className="h-full w-full object-cover" />
           ) : (
-            <div
-              className="h-full w-full flex items-center justify-center text-white font-semibold"
-              style={{ background: 'linear-gradient(135deg,var(--cyan),var(--fuchsia))' }}
-            >
+            <span className="flex h-full w-full items-center justify-center font-display text-lg font-bold text-fuchsia">
               {initial}
-            </div>
+            </span>
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-text-90 font-medium truncate">{agrupacion}</div>
-          <div className="text-text-45 text-xs">
+
+        <div className="min-w-0 flex-1">
+          <div
+            className="text-[14px] font-semibold uppercase text-text-white"
+            style={{ letterSpacing: '0.5px' }}
+          >
+            {agrupacion}
+          </div>
+          <div className="mt-0.5 text-[11px] text-text-45">
             {rows.length} integrante{rows.length > 1 ? 's' : ''}
           </div>
         </div>
+
         <ChevronDown
-          className={`h-5 w-5 text-text-45 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`h-5 w-5 shrink-0 transition-transform duration-300 ${
+            open ? 'rotate-180 text-fuchsia' : 'text-text-45'
+          }`}
         />
       </button>
+
       {open && (
-        <div className="border-t border-glass-border p-2 space-y-2">
+        <div className="border-t border-glass-border anim-fade-in">
           {rows.map((r, i) => (
             <KardexRow key={i} row={r} />
           ))}
         </div>
       )}
-    </div>
+    </article>
   );
 }

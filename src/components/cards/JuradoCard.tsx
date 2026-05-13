@@ -20,78 +20,110 @@ export function JuradoCard({ nota }: Props) {
     .filter(Boolean);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-glass-border bg-glass-bg">
+    <article
+      className={`overflow-hidden rounded-lg border transition ${
+        open
+          ? 'border-gold/30 shadow-[0_4px_18px_rgba(232,208,152,0.06)]'
+          : 'border-glass-border'
+      }`}
+      style={{
+        background: open
+          ? 'linear-gradient(180deg, var(--bg-card) 0%, var(--bg-void) 100%)'
+          : 'linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-card) 100%)',
+      }}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 p-2.5 text-left hover:bg-white/5"
+        className="flex w-full items-center gap-3 p-3 text-left"
       >
-        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-glass-border">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-gold">
           {foto ? (
             <img src={foto} alt={nombre} className="h-full w-full object-cover" />
           ) : (
-            <div
-              className="h-full w-full flex items-center justify-center text-white text-sm font-semibold"
-              style={{ background: 'linear-gradient(135deg,var(--cyan),var(--fuchsia))' }}
+            <span
+              className="flex h-full w-full items-center justify-center font-display text-base font-bold text-gold"
+              style={{
+                background:
+                  'linear-gradient(135deg, rgba(232,208,152,0.18) 0%, rgba(0,229,255,0.12) 100%)',
+              }}
             >
               {initial}
-            </div>
+            </span>
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-text-90 text-sm truncate">{nombre}</div>
+
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] font-semibold text-text-white">{nombre}</div>
           {generos.length > 0 && (
-            <div className="mt-0.5 flex flex-wrap gap-1">
-              {generos.map((g) => (
-                <span
-                  key={g}
-                  className={`rounded px-1.5 py-0.5 text-[9px] uppercase ${generoClass(g)}`}
-                >
+            <div
+              className="mt-0.5 flex flex-wrap text-[8px] font-light uppercase text-text-45"
+              style={{ letterSpacing: '0.5px', gap: '6px' }}
+            >
+              {generos.map((g, i) => (
+                <span key={g} className="flex items-baseline">
+                  {i > 0 && <span className="mr-1.5 text-text-25">·</span>}
                   {g}
                 </span>
               ))}
             </div>
           )}
         </div>
-        <div className="text-right">
-          <div className="text-lg font-bold text-text-90">{total}</div>
+
+        <div
+          className="shrink-0 font-display text-[22px] font-bold leading-none text-gold"
+          style={{ letterSpacing: '-0.5px' }}
+        >
+          {total}
         </div>
+
         <ChevronDown
-          className={`h-4 w-4 text-text-45 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 transition-transform duration-300 ${
+            open ? 'rotate-180 text-gold' : 'text-text-45'
+          }`}
         />
       </button>
+
       {open && (
-        <div className="border-t border-glass-border bg-base/40 p-3">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="border-t border-glass-border px-3 pb-3 pt-2.5 anim-fade-in">
+          <div className="grid grid-cols-2 gap-1.5">
             <NotaItem label="Temática" value={nota.tematica} />
             <NotaItem label="Interpretación" value={nota.interpretacion} />
             <NotaItem label="Coreografía" value={nota.coreografia} />
             <NotaItem label="Dificultad" value={nota.dificultad_y_ejecucion} />
           </div>
           {nota.comentario && (
-            <p className="mt-2 rounded border border-glass-border bg-glass-bg p-2 text-xs italic text-text-90">
+            <p
+              className="mt-1.5 rounded-md border-l-2 border-cyan/30 px-3 py-2.5 text-[11px] italic text-text-65"
+              style={{
+                background: 'rgba(0,229,255,0.03)',
+                lineHeight: '1.6',
+              }}
+            >
               "{nota.comentario}"
             </p>
           )}
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
-function NotaItem({ label, value }: { label: string; value: number | string | null }) {
+function NotaItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: number | string | null;
+}) {
   return (
-    <div className="rounded border border-glass-border bg-glass-bg p-2 text-center">
-      <div className="text-[10px] uppercase text-text-45">{label}</div>
-      <div className="text-sm font-semibold text-text-90">{value ?? '—'}</div>
+    <div
+      className="flex items-center justify-between rounded-md border border-glass-border bg-white/[0.02] px-2.5 py-2 text-[10px]"
+    >
+      <span className="font-medium uppercase text-text-65" style={{ letterSpacing: '0.4px' }}>
+        {label}
+      </span>
+      <b className="font-display text-[14px] font-bold text-cyan">{value ?? '—'}</b>
     </div>
   );
-}
-
-function generoClass(g: string): string {
-  if (g === 'FOLKLORE') return 'bg-gold/20 text-gold border border-gold/40';
-  if (g === 'URBANO') return 'bg-fuchsia/20 text-fuchsia border border-fuchsia/40';
-  if (g === 'ACADEMICO' || g === 'ACADÉMICO')
-    return 'bg-cyan/20 text-cyan border border-cyan/40';
-  return 'bg-glass-bg text-text-45 border border-glass-border';
 }
