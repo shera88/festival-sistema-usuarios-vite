@@ -54,6 +54,7 @@ jobs:
           php-version: '8.4'
           extensions: curl, mbstring, json
       - run: npm install --legacy-peer-deps --no-audit --no-fund
+      - run: npm install -D @playwright/test@^1.49.0 --legacy-peer-deps --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - name: Generate php-backend/config.php
         run: |
