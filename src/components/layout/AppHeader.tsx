@@ -60,16 +60,13 @@ export function AppHeader() {
             <Menu className="h-6 w-6 text-white" />
           </button>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center">
             <img
               src={logoUrl}
-              alt="Festival DanzArte"
-              className="h-10 w-auto object-contain"
+              alt="Festival DanzArte 2026"
+              className="h-12 w-auto object-contain"
               style={{ filter: 'drop-shadow(0 0 12px rgba(0,229,255,0.18))' }}
             />
-            <h1 className="hidden text-lg font-semibold tracking-tight sm:block">
-              Festival <span style={{ color: 'var(--cyan)' }}>DanzArte</span>
-            </h1>
           </div>
         </div>
 

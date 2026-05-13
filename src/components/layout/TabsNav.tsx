@@ -11,7 +11,7 @@ const TABS = [
 export function TabsNav() {
   return (
     <nav
-      className="sticky top-[60px] z-10 flex overflow-x-auto border-b border-glass-border backdrop-blur-md no-scrollbar"
+      className="sticky top-16 z-30 flex overflow-x-auto border-b border-glass-border backdrop-blur-md no-scrollbar"
       style={{
         background:
           'linear-gradient(90deg, rgba(14,9,40,0.85) 0%, rgba(18,10,48,0.92) 100%)',
