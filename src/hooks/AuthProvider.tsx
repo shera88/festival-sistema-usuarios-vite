@@ -1,32 +1,32 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { authApi } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import type { User } from '@/types/domain';
-
-interface AuthState {
-  user: User | null;
-  loading: boolean;
-  login: (idContacto: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const AuthCtx = createContext<AuthState | null>(null);
+import { AuthCtx } from './auth-context';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     authApi
       .me()
-      .then((res) => setUser(res.user))
+      .then((res) => {
+        if (!cancelled) setUser(res.user);
+      })
       .catch((err) => {
         if (!(err instanceof ApiError && err.status === 401)) {
           console.error('me() error:', err);
         }
-        setUser(null);
+        if (!cancelled) setUser(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function login(idContacto: string, password: string) {
@@ -43,10 +43,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return <AuthCtx.Provider value={{ user, loading, login, logout }}>{children}</AuthCtx.Provider>;
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthCtx);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
 }

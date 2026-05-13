@@ -13,24 +13,29 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState<SearchResult | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<number | null>(null);
 
+  const showSuggestions =
+    !dismissed &&
+    !(selected && query === selected.nombre) &&
+    query.trim().length >= 2 &&
+    suggestions.length > 0;
+
   useEffect(() => {
     if (selected && query === selected.nombre) return;
-    if (query.trim().length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
+    const q = query.trim();
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(async () => {
+      if (q.length < 2) {
+        setSuggestions([]);
+        return;
+      }
       try {
-        const results = await authApi.searchParticipants(query.trim());
+        const results = await authApi.searchParticipants(q);
         setSuggestions(results);
-        setShowSuggestions(results.length > 0);
       } catch (err) {
         console.error('search error:', err);
         setSuggestions([]);
@@ -43,7 +48,7 @@ export function LoginPage() {
   function pickSuggestion(s: SearchResult) {
     setSelected(s);
     setQuery(s.nombre);
-    setShowSuggestions(false);
+    setDismissed(true);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -117,8 +122,9 @@ export function LoginPage() {
               onChange={(e) => {
                 setQuery(e.target.value);
                 setSelected(null);
+                setDismissed(false);
               }}
-              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              onFocus={() => setDismissed(false)}
               placeholder="Busque su nombre, carnet o teléfono..."
               autoComplete="off"
               className="w-full rounded-lg border border-glass-border bg-elev px-3 py-2.5 text-text-90 placeholder:text-text-45 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan"
