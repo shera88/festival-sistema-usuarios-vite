@@ -1,10 +1,16 @@
 -- migrations/001_login_rpcs.sql
 -- ADITIVO: crea 2 funciones SECURITY DEFINER para login del portal de usuarios.
 -- No toca data existente. Idempotente (CREATE OR REPLACE).
+--
+-- NOTA: id_contacto en festival_contactos_global es UUID. Las funciones reciben
+-- el id como text desde el cliente y lo castean a uuid en el WHERE. El SELECT
+-- castea id_contacto::text para matchear el RETURNS TABLE.
+
+-- Drop primero por si existen con signatura previa incompatible
+DROP FUNCTION IF EXISTS public.search_login_users(text);
+DROP FUNCTION IF EXISTS public.validate_login(text, text);
 
 -- 1) Búsqueda de usuarios para autocomplete de login
---    Filtra por nombre/carnet/telefono/email
---    Excluye contactos con antecedentes='prospecto_no_participo'
 CREATE OR REPLACE FUNCTION public.search_login_users(p_query text)
 RETURNS TABLE (
   id_contacto text,
@@ -30,7 +36,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
   SELECT
-    id_contacto,
+    id_contacto::text,
     numero_de_carnet,
     nombre_y_apellido,
     telefono,
@@ -88,7 +94,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
   SELECT
-    id_contacto,
+    id_contacto::text,
     numero_de_carnet,
     nombre_y_apellido,
     telefono,
@@ -106,7 +112,7 @@ AS $$
     id_original_director,
     id_original_coreografo
   FROM festival_contactos_global
-  WHERE id_contacto = p_id_contacto
+  WHERE id_contacto = p_id_contacto::uuid
     AND (antecedentes IS NULL OR antecedentes <> 'prospecto_no_participo')
     AND (
       regexp_replace(coalesce(numero_de_carnet, ''), '\s', '', 'g') = regexp_replace(coalesce(p_password, ''), '\s', '', 'g')
@@ -121,4 +127,4 @@ GRANT EXECUTE ON FUNCTION public.validate_login(text, text) TO anon, authenticat
 COMMENT ON FUNCTION public.search_login_users(text) IS
   'Autocomplete de usuarios para la pantalla de login del portal. Excluye prospectos. Pública (anon).';
 COMMENT ON FUNCTION public.validate_login(text, text) IS
-  'Valida login del portal usando id_contacto + (numero_de_carnet o telefono). Pública (anon). Devuelve fila completa o 0 filas.';
+  'Valida login del portal usando id_contacto (text→uuid) + (numero_de_carnet o telefono). Pública (anon). Devuelve fila completa o 0 filas.';
