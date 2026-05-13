@@ -1,6 +1,5 @@
 import { NavLink } from 'react-router-dom';
 import {
-  Home,
   ClipboardList,
   Users,
   Award,
@@ -22,7 +21,6 @@ const SECTIONS = [
   {
     label: 'Mi Cuenta',
     items: [
-      { to: '/', label: 'Inicio', icon: Home },
       { to: '/inscripciones', label: 'Inscripciones', icon: ClipboardList, color: 'var(--cyan)' },
       { to: '/kardex', label: 'Kardex', icon: Users, color: 'var(--fuchsia)' },
       { to: '/calificaciones', label: 'Calificaciones', icon: Award, color: 'var(--gold)' },
@@ -86,7 +84,7 @@ export function AppSidebar({ open, onClose }: Props) {
                   <NavLink
                     key={item.to}
                     to={item.to}
-                    end={item.to === '/'}
+                    end
                     onClick={onClose}
                     className={({ isActive }) =>
                       `group flex items-center gap-3 border-b border-white/5 px-6 py-3.5 text-[13px] transition ${

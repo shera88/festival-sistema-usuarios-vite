@@ -47,8 +47,8 @@ export function AppHeader() {
       <AppSidebar open={sidebar} onClose={() => setSidebar(false)} />
 
       <nav
-        className="sticky top-0 z-50 flex items-center justify-between border-b border-brand-border px-4 py-3 backdrop-blur-md"
-        style={{ background: 'rgba(10,12,15,0.8)' }}
+        className="sticky top-0 z-50 flex items-center justify-between border-b border-glass-border px-4 py-3 backdrop-blur-md"
+        style={{ background: 'rgba(8, 5, 30, 0.85)' }}
       >
         <div className="flex items-center gap-3">
           <button
@@ -61,18 +61,14 @@ export function AppHeader() {
           </button>
 
           <div className="flex items-center gap-2.5">
-            <div
-              className="flex h-9 w-9 items-center justify-center rounded-xl"
-              style={{
-                background: 'var(--brand-accent)',
-                boxShadow: 'var(--shadow-glow)',
-              }}
-            >
-              <img src={logoUrl} alt="DanzArte" className="h-7 w-auto" />
-            </div>
-            <h1 className="hidden text-lg font-bold tracking-tight sm:block">
-              Festival{' '}
-              <span style={{ color: 'var(--brand-accent)' }}>DanzArte</span>
+            <img
+              src={logoUrl}
+              alt="Festival DanzArte"
+              className="h-10 w-auto object-contain"
+              style={{ filter: 'drop-shadow(0 0 12px rgba(0,229,255,0.18))' }}
+            />
+            <h1 className="hidden text-lg font-semibold tracking-tight sm:block">
+              Festival <span style={{ color: 'var(--cyan)' }}>DanzArte</span>
             </h1>
           </div>
         </div>
