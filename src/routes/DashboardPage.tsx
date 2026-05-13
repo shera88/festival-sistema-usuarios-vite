@@ -18,7 +18,7 @@ export function DashboardPage() {
       <AppHeader />
       <UserHero user={user} />
       <TabsNav />
-      <main className="mx-auto max-w-5xl">
+      <main className="w-full">
         <Routes>
           <Route index element={<Navigate to="/inscripciones" replace />} />
           <Route path="inscripciones" element={<InscripcionesTab />} />
