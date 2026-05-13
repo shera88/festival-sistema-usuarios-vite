@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./tokens.css";
+
+@theme {
+  --color-base: var(--bg-base);
+  --color-elev: var(--bg-elev);
+  --color-cyan: var(--cyan);
+  --color-fuchsia: var(--fuchsia);
+  --color-gold: var(--gold);
+  --color-text-90: var(--text-90);
+  --color-text-45: var(--text-45);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

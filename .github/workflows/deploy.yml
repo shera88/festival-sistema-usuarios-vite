@@ -1,0 +1,72 @@
+name: deploy
+
+# PARQUEADO. Sólo trigger manual hasta autorización explícita del owner.
+# Cuando se autorice deploy: descomentar el push trigger abajo.
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Build SPA
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Generate php-backend/config.php
+        run: |
+          cat > php-backend/config.php <<EOF
+          <?php
+          declare(strict_types=1);
+          return [
+              'supabase_url'              => '${{ secrets.SUPABASE_URL }}',
+              'supabase_service_role_key' => '${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}',
+              'session_name'              => 'fdz_session',
+              'session_lifetime'          => 604800,
+              'cookie_secure'             => true,
+              'cookie_samesite'           => 'Lax',
+              'cookie_domain'             => 'usuarios.festivaldanzarte.com',
+              'cors_origin'               => 'https://usuarios.festivaldanzarte.com',
+              'debug'                     => false,
+          ];
+          EOF
+
+      - name: Stage deploy package
+        run: |
+          mkdir -p deploy-package
+          cp -r dist/* deploy-package/
+          mkdir -p deploy-package/api
+          cp -r php-backend/* deploy-package/api/
+
+      - name: Deploy via SFTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          server-dir: ${{ secrets.SFTP_REMOTE_PATH }}/
+          local-dir: deploy-package/
+          protocol: ftp
+
+      - name: Smoke test
+        run: |
+          sleep 30
+          curl -fsS https://usuarios.festivaldanzarte.com/ | grep -q "Festival DanzArte"

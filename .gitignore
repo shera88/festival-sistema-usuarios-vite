@@ -1,0 +1,55 @@
+# deps
+node_modules
+.pnpm-store
+
+# build
+dist
+dist-ssr
+*.local
+
+# vite
+.vite-cache
+.vite
+
+# env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# logs
+logs
+*.log
+npm-debug.log*
+
+# os
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+
+# typescript
+*.tsbuildinfo
+
+# PHP backend secret
+php-backend/config.php
+php-backend/rate-limit-data
+php-backend/stderr.log
+
+# playwright
+test-results
+playwright-report
+playwright/.cache
+
+# coverage
+coverage
+
+# auto-verify-loop screenshots (kept locally, not in repo)
+.claude/auto-verify-loop
+
+# backups
+backups/
