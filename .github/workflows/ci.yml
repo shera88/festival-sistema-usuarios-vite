@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 22
           cache: "npm"
-      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
       - run: npm run lint
 
   typecheck:
@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: 22
           cache: "npm"
-      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
       - run: npm run typecheck
 
   build:
@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: 22
           cache: "npm"
-      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
       - run: npm run build
       - run: npm run test
 
@@ -57,7 +57,7 @@ jobs:
         with:
           php-version: '8.4'
           extensions: curl, mbstring, json
-      - run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - run: npm install --legacy-peer-deps --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - name: Generate php-backend/config.php
         run: |
