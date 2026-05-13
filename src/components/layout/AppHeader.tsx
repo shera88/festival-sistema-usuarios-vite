@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { NavMenu } from './NavMenu';
 import logoUrl from '@/assets/logo-danzarte.png';
 
 export function AppHeader() {
@@ -33,7 +34,8 @@ export function AppHeader() {
           'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%)',
       }}
     >
-      <div className="flex h-full items-center">
+      <div className="flex h-full items-center gap-3">
+        <NavMenu />
         <img
           src={logoUrl}
           alt="Festival DanzArte 2026"
