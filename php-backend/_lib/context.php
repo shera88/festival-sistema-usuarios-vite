@@ -30,13 +30,18 @@ function parseIdCsv($value): array
 
 function quoteIfNeeded(string $value): string
 {
-    if (preg_match('/[=, ]/', $value)) return '"' . $value . '"';
-    return $value;
+    // PostgREST: comillas dobles si el valor tiene caracteres especiales
+    // de su sintaxis (`,`, `=`, ` `, `(`, `)`), o si contiene non-ASCII
+    // (acentos, etc.). URL-encode siempre para que el HTTP request sea válido.
+    $needsQuotes = preg_match('/[=, ()"]/u', $value) || !preg_match('/^[\x20-\x7e]*$/', $value);
+    $encoded = rawurlencode($value);
+    if ($needsQuotes) return '"' . $encoded . '"';
+    return $encoded;
 }
 
 function buildInFilter(string $column, array $ids): ?string
 {
     if (count($ids) === 0) return null;
-    $list = implode(',', array_map(fn($id) => '"' . $id . '"', $ids));
+    $list = implode(',', array_map(fn($id) => '"' . rawurlencode((string)$id) . '"', $ids));
     return "$column=in.($list)";
 }

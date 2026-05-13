@@ -37,6 +37,7 @@ export function AppHeader() {
           type="button"
           onClick={handleSync}
           disabled={syncing}
+          aria-label="Sincronizar"
           className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border bg-glass-bg px-3 py-1.5 text-xs text-text-90 hover:border-cyan/40 disabled:opacity-50"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
@@ -45,6 +46,7 @@ export function AppHeader() {
         <button
           type="button"
           onClick={handleLogout}
+          aria-label="Salir"
           className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border bg-glass-bg px-3 py-1.5 text-xs text-text-90 hover:border-fuchsia/40"
         >
           <LogOut className="h-3.5 w-3.5" />
