@@ -12,14 +12,14 @@ import { InscripcionPage } from './InscripcionPage';
 import { KardexFormPage } from './KardexFormPage';
 import { SolicitudPage } from './SolicitudPage';
 
-const FORM_PATHS = ['/inscripcion', '/kardex-form', '/solicitud'];
+const FORM_PATHS = new Set(['/inscripcion', '/kardex-form', '/solicitud']);
 
 export function DashboardPage() {
   const { user } = useAuth();
   const location = useLocation();
   if (!user) return null;
 
-  const isFormPage = FORM_PATHS.some((p) => location.pathname.startsWith(p));
+  const isFormPage = FORM_PATHS.has(location.pathname);
 
   return (
     <div className="flex min-h-screen flex-col">

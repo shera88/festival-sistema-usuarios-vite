@@ -1,15 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import {
-  ClipboardList,
-  Users,
-  Award,
-  Video,
-  CreditCard,
-  FilePlus,
-  FileText,
-  Music,
-  X,
-} from 'lucide-react';
+import { FilePlus, FileText, Music, X } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 
 interface Props {
@@ -18,16 +8,6 @@ interface Props {
 }
 
 const SECTIONS = [
-  {
-    label: 'Mi Cuenta',
-    items: [
-      { to: '/inscripciones', label: 'Inscripciones', icon: ClipboardList, color: 'var(--cyan)' },
-      { to: '/kardex', label: 'Kardex', icon: Users, color: 'var(--fuchsia)' },
-      { to: '/calificaciones', label: 'Calificaciones', icon: Award, color: 'var(--gold)' },
-      { to: '/videos', label: 'Videos', icon: Video, color: 'var(--purple)' },
-      { to: '/pagos', label: 'Pagos', icon: CreditCard, color: 'var(--green)' },
-    ],
-  },
   {
     label: 'Formularios',
     items: [
