@@ -1,30 +1,33 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { UserHero } from '@/components/layout/UserHero';
+import { TabsNav } from '@/components/layout/TabsNav';
+import { InscripcionesTab } from './tabs/InscripcionesTab';
+import { KardexTab } from './tabs/KardexTab';
+import { CalificacionesTab } from './tabs/CalificacionesTab';
+import { VideosTab } from './tabs/VideosTab';
+import { PagosTab } from './tabs/PagosTab';
 
 export function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   if (!user) return null;
 
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-glass-border px-4 py-3">
-        <h1 className="text-text-90 font-semibold">Mi Cuenta</h1>
-        <button
-          onClick={() => logout()}
-          className="rounded-lg border border-glass-border px-3 py-1.5 text-sm text-text-90 hover:bg-glass-bg"
-        >
-          Salir
-        </button>
-      </header>
-      <main className="p-6">
-        <p className="text-text-90">
-          Bienvenido, <strong>{user.nombre_y_apellido}</strong>
-        </p>
-        <p className="text-text-45 text-sm mt-1">
-          {user.rol_primario} • {user.nombre_agrupacion}
-        </p>
-        <p className="mt-6 text-text-45 text-sm italic">
-          Tabs (Inscripciones, Kardex, Calificaciones, Videos, Pagos) próximo chunk.
-        </p>
+    <div className="min-h-screen pb-12">
+      <AppHeader />
+      <UserHero user={user} />
+      <TabsNav />
+      <main className="mx-auto max-w-5xl">
+        <Routes>
+          <Route index element={<Navigate to="/inscripciones" replace />} />
+          <Route path="inscripciones" element={<InscripcionesTab />} />
+          <Route path="kardex" element={<KardexTab />} />
+          <Route path="calificaciones" element={<CalificacionesTab />} />
+          <Route path="videos" element={<VideosTab />} />
+          <Route path="pagos" element={<PagosTab />} />
+          <Route path="*" element={<Navigate to="/inscripciones" replace />} />
+        </Routes>
       </main>
     </div>
   );
