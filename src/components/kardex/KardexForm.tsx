@@ -375,7 +375,6 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
               >
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-primary-gradient text-white">
                   {fotoPreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={fotoPreview}
                       alt="Vista previa"

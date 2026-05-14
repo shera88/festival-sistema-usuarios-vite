@@ -77,17 +77,6 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
     };
   }, [open, uploading, onClose]);
 
-  // Reset pendings al cerrar
-  useEffect(() => {
-    if (!open) {
-      revokePending();
-      setPendingAudio(null);
-      setPendingVideo(null);
-      setErrMsg(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
   function revokePending() {
     if (pendingAudioUrl.current) {
       URL.revokeObjectURL(pendingAudioUrl.current);
@@ -98,6 +87,17 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
       pendingVideoUrl.current = null;
     }
   }
+
+  // Reset pendings al cerrar
+  useEffect(() => {
+    if (!open) {
+      revokePending();
+      setPendingAudio(null);
+      setPendingVideo(null);
+      setErrMsg(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open || !inscripcion) return null;
 

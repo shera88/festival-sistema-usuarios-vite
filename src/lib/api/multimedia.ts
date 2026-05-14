@@ -52,7 +52,7 @@ export const multimediaApi = {
       };
       xhr.onload = () => {
         const raw = xhr.responseText || '';
-        let body: Partial<MultimediaSubirRes> & { error?: string; ok?: boolean } = {};
+        let body: Partial<MultimediaSubirRes> & { error?: string; ok?: boolean };
         try {
           body = raw ? JSON.parse(raw) : {};
         } catch {
