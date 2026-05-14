@@ -82,11 +82,15 @@ function mmExtFromMime(string $mime): ?string
     return $map[$mime] ?? null;
 }
 
-/** Construye storage_path completo (sin el bucket prefix). */
+/** Construye storage_path completo (sin el bucket prefix).
+ * Timestamp en filename fuerza URL única por upload y evita
+ * CDN/browser cache servir versión antigua al reemplazar.
+ */
 function mmStoragePath(string $tipo, int $orden, string $agrupacion, string $obra, string $ext): string
 {
     $folder = $orden . '-' . mmSafe($agrupacion);
-    $file = mmSafe($obra) . '.' . $ext;
+    $stamp = dechex(time());
+    $file = mmSafe($obra) . '-' . $stamp . '.' . $ext;
     $sub = $tipo === 'video_led' ? 'videos-led' : 'audios';
     return "$sub/$folder/$file";
 }
