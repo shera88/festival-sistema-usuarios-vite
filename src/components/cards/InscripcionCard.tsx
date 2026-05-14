@@ -231,7 +231,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
               <div className="mt-3 flex items-center gap-2 rounded-md border border-glass-border bg-glass-bg px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] font-semibold uppercase text-text-65" style={{ letterSpacing: '0.5px' }}>
-                    Multimedia (audio + video LED)
+                    Subir multimedia
                   </div>
                   {mmConfirmado ? (
                     <div className="mt-0.5 flex items-center gap-1 text-[10px] text-cyan">

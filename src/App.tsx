@@ -5,6 +5,7 @@ import { AuthProvider } from '@/hooks/AuthProvider';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { LoginPage } from '@/routes/LoginPage';
 import { DashboardPage } from '@/routes/DashboardPage';
+import { UpdateBanner } from '@/components/shared/UpdateBanner';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Toaster theme="dark" position="top-right" />
+          <UpdateBanner />
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
