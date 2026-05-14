@@ -16,6 +16,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 interface Props {
   insc: Inscripcion;
   notas: Nota[];
+  year: string;
 }
 
 type SubTab = 'detalles' | 'video' | 'calificacion';
@@ -47,7 +48,8 @@ function gradientFor(name: string): string {
   return palette[Math.abs(h) % palette.length];
 }
 
-export function InscripcionCard({ insc, notas }: Props) {
+export function InscripcionCard({ insc, notas, year }: Props) {
+  const mmEnabled = Number(year) >= 2026;
   const [open, setOpen] = useState(false);
   const [sub, setSub] = useState<SubTab>('detalles');
   const [logoFailed, setLogoFailed] = useState(false);
@@ -225,6 +227,7 @@ export function InscripcionCard({ insc, notas }: Props) {
                   <AudioPlayer src={audioUrl} />
                 </div>
               )}
+              {mmEnabled && (
               <div className="mt-3 flex items-center gap-2 rounded-md border border-glass-border bg-glass-bg px-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] font-semibold uppercase text-text-65" style={{ letterSpacing: '0.5px' }}>
@@ -278,6 +281,7 @@ export function InscripcionCard({ insc, notas }: Props) {
                   />
                 </button>
               </div>
+              )}
               {insc.informe && (
                 <div
                   className="mt-3 rounded-md border-l-2 border-cyan/40 px-3.5 py-2.5 text-[12px] text-text-90"

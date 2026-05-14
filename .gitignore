@@ -60,3 +60,8 @@ node_modules_TRASH_*
 
 # screenshots (local verification only)
 screenshots/
+
+.vercel
+
+# credentials (NEVER commit)
+.credentials/

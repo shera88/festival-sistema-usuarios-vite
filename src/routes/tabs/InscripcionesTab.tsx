@@ -108,6 +108,7 @@ export function InscripcionesTab() {
                 key={it.id_inscripcion}
                 insc={it}
                 notas={notasByInsc[it.id_inscripcion] || []}
+                year={year}
               />
             ))}
           </DayGroup>
