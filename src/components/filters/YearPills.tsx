@@ -6,7 +6,7 @@ interface Props<T extends string> {
 
 export function YearPills<T extends string>({ years, value, onChange }: Props<T>) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
       {years.map((y) => {
         const active = y === value;
         return (
@@ -16,8 +16,8 @@ export function YearPills<T extends string>({ years, value, onChange }: Props<T>
             onClick={() => onChange(y)}
             className={
               active
-                ? 'rounded-full bg-[linear-gradient(135deg,var(--cyan),var(--fuchsia))] px-4 py-1.5 text-xs font-semibold text-white shadow'
-                : 'rounded-full border border-glass-border bg-glass-bg px-4 py-1.5 text-xs text-text-45 hover:text-text-90 hover:border-cyan/40'
+                ? 'rounded-full bg-[linear-gradient(135deg,var(--cyan),var(--fuchsia))] px-2 py-1.5 text-xs font-semibold text-white shadow sm:px-4'
+                : 'rounded-full border border-glass-border bg-glass-bg px-2 py-1.5 text-xs text-text-45 hover:border-cyan/40 hover:text-text-90 sm:px-4'
             }
           >
             {y}

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { FilePlus, FileText, Music, X } from 'lucide-react';
+import { FilePlus, FileText, IdCard, Home, X } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 
 interface Props {
@@ -7,36 +7,54 @@ interface Props {
   onClose: () => void;
 }
 
+// Prefetch dinámico de los chunks lazy al hacer hover sobre el NavLink.
+// Esto carga el chunk en background ANTES del click → navegación instantánea.
+const PREFETCH: Record<string, () => Promise<unknown>> = {
+  '/inscripcion': () => import('@/routes/InscripcionPage'),
+  '/kardex-form': () => import('@/routes/KardexFormPage'),
+  '/solicitud': () => import('@/routes/SolicitudPage'),
+};
+
 const SECTIONS = [
+  {
+    label: 'Navegación',
+    items: [
+      { to: '/inscripciones', label: 'Inicio', icon: Home },
+    ],
+  },
   {
     label: 'Formularios',
     items: [
-      { to: '/inscripcion', label: 'Inscripción', icon: FilePlus, color: 'var(--cyan)' },
-      { to: '/kardex-form', label: 'Kardex (form)', icon: Music, color: 'var(--fuchsia)' },
-      { to: '/solicitud', label: 'Solicitud', icon: FileText, color: 'var(--gold)' },
+      { to: '/inscripcion', label: 'Inscripción', icon: FilePlus },
+      { to: '/kardex-form', label: 'Kardex', icon: IdCard },
+      { to: '/solicitud', label: 'Solicitud', icon: FileText },
     ],
   },
 ] as const;
 
 export function AppSidebar({ open, onClose }: Props) {
+  function prefetch(to: string) {
+    PREFETCH[to]?.();
+  }
+
   return (
     <>
       {open && (
         <div
-          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm transition-opacity duration-150"
           onClick={onClose}
         />
       )}
 
       <aside
-        className={`fixed left-0 top-0 z-[70] flex h-full w-64 flex-col border-r border-brand-border transition-transform duration-300 ease-in-out ${
+        className={`fixed left-0 top-0 z-[70] flex h-full w-64 flex-col border-r border-brand-border transition-transform duration-150 ease-out will-change-transform ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ background: 'var(--brand-sidebar)' }}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-white/5 p-5">
           <div className="flex items-center gap-2.5">
-            <img src={logoUrl} alt="DanzArte" className="h-9 w-auto" />
+            <img src={logoUrl} alt="Danzarte" className="h-9 w-auto" />
             <span className="font-bold text-lg">Menú</span>
           </div>
           <button
@@ -66,18 +84,17 @@ export function AppSidebar({ open, onClose }: Props) {
                     to={item.to}
                     end
                     onClick={onClose}
+                    onMouseEnter={() => prefetch(item.to)}
+                    onFocus={() => prefetch(item.to)}
                     className={({ isActive }) =>
-                      `group flex items-center gap-3 border-b border-white/5 px-6 py-3.5 text-[13px] transition ${
+                      `group flex items-center gap-3 border-b border-white/5 px-6 py-3.5 text-[13px] transition-colors ${
                         isActive
                           ? 'bg-white/5 font-semibold text-cyan'
                           : 'text-text-65 hover:bg-white/5 hover:text-white'
                       }`
                     }
                   >
-                    <Icon
-                      className="h-4 w-4 shrink-0 transition group-hover:scale-110"
-                      style={'color' in item ? { color: item.color as string } : undefined}
-                    />
+                    <Icon className="h-4 w-4 shrink-0 text-white transition-transform group-hover:scale-110" />
                     <span>{item.label}</span>
                   </NavLink>
                 );
@@ -90,7 +107,7 @@ export function AppSidebar({ open, onClose }: Props) {
           className="border-t border-white/5 p-4 text-center text-[10px] text-text-25"
           style={{ letterSpacing: '0.5px' }}
         >
-          XVIII Festival DanzArte 2026
+          XVIII Festival Danzarte 2026
         </div>
       </aside>
     </>

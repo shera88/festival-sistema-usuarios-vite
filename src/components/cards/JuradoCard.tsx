@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import type { Nota } from '@/types/domain';
 import { appsheetJuradoFoto } from '@/lib/utils/appsheet';
 import { calcularPromedioJurado } from '@/lib/utils/scoring';
+import { webpProxy } from '@/lib/utils/img';
 
 interface Props {
   nota: Nota;
@@ -39,7 +40,13 @@ export function JuradoCard({ nota }: Props) {
       >
         <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-gold">
           {foto ? (
-            <img src={foto} alt={nombre} className="h-full w-full object-cover" />
+            <img
+              src={webpProxy(foto, 80) ?? foto}
+              alt={nombre}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
           ) : (
             <span
               className="flex h-full w-full items-center justify-center font-display text-base font-bold text-gold"
@@ -71,8 +78,8 @@ export function JuradoCard({ nota }: Props) {
         </div>
 
         <div
-          className="shrink-0 font-display text-[22px] font-bold leading-none text-gold"
-          style={{ letterSpacing: '-0.5px' }}
+          className="shrink-0 font-display text-[15px] font-bold leading-none text-gold"
+          style={{ letterSpacing: '-0.3px' }}
         >
           {total}
         </div>
@@ -118,12 +125,17 @@ function NotaItem({
 }) {
   return (
     <div
-      className="flex items-center justify-between rounded-md border border-glass-border bg-white/[0.02] px-2.5 py-2 text-[10px]"
+      className="flex items-center justify-between gap-1.5 rounded-md border border-glass-border bg-white/[0.02] px-2 py-1.5"
     >
-      <span className="font-medium uppercase text-text-65" style={{ letterSpacing: '0.4px' }}>
+      <span
+        className="min-w-0 truncate text-[9px] font-medium uppercase text-text-65"
+        style={{ letterSpacing: '0.3px' }}
+      >
         {label}
       </span>
-      <b className="font-display text-[14px] font-bold text-cyan">{value ?? '—'}</b>
+      <b className="font-display text-[12px] font-bold leading-none text-cyan">
+        {value ?? '—'}
+      </b>
     </div>
   );
 }

@@ -1,4 +1,9 @@
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { X, Loader2, Pencil } from 'lucide-react';
 import type { User } from '@/types/domain';
+import { webpProxy } from '@/lib/utils/img';
 
 interface Props {
   user: User;
@@ -10,65 +15,154 @@ export function UserHero({ user }: Props) {
     ? user.rol_primario.charAt(0).toUpperCase() + user.rol_primario.slice(1)
     : 'Contacto';
   const inst = user.nombre_agrupacion || 'Sin institución';
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div
-      className="relative flex items-center gap-6 overflow-hidden border-b border-glass-border px-4 py-6 sm:px-8"
-      style={{
-        background:
-          'linear-gradient(135deg, rgba(14, 9, 40, 0.8) 0%, rgba(18, 10, 48, 0.5) 100%)',
-      }}
+      className="flex items-center gap-4 border-b border-glass-border px-4 py-5 sm:px-8 sm:py-6"
+      style={{ background: 'var(--bg-base)' }}
     >
-      <div
-        className="pointer-events-none absolute -right-[20%] -top-[50%] h-[300px] w-[300px]"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0, 229, 255, 0.08), transparent 70%)',
+      <button
+        type="button"
+        onClick={() => {
+          if (user.imagen_contacto) {
+            setPreviewLoaded(false);
+            setPreviewOpen(true);
+          }
         }}
-      />
-
-      <div
-        className="relative z-10 h-16 w-16 shrink-0 overflow-hidden rounded-full border-[3px] border-cyan"
-        style={{
-          background: 'var(--bg-elevated)',
-          boxShadow: '0 0 24px rgba(0, 229, 255, 0.2)',
+        onMouseEnter={() => {
+          if (user.imagen_contacto) {
+            const hi = webpProxy(user.imagen_contacto, 450);
+            if (hi) {
+              const img = new Image();
+              img.src = hi;
+            }
+          }
         }}
+        disabled={!user.imagen_contacto}
+        aria-label="Ver foto en grande"
+        className="h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-full transition hover:shadow-[0_0_18px_rgba(0,229,255,0.3)] disabled:cursor-default sm:h-16 sm:w-16"
+        style={{ background: 'var(--bg-elevated)' }}
       >
         {user.imagen_contacto ? (
           <img
-            src={user.imagen_contacto}
+            src={webpProxy(user.imagen_contacto, 128) ?? user.imagen_contacto}
             alt={user.nombre_y_apellido}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
             className="h-full w-full object-cover"
             onError={(e) => {
               const target = e.currentTarget;
               target.style.display = 'none';
               const parent = target.parentElement;
               if (parent) {
-                parent.innerHTML = `<div class="h-full w-full flex items-center justify-center text-white font-display font-bold text-2xl" style="background:linear-gradient(135deg,var(--cyan),var(--fuchsia))">${initial}</div>`;
+                parent.innerHTML = `<div class="h-full w-full flex items-center justify-center text-white font-display font-bold text-2xl" style="background:var(--bg-card)">${initial}</div>`;
               }
             }}
           />
         ) : (
           <div
-            className="flex h-full w-full items-center justify-center font-display text-2xl font-bold text-white"
-            style={{ background: 'linear-gradient(135deg, var(--cyan), var(--fuchsia))' }}
+            className="flex h-full w-full items-center justify-center font-display text-2xl font-bold text-text-white"
+            style={{ background: 'var(--bg-card)' }}
           >
             {initial}
           </div>
         )}
-      </div>
+      </button>
 
-      <div className="relative z-10 min-w-0 flex-1">
-        <div className="truncate font-display text-lg font-light gradient-text-cf">
-          {user.nombre_y_apellido}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <div
+            className="truncate text-base font-light text-text-white sm:text-lg"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            {user.nombre_y_apellido}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/perfil')}
+            aria-label="Editar perfil"
+            title="Editar perfil"
+            className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md text-text-45 transition hover:bg-white/5 hover:text-cyan"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
         </div>
         <div
-          className="mt-1 truncate text-[11px] uppercase text-text-45"
-          style={{ letterSpacing: '0.5px' }}
+          className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] uppercase text-text-65"
+          style={{ letterSpacing: '0.6px' }}
         >
-          {rol} • {inst}
+          <span
+            className="rounded-md border border-glass-border bg-elev px-2 py-0.5 text-[9px] font-medium text-text-90"
+            style={{ letterSpacing: '0.8px' }}
+          >
+            {rol}
+          </span>
+          <span className="text-text-45">•</span>
+          <span className="truncate">{inst}</span>
         </div>
       </div>
+
+      {previewOpen && user.imagen_contacto &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-6 anim-fade-in"
+            onClick={() => setPreviewOpen(false)}
+          >
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewOpen(false);
+              }}
+              aria-label="Cerrar"
+              className="absolute right-4 top-4 grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-white/15 bg-black/55 text-white backdrop-blur-md transition hover:border-cyan hover:text-cyan"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-h-[80vh] max-w-full overflow-hidden rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]"
+              style={{ background: 'var(--bg-elevated)' }}
+            >
+              {!previewLoaded && (
+                <img
+                  src={webpProxy(user.imagen_contacto, 128) ?? user.imagen_contacto}
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                  className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl"
+                />
+              )}
+              <img
+                src={webpProxy(user.imagen_contacto, 450) ?? user.imagen_contacto}
+                alt={user.nombre_y_apellido}
+                draggable={false}
+                fetchPriority="high"
+                decoding="async"
+                onLoad={() => setPreviewLoaded(true)}
+                className={`relative block max-h-[80vh] max-w-full transition-opacity duration-200 ${
+                  previewLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+              {!previewLoaded && (
+                <div className="absolute inset-0 grid place-items-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-cyan drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]" />
+                </div>
+              )}
+            </div>
+            <p
+              className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-[12px] font-medium text-white backdrop-blur-md"
+              style={{ letterSpacing: '0.3px' }}
+            >
+              {user.nombre_y_apellido}
+            </p>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

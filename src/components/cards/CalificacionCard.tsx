@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { Nota } from '@/types/domain';
 import { calcularPromedioFinal, fmtScore } from '@/lib/utils/scoring';
+import { webpProxy } from '@/lib/utils/img';
 import { JuradoCard } from './JuradoCard';
 
 interface Props {
@@ -44,7 +45,13 @@ export function CalificacionCard({ notas }: Props) {
           }}
         >
           {logo ? (
-            <img src={logo} alt={inst} className="h-full w-full object-cover" />
+            <img
+              src={webpProxy(logo, 96) ?? logo}
+              alt={inst}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center font-display text-lg font-bold text-gold">
               {initial}
@@ -71,11 +78,11 @@ export function CalificacionCard({ notas }: Props) {
 
         <div className="flex shrink-0 flex-col items-end gap-0.5 text-right">
           <div
-            className="font-display text-3xl font-extrabold leading-none gradient-text-gc"
-            style={{ letterSpacing: '-0.5px' }}
+            className="font-display text-lg font-bold leading-none gradient-text-gc"
+            style={{ letterSpacing: '-0.3px' }}
           >
             {fmtScore(promedio)}
-            <small className="text-sm font-normal text-text-45" style={{ WebkitTextFillColor: 'var(--text-45)' as string }}>
+            <small className="text-[10px] font-normal text-text-45" style={{ WebkitTextFillColor: 'var(--text-45)' as string }}>
               /100
             </small>
           </div>

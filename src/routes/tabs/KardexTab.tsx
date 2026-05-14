@@ -5,11 +5,16 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { StatsCards } from '@/components/shared/StatsCards';
 import { KardexGroup } from '@/components/cards/KardexGroup';
-import { useKardex } from '@/hooks/queries';
+import { useInscripciones, useKardex } from '@/hooks/queries';
 import { useAuth } from '@/hooks/useAuth';
-import type { KardexRow, Year } from '@/types/domain';
+import type { Inscripcion, KardexRow, Year } from '@/types/domain';
 
 const YEARS = ['2023', '2024', '2025', '2026'] as const satisfies readonly Year[];
+
+export interface AgrupacionMeta {
+  id_agrupacion: string | null;
+  estado_credenciales: string | null;
+}
 
 export function KardexTab() {
   const { user } = useAuth();
@@ -17,7 +22,23 @@ export function KardexTab() {
   const [search, setSearch] = useState('');
 
   const q = useKardex(year, !!user);
+  const inscQ = useInscripciones(year, !!user);
+
   const rows = (q.data?.[year] ?? []) as KardexRow[];
+  const inscripciones = (inscQ.data?.[year] ?? []) as Inscripcion[];
+
+  const metaByName = useMemo<Record<string, AgrupacionMeta>>(() => {
+    const m: Record<string, AgrupacionMeta> = {};
+    for (const i of inscripciones) {
+      const key = (i.agrupacion || '').toLowerCase().trim();
+      if (!key || m[key]) continue;
+      m[key] = {
+        id_agrupacion: i.id_agrupacion,
+        estado_credenciales: i.estado_credenciales ?? null,
+      };
+    }
+    return m;
+  }, [inscripciones]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return rows;
@@ -31,17 +52,31 @@ export function KardexTab() {
   }, [rows, search]);
 
   const groups = useMemo(() => {
-    const m: Record<string, { logo: string | null; rows: KardexRow[] }> = {};
+    // Agrupa por id_agrupacion cuando exista; sino por nombre normalizado.
+    // Normalize: trim + collapse whitespace + upper + sin acentos.
+    const norm = (s: string) =>
+      s.trim().replace(/\s+/g, ' ').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const m: Record<
+      string,
+      { displayName: string; logo: string | null; rows: KardexRow[] }
+    > = {};
     for (const r of filtered) {
-      const inst = r.agrupacion || 'Sin institución';
-      if (!m[inst]) m[inst] = { logo: r.enlace_del_logo, rows: [] };
-      if (!m[inst].logo && r.enlace_del_logo) m[inst].logo = r.enlace_del_logo;
-      m[inst].rows.push(r);
+      const rawName = r.agrupacion || 'Sin institución';
+      const key = r.id_agrupacion ? `id:${r.id_agrupacion}` : `name:${norm(rawName)}`;
+      if (!m[key]) m[key] = { displayName: rawName, logo: r.enlace_del_logo, rows: [] };
+      if (!m[key].logo && r.enlace_del_logo) m[key].logo = r.enlace_del_logo;
+      m[key].rows.push(r);
     }
     return m;
   }, [filtered]);
 
-  const insts = Object.keys(groups).sort();
+  const insts = useMemo(
+    () =>
+      Object.keys(groups).sort((a, b) =>
+        groups[a].displayName.localeCompare(groups[b].displayName),
+      ),
+    [groups],
+  );
 
   const stats = useMemo(() => {
     const totalIntegrantes = rows.length;
@@ -73,14 +108,20 @@ export function KardexTab() {
       )}
 
       <div className="space-y-3">
-        {insts.map((inst) => (
-          <KardexGroup
-            key={inst}
-            agrupacion={inst}
-            logo={groups[inst].logo}
-            rows={groups[inst].rows}
-          />
-        ))}
+        {insts.map((key) => {
+          const g = groups[key];
+          const metaKey = g.displayName.toLowerCase().trim();
+          return (
+            <KardexGroup
+              key={key}
+              year={year}
+              agrupacion={g.displayName}
+              logo={g.logo}
+              rows={g.rows}
+              meta={metaByName[metaKey] ?? null}
+            />
+          );
+        })}
       </div>
     </div>
   );

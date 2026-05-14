@@ -71,28 +71,140 @@
 
   --font-display: 'Inter', system-ui, sans-serif;
   --font-body:    'Inter', system-ui, sans-serif;
+
+  /* === Tokens shadcn (compat con componentes UI festival) === */
+  --background: var(--bg-base);
+  --foreground: var(--text-90);
+  --card: var(--bg-card);
+  --card-foreground: var(--text-90);
+  --popover: var(--bg-elevated);
+  --popover-foreground: var(--text-90);
+  --primary: var(--cyan);
+  --primary-foreground: var(--bg-void);
+  --secondary: var(--bg-card-h);
+  --secondary-foreground: var(--text-90);
+  --muted: rgba(255,255,255,0.05);
+  --muted-foreground: var(--text-65);
+  --accent: var(--fuchsia);
+  --accent-foreground: #FFFFFF;
+  --destructive: #EF4444;
+  --input: rgba(255,255,255,0.12);
+  --ring: var(--cyan);
+  --radius: 0.625rem;
+
+  /* Aliases marca usados por componentes festival */
+  --amber-primary: var(--cyan);
+  --amber-accent:  var(--fuchsia);
+  --amber-cream:   #FFFFFF;
+  --amber-soft:    var(--cyan-soft);
+  --warn-orange:   #F59E0B;
+  --brand-cyan:    var(--cyan);
+  --brand-fuchsia: var(--fuchsia);
+  --brand-gold:    var(--gold);
+  --brand-purple:  var(--purple);
+
+  --primary-gradient: linear-gradient(90deg, #FF1FA8 0%, #A33CCB 50%, #00E5FF 100%);
+  --brand-gradient:   linear-gradient(90deg, #FF1FA8 0%, #A33CCB 50%, #00E5FF 100%);
+}
+
+html {
+  color-scheme: dark;
 }
 
 html, body {
   background-color: var(--bg-base);
   color: var(--text-90);
   font-family: var(--font-body);
-  font-weight: 400;
-  letter-spacing: 0;
+  font-weight: 300;
+  letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5 {
+h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 300;
+  letter-spacing: -0.022em;
+}
+h1 { font-weight: 200; letter-spacing: -0.03em; }
+
+input, textarea, select {
+  color: inherit;
+  font-family: inherit;
+}
+
+/* Audio player slider custom — sin estilo nativo, track con fill cyan,
+   thumb circular. Compatible Chrome/Safari/Firefox. */
+.audio-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    var(--cyan) 0%,
+    var(--cyan) var(--pct, 0%),
+    rgba(255, 255, 255, 0.12) var(--pct, 0%),
+    rgba(255, 255, 255, 0.12) 100%
+  );
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+}
+.audio-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  border: 2px solid var(--bg-base);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+  cursor: pointer;
+}
+.audio-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  border: 2px solid var(--bg-base);
+  box-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+  cursor: pointer;
+}
+.audio-slider--vol::-webkit-slider-thumb {
+  width: 10px;
+  height: 10px;
+}
+.audio-slider--vol::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+}
+.audio-slider--vol {
+  height: 3px;
+}
+
+/* Fullscreen iframe — Vimeo embed cuando va pantalla completa, fuerza 100vw/100vh
+   y bg negro para evitar bandas blancas del browser default. */
+iframe:fullscreen,
+iframe:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000 !important;
+  object-fit: contain;
+}
+*:fullscreen,
+*:-webkit-full-screen {
+  background: #000;
+}
+
+h1, h2, h3, h4, h5 {
   color: var(--text-white);
 }
 
 body {
   position: relative;
   min-height: 100vh;
+  background: var(--bg-base);
 }
 
 #root {
@@ -100,6 +212,50 @@ body {
   z-index: 1;
   min-height: 100vh;
 }
+
+/* Card premium: fondo sólido, borde nítido, sombra discreta */
+.card-depth {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.03) inset,
+    0 10px 30px -18px rgba(0,0,0,0.6);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.card-depth:hover {
+  border-color: var(--border-strong);
+}
+
+/* Botón primario sólido (sin gradients) */
+.btn-primary {
+  background: var(--cyan);
+  color: #04020F;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-radius: 9999px;
+  padding: 0.85rem 1.75rem;
+  font-size: 13px;
+  text-transform: uppercase;
+  transition: background 140ms ease, transform 140ms ease;
+}
+.btn-primary:hover { background: #66F0FF; transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text-90);
+  border: 1px solid var(--border-strong);
+  border-radius: 9999px;
+  padding: 0.85rem 1.5rem;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.04); border-color: var(--text-45); }
+
+.text-accent-cyan { color: var(--cyan); }
+.text-accent-fuchsia { color: var(--fuchsia); }
+.text-accent-gold { color: var(--gold); }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -97,7 +97,7 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-md rounded-2xl border border-glass-border bg-glass-bg backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.4)] p-8">
         <div className="flex justify-center mb-6">
-          <img src={logoUrl} alt="Festival DanzArte 2026" className="h-24 w-auto" />
+          <img src={logoUrl} alt="Festival Danzarte 2026" className="h-24 w-auto" />
         </div>
 
         <h2 className="text-center text-xl font-semibold text-text-90 mb-1">Mi Cuenta</h2>

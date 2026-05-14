@@ -42,5 +42,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <AuthCtx.Provider value={{ user, loading, login, logout }}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{ user, loading, login, logout, setUser }}>{children}</AuthCtx.Provider>;
 }

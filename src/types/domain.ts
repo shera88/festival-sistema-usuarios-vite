@@ -63,9 +63,38 @@ export interface Inscripcion {
   informe: string | null;
   indicaciones: string | null;
   url_video: string | null;
+  estado_credenciales: string | null;
+  multimedia_confirmado?: boolean | null;
+  audio_url_multimedia?: string | null;
+  video_led_url_multimedia?: string | null;
+}
+
+export interface MultimediaArchivo {
+  id_multimedia: string;
+  id_institucion: string;
+  id_inscripcion: string | null;
+  year: number;
+  tipo: 'audio' | 'video_led';
+  nombre_archivo: string | null;
+  extension: string;
+  mime_type: string | null;
+  peso_bytes: number;
+  storage_path: string;
+  url_publica: string;
+  uploaded_by: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface MultimediaListaRes {
+  archivos: MultimediaArchivo[];
+  confirmado: boolean;
+  fecha_confirmacion: string | null;
 }
 
 export interface KardexRow {
+  id_kardex?: string | null;
+  id_agrupacion?: string | null;
   nombre_y_apellido: string | null;
   cargo: string | null;
   foto: string | null;
@@ -79,6 +108,7 @@ export interface KardexRow {
   estado: string | null;
   enlace_del_credencial: string | null;
   enlace_del_certificado: string | null;
+  verificado?: boolean | null;
 }
 
 export interface Nota {

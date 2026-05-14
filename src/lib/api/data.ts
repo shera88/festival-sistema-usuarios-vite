@@ -8,7 +8,7 @@ export const dataApi = {
     api.get<Record<string, Inscripcion[]>>(`/inscripciones.php?year=${year}`),
 
   kardex: (year: Year) =>
-    api.get<Record<string, KardexRow[]>>(`/kardex.php?year=${year}`),
+    api.get<Record<string, KardexRow[]>>(`/kardex-listar.php?year=${year}`),
 
   calificaciones: (year: YearNotas) =>
     api.get<Record<string, Nota[]>>(`/calificaciones.php?year=${year}`),

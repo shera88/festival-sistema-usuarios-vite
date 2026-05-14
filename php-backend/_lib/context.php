@@ -8,14 +8,14 @@ function buildContextFilter(array $user): ?string
     foreach (parseIdCsv($user['id_agrupacion'] ?? '') as $id) {
         $conditions[] = 'id_agrupacion.eq.' . quoteIfNeeded($id);
     }
-    if (!empty($user['id_original_representante'])) {
-        $conditions[] = 'id_encargado.eq.' . quoteIfNeeded($user['id_original_representante']);
+    foreach (parseIdCsv($user['id_original_representante'] ?? '') as $id) {
+        $conditions[] = 'id_encargado.eq.' . quoteIfNeeded($id);
     }
-    if (!empty($user['id_original_director'])) {
-        $conditions[] = 'id_director.eq.' . quoteIfNeeded($user['id_original_director']);
+    foreach (parseIdCsv($user['id_original_director'] ?? '') as $id) {
+        $conditions[] = 'id_director.eq.' . quoteIfNeeded($id);
     }
-    if (!empty($user['id_original_coreografo'])) {
-        $conditions[] = 'id_coreografo.eq.' . quoteIfNeeded($user['id_original_coreografo']);
+    foreach (parseIdCsv($user['id_original_coreografo'] ?? '') as $id) {
+        $conditions[] = 'id_coreografo.eq.' . quoteIfNeeded($id);
     }
 
     if (count($conditions) === 0) return null;

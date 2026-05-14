@@ -6,6 +6,7 @@ export interface AuthState {
   loading: boolean;
   login: (idContacto: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  setUser: (user: User | null) => void;
 }
 
 export const AuthCtx = createContext<AuthState | null>(null);

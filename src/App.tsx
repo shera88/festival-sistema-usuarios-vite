@@ -9,10 +9,13 @@ import { DashboardPage } from '@/routes/DashboardPage';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      // Sin cache stale: cada navegación re-fetcha. Supabase Realtime invalida
+      // automáticamente cuando hay cambios server-side.
+      staleTime: 0,
       gcTime: 5 * 60_000,
       retry: 1,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
     },
   },
 });

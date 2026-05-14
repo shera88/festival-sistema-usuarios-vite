@@ -11,33 +11,28 @@ const TABS = [
 export function TabsNav() {
   return (
     <nav
-      className="sticky top-16 z-30 flex overflow-x-auto border-b border-glass-border backdrop-blur-md no-scrollbar"
-      style={{
-        background:
-          'linear-gradient(90deg, rgba(14,9,40,0.85) 0%, rgba(18,10,48,0.92) 100%)',
-      }}
+      className="sticky top-16 z-30 flex overflow-x-auto border-b border-glass-border no-scrollbar"
+      style={{ background: 'var(--bg-base)' }}
     >
       {TABS.map((t) => (
         <NavLink
           key={t.to}
           to={t.to}
           className={({ isActive }) =>
-            `relative flex-1 min-w-[110px] whitespace-nowrap px-3 py-3 text-center text-[10px] font-light uppercase transition-all duration-300 ${
-              isActive ? '' : 'text-text-45 hover:bg-cyan/[0.05]'
+            `relative flex-1 min-w-[110px] whitespace-nowrap px-4 py-4 text-center text-[11px] font-semibold uppercase transition-colors ${
+              isActive ? 'text-text-white' : 'text-text-45 hover:text-text-90'
             }`
           }
           style={({ isActive }) =>
             isActive
               ? {
                   color: t.color,
-                  letterSpacing: '0.5px',
-                  borderBottom: `3px solid ${t.color}`,
-                  textShadow: `0 0 12px ${t.color}55`,
+                  letterSpacing: '0.8px',
+                  borderBottom: `2px solid ${t.color}`,
                 }
               : {
-                  letterSpacing: '0.5px',
-                  borderBottom: '3px solid transparent',
-                  ['--hover-color' as string]: t.color,
+                  letterSpacing: '0.8px',
+                  borderBottom: '2px solid transparent',
                 }
           }
         >
