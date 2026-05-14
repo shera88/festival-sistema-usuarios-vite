@@ -6,6 +6,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://festivaldanzarte.com/app-portal/php/:path*"
+    },
+    {
+      "source": "/((?!assets/|api/).*)",
+      "destination": "/index.html"
     }
   ]
 }
