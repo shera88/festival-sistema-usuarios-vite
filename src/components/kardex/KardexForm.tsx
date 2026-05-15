@@ -152,7 +152,7 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
           fd.append(k, String(v));
         }
       }
-      const res = await fetch(apiUrl("kardex.php"), { method: "POST", body: fd });
+      const res = await fetch(apiUrl("kardex.php"), { method: "POST", credentials: "include", body: fd });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) {
         toast.error(json.error || `Error ${res.status}: no se pudo registrar el kárdex`);

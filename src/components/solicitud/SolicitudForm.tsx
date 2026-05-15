@@ -211,6 +211,7 @@ export function SolicitudForm({ defaultValues }: { defaultValues?: Partial<Solic
       };
       const res = await fetch(apiUrl("solicitud.php"), {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });

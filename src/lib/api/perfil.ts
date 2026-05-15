@@ -1,4 +1,5 @@
 import { api } from './client';
+import { apiUrl } from './url';
 import type { User } from '@/types/domain';
 
 export type PerfilPatch = Partial<{
@@ -25,10 +26,9 @@ export const perfilApi = {
     api.post<PerfilEditarRes>('/usuario-perfil-editar.php', { patch }),
 
   subirFoto: async (file: File): Promise<UsuarioFotoRes> => {
-    const base = (import.meta.env.VITE_API_URL as string | undefined) || '/api';
     const form = new FormData();
     form.append('foto', file);
-    const res = await fetch(`${base}/usuario-foto.php`, {
+    const res = await fetch(apiUrl('usuario-foto.php'), {
       method: 'POST',
       credentials: 'include',
       body: form,

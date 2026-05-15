@@ -1,4 +1,5 @@
 import { api } from './client';
+import { apiUrl } from './url';
 import type { MultimediaListaRes } from '@/types/domain';
 
 export interface MultimediaSubirRes {
@@ -33,7 +34,6 @@ export const multimediaApi = {
     file: File,
     onProgress?: (status: { phase: 'uploading' | 'processing'; pct: number }) => void,
   ): Promise<MultimediaSubirRes> => {
-    const base = (import.meta.env.VITE_API_URL as string | undefined) || '/api';
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       const form = new FormData();
@@ -67,7 +67,7 @@ export const multimediaApi = {
         }
       };
       xhr.onerror = () => reject(new Error('Error de red durante la subida'));
-      xhr.open('POST', `${base}/multimedia-subir.php`);
+      xhr.open('POST', apiUrl('multimedia-subir.php'));
       xhr.withCredentials = true;
       xhr.send(form);
     });

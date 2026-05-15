@@ -1,4 +1,5 @@
 import { api } from './client';
+import { apiUrl } from './url';
 
 export interface KardexEliminarRes {
   ok: true;
@@ -60,11 +61,10 @@ export const kardexApi = {
     api.post<KardexEditarRes>('/kardex-editar.php', { id_kardex, patch }),
 
   subirFoto: async (id_kardex: string, file: File): Promise<KardexFotoRes> => {
-    const base = (import.meta.env.VITE_API_URL as string | undefined) || '/api';
     const form = new FormData();
     form.append('id_kardex', id_kardex);
     form.append('foto', file);
-    const res = await fetch(`${base}/kardex-foto.php`, {
+    const res = await fetch(apiUrl('kardex-foto.php'), {
       method: 'POST',
       credentials: 'include',
       body: form,
