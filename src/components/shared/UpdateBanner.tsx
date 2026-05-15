@@ -3,10 +3,12 @@ import { Download, X } from 'lucide-react';
 
 const VERSION_URL = 'https://festivaldanzarte.com/app-portal/version.json';
 const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.festivaldanzarte.portal';
+const DESKTOP_DOWNLOAD_URL = 'https://festivaldanzarte.com/app-portal/desktop/';
 
 declare global {
   interface Window {
     __MOBILE_VERSION__?: string;
+    __DESKTOP_VERSION__?: string;
   }
 }
 
@@ -32,8 +34,19 @@ export function UpdateBanner() {
   const [show, setShow] = useState(false);
   const [info, setInfo] = useState<VersionInfo | null>(null);
 
+  const platform: 'mobile' | 'desktop' | null =
+    typeof window !== 'undefined'
+      ? window.__MOBILE_VERSION__
+        ? 'mobile'
+        : window.__DESKTOP_VERSION__
+          ? 'desktop'
+          : null
+      : null;
+
   useEffect(() => {
-    const current = window.__MOBILE_VERSION__;
+    if (!platform) return;
+    const current =
+      platform === 'mobile' ? window.__MOBILE_VERSION__ : window.__DESKTOP_VERSION__;
     if (!current) return;
 
     fetch(VERSION_URL, { cache: 'no-store' })
@@ -46,9 +59,11 @@ export function UpdateBanner() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [platform]);
 
-  if (!show || !info) return null;
+  if (!show || !info || !platform) return null;
+
+  const downloadUrl = platform === 'mobile' ? PLAY_STORE_URL : DESKTOP_DOWNLOAD_URL;
 
   return (
     <div
@@ -65,7 +80,7 @@ export function UpdateBanner() {
         </div>
       </div>
       <a
-        href={PLAY_STORE_URL}
+        href={downloadUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="rounded-full bg-cyan px-3 py-1.5 text-[11px] font-semibold uppercase text-[#04020F] transition hover:bg-[#66F0FF]"

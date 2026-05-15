@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { authApi } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import type { SearchResult } from '@/types/domain';
+import { webpProxy } from '@/lib/utils/img';
 import logoUrl from '@/assets/logo-danzarte.png';
 
 export function LoginPage() {
@@ -140,8 +141,10 @@ export function LoginPage() {
                   >
                     {s.foto ? (
                       <img
-                        src={s.foto}
+                        src={webpProxy(s.foto, 80) ?? s.foto}
                         alt={s.nombre}
+                        loading="lazy"
+                        decoding="async"
                         className="h-10 w-10 rounded-full object-cover"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).style.display = 'none';

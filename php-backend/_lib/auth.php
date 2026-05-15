@@ -7,13 +7,30 @@ function sendJson($data, int $status = 200): void
 {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
+    applyCorsHeaders();
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+}
+
+/** Whitelist de origenes permitidos. Refleja el Origin del request si esta en la lista. */
+function applyCorsHeaders(): void
+{
     $cfg = require __DIR__ . '/../config.php';
-    $origin = $cfg['cors_origin'];
-    header("Access-Control-Allow-Origin: $origin");
+    $reqOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $whitelist = [
+        $cfg['cors_origin'] ?? '',
+        'http://127.0.0.1:5173',
+        'http://localhost:5173',
+        'https://localhost',          // Capacitor Android
+        'capacitor://localhost',      // Capacitor iOS
+        'https://festival-sistema-usuarios-vite.vercel.app',
+        'https://festivaldanzarte.com',
+    ];
+    $allow = in_array($reqOrigin, $whitelist, true) ? $reqOrigin : ($cfg['cors_origin'] ?? '*');
+    header("Access-Control-Allow-Origin: $allow");
+    header('Vary: Origin');
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization, X-Requested-With');
 }
 
 function handlePreflight(): void

@@ -7,6 +7,7 @@ import { whatsappLink } from '@/lib/utils/whatsapp';
 import { webpProxy } from '@/lib/utils/img';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { EditKardexDialog } from './EditKardexDialog';
+import { LazyImage } from '@/components/shared/LazyImage';
 import { kardexApi } from '@/lib/api/kardex';
 
 interface Props {
@@ -253,13 +254,22 @@ export function KardexRow({
           style={{ background: 'var(--bg-elevated)' }}
         >
           {fotoOpt ? (
-            <img
+            <LazyImage
               src={fotoOpt}
               alt={nombre}
-              loading="lazy"
-              decoding="async"
               draggable={false}
               className="h-full w-full object-cover"
+              fallback={
+                <span
+                  className="flex h-full w-full items-center justify-center font-display text-base font-bold text-fuchsia"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(255,31,168,0.15) 0%, rgba(255,31,168,0.05) 100%)',
+                  }}
+                >
+                  {initial}
+                </span>
+              }
             />
           ) : (
             <span

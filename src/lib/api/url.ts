@@ -1,8 +1,17 @@
 /**
- * Resuelve la URL de un endpoint PHP respetando la `base` de Vite.
- * En dev: `apiUrl("inscripcion.php")` → `/api/inscripcion.php` (proxy a PHP local).
- * En prod (base="/landing/"): `/landing/api/inscripcion.php`.
+ * Resuelve la URL de un endpoint PHP.
+ * - Mobile (Capacitor): URL absoluta a backend remoto.
+ * - Web dev: `/api/<endpoint>` via Vite proxy.
+ * - Web prod (Vercel): `/api/<endpoint>` via Vercel rewrite.
  */
+const MOBILE_API_BASE = 'https://festivaldanzarte.com/app-portal/php';
+
+function isMobile(): boolean {
+  return typeof window !== 'undefined' && typeof window.__MOBILE_VERSION__ === 'string';
+}
+
 export function apiUrl(endpoint: string): string {
-  return `${import.meta.env.BASE_URL}api/${endpoint}`;
+  const clean = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+  if (isMobile()) return `${MOBILE_API_BASE}/${clean}`;
+  return `${import.meta.env.BASE_URL}api/${clean}`;
 }
