@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, VolumeX, Volume1, Music } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Play, Pause, Music } from 'lucide-react';
 
 interface Props {
   src: string;
@@ -18,16 +18,7 @@ export function AudioPlayer({ src, title = 'Audio de la obra' }: Props) {
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [muted, setMuted] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.volume = volume;
-    a.muted = muted;
-  }, [volume, muted]);
 
   function toggle() {
     const a = audioRef.current;
@@ -50,13 +41,6 @@ export function AudioPlayer({ src, title = 'Audio de la obra' }: Props) {
     setCurrent(v);
   }
 
-  function changeVolume(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = Number(e.target.value);
-    setVolume(v);
-    if (v > 0 && muted) setMuted(false);
-  }
-
-  const VolIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
   const pct = duration > 0 ? (current / duration) * 100 : 0;
 
   return (
@@ -70,7 +54,8 @@ export function AudioPlayer({ src, title = 'Audio de la obra' }: Props) {
       <audio
         ref={audioRef}
         src={src}
-        preload="metadata"
+        preload="auto"
+        crossOrigin="anonymous"
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onTimeUpdate={(e) => setCurrent((e.target as HTMLAudioElement).currentTime)}
@@ -127,32 +112,6 @@ export function AudioPlayer({ src, title = 'Audio de la obra' }: Props) {
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setMuted((m) => !m)}
-          aria-label={muted ? 'Activar sonido' : 'Silenciar'}
-          className="text-text-65 transition hover:text-cyan"
-        >
-          <VolIcon className="h-4 w-4" />
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.01}
-          value={muted ? 0 : volume}
-          onChange={changeVolume}
-          aria-label="Volumen"
-          className="audio-slider audio-slider--vol flex-1"
-          style={{
-            ['--pct' as string]: `${(muted ? 0 : volume) * 100}%`,
-          }}
-        />
-        <span className="w-8 text-right text-[10px] text-text-45 tabular-nums">
-          {Math.round((muted ? 0 : volume) * 100)}%
-        </span>
-      </div>
     </div>
   );
 }

@@ -169,3 +169,75 @@ export interface Bootstrap {
 
 export type Year = '2023' | '2024' | '2025' | '2026';
 export type YearNotas = '2023' | '2024' | '2025';
+
+// ============== Pagos 2026 ==============
+
+export type PagoConcepto = 'inscripcion' | 'convenio_entradas' | 'credencial' | 'credencial_unit';
+export type PagoEstado = 'pendiente' | 'enviado' | 'verificado' | 'rechazado' | 'anulado';
+
+export interface MetodoPago {
+  id_metodo: string;
+  metodo: string;
+}
+
+export interface CompromisoDeuda {
+  concepto: PagoConcepto;
+  id_referencia: string;
+  descripcion: string;
+  subdivision: string | null;
+  bailarines: number | null;
+  monto_total: number;
+  pagado_verificado: number;
+  pagado_pendiente: number;
+  saldo: number;
+}
+
+export interface PagoHistorial {
+  id_pago: string;
+  numero_recibo: string | null;
+  concepto: PagoConcepto;
+  id_referencia: string;
+  fecha: string | null;
+  hora: string | null;
+  id_metodo_pago: string | null;
+  metodo_pago: string;
+  monto: number;
+  estado: PagoEstado;
+  nombre_pagador: string | null;
+  comprobante_url: string | null;
+  recibo_pdf_url: string | null;
+  observacion: string | null;
+}
+
+export interface PagosResumen {
+  id_agrupacion: string;
+  nombre_agrupacion: string;
+  enlace_del_logo: string | null;
+  compromisos: CompromisoDeuda[];
+  historial: PagoHistorial[];
+  totales: {
+    total_deuda: number;
+    pagado_verificado: number;
+    pagado_pendiente: number;
+    saldo: number;
+  };
+  metodos_pago: MetodoPago[];
+}
+
+export interface PagoCrearReq {
+  concepto: PagoConcepto;
+  id_referencia: string;
+  monto: number;
+  id_metodo_pago: string;
+  observacion?: string;
+  comprobante?: File;
+}
+
+export interface PagoCrearRes {
+  ok: true;
+  id_pago: string;
+  numero_recibo: string;
+  estado: PagoEstado;
+  comprobante_url: string | null;
+  monto: number;
+}

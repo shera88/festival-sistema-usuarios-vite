@@ -11,7 +11,7 @@ interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'loading
  * respeta `loading="lazy"` confiablemente — esto evita decodear
  * decenas de imágenes simultáneamente y crashear la app.
  */
-export function LazyImage({ src, rootMargin = '200px', fallback, ...rest }: Props) {
+export function LazyImage({ src, rootMargin = '500px', fallback, ...rest }: Props) {
   const ref = useRef<HTMLImageElement | null>(null);
   const [visible, setVisible] = useState(false);
 
