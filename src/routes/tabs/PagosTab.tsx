@@ -260,7 +260,8 @@ function CompromisoCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const isPaid = c.saldo <= 0.01;
-  const color = conceptoColor[c.concepto] ?? '#00E5FF';
+  const color = conceptoColor[c.concepto] ?? '#0891B2';
+  const colorLight = conceptoColorLight[c.concepto] ?? '#00E5FF';
   const pct = c.monto_total > 0 ? Math.min(100, ((c.monto_total - c.saldo) / c.monto_total) * 100) : 0;
   const initial = (nombreAgrupacion || '?').charAt(0).toUpperCase();
 
@@ -292,7 +293,7 @@ function CompromisoCard({
             ) : (
               <div
                 className="grid h-full w-full place-items-center text-[13px] font-semibold"
-                style={{ color, fontFamily: FONT_DISPLAY }}
+                style={{ color: colorLight, fontFamily: FONT_DISPLAY }}
               >
                 {initial}
               </div>
@@ -405,7 +406,7 @@ function CompromisoCard({
             >
               <div
                 className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-                style={{ width: `${pct}%`, background: color }}
+                style={{ width: `${pct}%`, background: colorLight }}
               />
             </div>
           </div>
