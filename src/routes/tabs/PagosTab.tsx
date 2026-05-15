@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
@@ -8,10 +8,12 @@ import { PagoModal } from '@/components/cards/PagoModal';
 import { webpProxy } from '@/lib/utils/img';
 import type { CompromisoDeuda, PagoHistorial, PagoEstado } from '@/types/domain';
 
-/** Format estilo Wise/Mercury: 3.080 Bs */
 function bs(n: number): string {
   return new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' Bs';
 }
+
+const FONT_DISPLAY = "'Inter Tight', 'Inter', system-ui, sans-serif";
+const FONT_MONO = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
 
 const conceptoLabel: Record<string, string> = {
   inscripcion: 'Inscripciones',
@@ -20,35 +22,69 @@ const conceptoLabel: Record<string, string> = {
   credencial_unit: 'Credenciales Unitarias',
 };
 
-/** Solid colors flat — sin gradients, estilo Cash App / Wise.
- * Pensados con contraste blanco sobre cada color (WCAG AA o cercano).
- */
-const conceptoColor: Record<string, string> = {
-  inscripcion:       '#0891B2', // cyan oscuro (contraste blanco AA)
-  convenio_entradas: '#BE185D', // fuchsia oscuro (contraste blanco AA)
-  credencial:        '#D97706', // amber/oro oscuro (contraste blanco AA)
-  credencial_unit:   '#D97706',
+/** Gradientes por concepto — versión moderna con dirección + 2 stops */
+const conceptoGrad: Record<string, { grad: string; glow: string; accent: string }> = {
+  inscripcion: {
+    grad: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+    glow: 'rgba(6,182,212,0.35)',
+    accent: '#06B6D4',
+  },
+  convenio_entradas: {
+    grad: 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)',
+    glow: 'rgba(236,72,153,0.35)',
+    accent: '#EC4899',
+  },
+  credencial: {
+    grad: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+    glow: 'rgba(245,158,11,0.32)',
+    accent: '#F59E0B',
+  },
+  credencial_unit: {
+    grad: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 100%)',
+    glow: 'rgba(245,158,11,0.32)',
+    accent: '#F59E0B',
+  },
 };
 
-/** Variantes claras (para acentos como progress bar + icons) */
-const conceptoColorLight: Record<string, string> = {
-  inscripcion:       '#00E5FF',
-  convenio_entradas: '#FF1FA8',
-  credencial:        '#FCD34D',
-  credencial_unit:   '#FCD34D',
-};
+/** Hook: cuenta de 0 a value animado (count-up) */
+function useCountUp(value: number, durationMs = 900) {
+  const [current, setCurrent] = useState(0);
+  const startRef = useRef<number | null>(null);
+  const fromRef = useRef(0);
 
-/** Family de fuentes:
- * - font-display: Inter Tight (headlines + montos hero) — tighter geometric
- * - font-sans: Inter (body)
- * - font-mono: JetBrains Mono (números tabulares)
- */
-const FONT_DISPLAY = "'Inter Tight', 'Inter', system-ui, sans-serif";
-const FONT_MONO = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
+  useEffect(() => {
+    fromRef.current = current;
+    startRef.current = null;
+    let raf = 0;
+    const step = (t: number) => {
+      if (startRef.current == null) startRef.current = t;
+      const elapsed = t - startRef.current;
+      const p = Math.min(1, elapsed / durationMs);
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - p, 3);
+      setCurrent(Math.round(fromRef.current + (value - fromRef.current) * eased));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, durationMs]);
+
+  return current;
+}
 
 export function PagosTab() {
   const qc = useQueryClient();
   const [pagoTarget, setPagoTarget] = useState<CompromisoDeuda | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const q = useQuery({
     queryKey: ['pagos-resumen'],
@@ -84,124 +120,92 @@ export function PagosTab() {
 
   return (
     <>
+      <style>{ANIM_CSS}</style>
       <div className="space-y-7 px-3 py-5 sm:px-6 sm:py-6">
-        {/* HERO — Wise × Mercury style */}
-        <section
-          className="relative overflow-hidden rounded-2xl border border-white/[0.06]"
-          style={{
-            background: '#0c0a1e',
-          }}
-        >
-          <div className="px-5 py-5">
-            <div className="flex items-center justify-between">
-              <span
-                className="text-[10px] font-semibold uppercase text-text-45"
-                style={{ letterSpacing: '1.5px', fontFamily: FONT_DISPLAY }}
-              >
-                Saldo pendiente
-              </span>
-              {totales.saldo <= 0 && totales.total_deuda > 0 && (
-                <span
-                  className="flex items-center gap-1 rounded-full border border-green/40 px-2 py-0.5 text-[9px] font-semibold uppercase text-green"
-                  style={{ background: 'rgba(16,185,129,0.10)', letterSpacing: '0.8px' }}
-                >
-                  <Sparkles className="h-2.5 w-2.5" />
-                  Al día
-                </span>
-              )}
-            </div>
+        {/* HERO con aurora animada + count-up */}
+        <HeroSaldo
+          saldo={totales.saldo}
+          deuda={totales.total_deuda}
+          pagado={totales.pagado_verificado}
+          pendiente={totales.pagado_pendiente}
+          progreso={progresoTotal}
+        />
 
-            {/* Saldo número — Inter Tight, peso 500, proporcionado */}
-            <div
-              className="mt-2 text-white tabular-nums"
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontSize: '38px',
-                fontWeight: 500,
-                letterSpacing: '-0.035em',
-                lineHeight: 1,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {bs(totales.saldo)}
-            </div>
-
-            {/* Stats horizontal — Wise style con divisores verticales */}
-            <div className="mt-5 grid grid-cols-3 divide-x divide-white/[0.06]">
-              <StatColumn label="Deuda" value={bs(totales.total_deuda)} />
-              <StatColumn label="Pagado" value={bs(totales.pagado_verificado)} accent="var(--green)" />
-              <StatColumn
-                label="Pendiente"
-                value={bs(totales.pagado_pendiente)}
-                accent={totales.pagado_pendiente > 0 ? 'var(--cyan)' : undefined}
-              />
-            </div>
-
-            {totales.total_deuda > 0 && (
-              <div className="mt-5">
-                {/* Barra SÓLIDA cyan — sin gradient */}
-                <div
-                  className="relative h-1 overflow-hidden rounded-full"
-                  style={{ background: 'rgba(255,255,255,0.06)' }}
-                >
-                  <div
-                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-700"
-                    style={{
-                      width: `${progresoTotal}%`,
-                      background: '#00E5FF',
-                    }}
-                  />
-                </div>
-                <div
-                  className="mt-2 flex justify-between text-[10px] font-medium text-text-45 tabular-nums"
-                  style={{ fontFamily: FONT_MONO }}
-                >
-                  <span>{Math.round(progresoTotal)}% pagado</span>
-                  <span>{bs(totales.total_deuda - totalPagado)} restantes</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* COMPROMISOS */}
         {compromisos.length === 0 ? (
           <EmptyState>No tiene compromisos de pago para 2026.</EmptyState>
         ) : (
-          Object.entries(porConcepto).map(([concepto, items]) => (
-            <section key={concepto}>
-              <header className="mb-3 flex items-baseline justify-between px-1">
-                <h3
-                  className="text-[10px] font-bold uppercase text-text-65"
-                  style={{ letterSpacing: '1.8px', fontFamily: FONT_DISPLAY }}
+          Object.entries(porConcepto).map(([concepto, items], sectionIdx) => {
+            const isCollapsed = collapsedSections.has(concepto);
+            const pendingCount = items.filter((c) => c.saldo > 0.01).length;
+            return (
+              <section key={concepto} style={{ animation: `fadeUp 0.55s ${100 + sectionIdx * 80}ms ease-out both` }}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection(concepto)}
+                  className="mb-3 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-white/[0.025]"
+                  aria-expanded={!isCollapsed}
                 >
-                  {conceptoLabel[concepto] ?? concepto}
-                </h3>
-                <span
-                  className="text-[10px] font-medium text-text-45 tabular-nums"
-                  style={{ fontFamily: FONT_MONO }}
-                >
-                  {items.length}
-                </span>
-              </header>
-              <div className="space-y-2">
-                {items.map((c) => (
-                  <CompromisoCard
-                    key={c.id_referencia}
-                    c={c}
-                    logoUrl={logoUrl}
-                    nombreAgrupacion={nombre_agrupacion}
-                    pagosParciales={pagosByCompromiso[`${c.concepto}::${c.id_referencia}`] ?? []}
-                    onPagar={() => setPagoTarget(c)}
+                  <ChevronDown
+                    className={`h-3.5 w-3.5 shrink-0 text-text-65 transition-transform duration-300 ${isCollapsed ? '-rotate-90' : ''}`}
+                    strokeWidth={2.5}
                   />
-                ))}
-              </div>
-            </section>
-          ))
+                  <h3
+                    className="flex-1 text-[10.5px] font-semibold uppercase text-text-90"
+                    style={{ letterSpacing: '1.8px', fontFamily: FONT_DISPLAY }}
+                  >
+                    {conceptoLabel[concepto] ?? concepto}
+                  </h3>
+                  {pendingCount > 0 && (
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums"
+                      style={{
+                        background: 'rgba(245,158,11,0.15)',
+                        color: '#F59E0B',
+                        fontFamily: FONT_MONO,
+                        letterSpacing: '0.2px',
+                      }}
+                    >
+                      {pendingCount} pendiente{pendingCount > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  <span
+                    className="text-[10px] font-medium text-text-45 tabular-nums"
+                    style={{ fontFamily: FONT_MONO }}
+                  >
+                    {items.length}
+                  </span>
+                </button>
+                <div
+                  className="overflow-hidden transition-all duration-400 ease-out"
+                  style={{
+                    maxHeight: isCollapsed ? '0px' : `${items.length * 260 + 100}px`,
+                    opacity: isCollapsed ? 0 : 1,
+                  }}
+                >
+                  <div className="space-y-3">
+                    {items.map((c, idx) => (
+                      <CompromisoCard
+                        key={c.id_referencia}
+                        c={c}
+                        logoUrl={logoUrl}
+                        nombreAgrupacion={nombre_agrupacion}
+                        pagosParciales={pagosByCompromiso[`${c.concepto}::${c.id_referencia}`] ?? []}
+                        onPagar={() => setPagoTarget(c)}
+                        delayMs={sectionIdx * 80 + idx * 50}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </section>
+            );
+          })
         )}
 
         {historial.length === 0 && compromisos.length > 0 && (
-          <p className="px-2 text-center text-[11px] text-text-45">
+          <p
+            className="px-2 text-center text-[11px] text-text-45"
+            style={{ fontFamily: FONT_DISPLAY }}
+          >
             Aún no hay pagos registrados.
           </p>
         )}
@@ -220,22 +224,209 @@ export function PagosTab() {
   );
 }
 
-function StatColumn({ label, value, accent }: { label: string; value: string; accent?: string }) {
+function HeroSaldo({
+  saldo,
+  deuda,
+  pagado,
+  pendiente,
+  progreso,
+}: {
+  saldo: number;
+  deuda: number;
+  pagado: number;
+  pendiente: number;
+  progreso: number;
+}) {
+  const saldoCount = useCountUp(saldo);
+  const isClear = saldo <= 0 && deuda > 0;
+
+  return (
+    <section
+      className="relative overflow-hidden rounded-3xl border border-white/[0.07]"
+      style={{
+        background: '#0a0817',
+        animation: 'fadeUp 0.7s 0ms ease-out both',
+      }}
+    >
+      {/* Aurora animada — radial blooms drifting */}
+      <div className="pointer-events-none absolute inset-0 opacity-90">
+        <div
+          className="absolute -top-1/3 -right-1/4 h-[300px] w-[300px] rounded-full blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, rgba(255,31,168,0.28) 0%, transparent 70%)',
+            animation: 'aurora1 14s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute -bottom-1/3 -left-1/4 h-[280px] w-[280px] rounded-full blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, rgba(6,182,212,0.26) 0%, transparent 70%)',
+            animation: 'aurora2 16s ease-in-out infinite',
+          }}
+        />
+        <div
+          className="absolute top-1/3 left-1/3 h-[160px] w-[160px] rounded-full blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, rgba(139,92,246,0.22) 0%, transparent 70%)',
+            animation: 'aurora3 18s ease-in-out infinite',
+          }}
+        />
+      </div>
+
+      {/* Grain noise overlay */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04] mix-blend-overlay"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence baseFrequency='0.95' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>\")",
+        }}
+      />
+
+      <div className="relative px-5 py-5">
+        <div className="flex items-center justify-between">
+          <span
+            className="text-[10px] font-semibold uppercase text-text-45"
+            style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
+          >
+            Saldo pendiente
+          </span>
+          {isClear && (
+            <span
+              className="flex items-center gap-1 rounded-full border border-green/40 px-2.5 py-0.5 text-[9px] font-semibold uppercase text-green"
+              style={{ background: 'rgba(16,185,129,0.12)', letterSpacing: '0.8px' }}
+            >
+              <Sparkles className="h-2.5 w-2.5" />
+              Al día
+            </span>
+          )}
+        </div>
+
+        {/* Monto con gradient text + pulse glow sutil */}
+        <div
+          className="mt-2 bg-clip-text text-transparent tabular-nums"
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: '40px',
+            fontWeight: 500,
+            letterSpacing: '-0.04em',
+            lineHeight: 1,
+            backgroundImage: saldo > 0
+              ? 'linear-gradient(135deg, #FFFFFF 0%, #FFFFFF 40%, #C7D2FE 100%)'
+              : 'linear-gradient(135deg, #10B981, #06B6D4)',
+            fontVariantNumeric: 'tabular-nums',
+            filter: 'drop-shadow(0 0 24px rgba(255,255,255,0.06))',
+          }}
+        >
+          {bs(saldoCount)}
+        </div>
+
+        {/* Stats horizontal con dividers */}
+        <div
+          className="mt-5 grid grid-cols-3 divide-x divide-white/[0.06]"
+          style={{ fontFamily: FONT_DISPLAY }}
+        >
+          <StatColumn label="Deuda" value={bs(deuda)} />
+          <StatColumn label="Pagado" value={bs(pagado)} color="#10B981" />
+          <StatColumn
+            label="Pendiente"
+            value={bs(pendiente)}
+            color={pendiente > 0 ? '#06B6D4' : undefined}
+          />
+        </div>
+
+        {totales(deuda) && (
+          <div className="mt-5">
+            {/* Progress con gradient + animated shimmer */}
+            <div
+              className="relative h-1.5 overflow-hidden rounded-full"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
+            >
+              <div
+                className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000 ease-out"
+                style={{
+                  width: `${progreso}%`,
+                  background: 'linear-gradient(90deg, #06B6D4 0%, #8B5CF6 50%, #EC4899 100%)',
+                  boxShadow: '0 0 16px rgba(139,92,246,0.35)',
+                }}
+              />
+            </div>
+            <div
+              className="mt-2 flex justify-between text-[10px] font-medium text-text-45 tabular-nums"
+              style={{ fontFamily: FONT_MONO }}
+            >
+              <span>{Math.round(progreso)}% pagado</span>
+              <span>{bs(deuda - (pagado + pendiente))} restantes</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+function totales(d: number): boolean { return d > 0; }
+
+function StatusBadge({ isPaid }: { isPaid: boolean }) {
+  if (isPaid) {
+    return (
+      <span
+        className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase"
+        style={{
+          background: 'rgba(16,185,129,0.12)',
+          borderColor: 'rgba(16,185,129,0.40)',
+          color: '#10B981',
+          letterSpacing: '0.8px',
+          fontFamily: FONT_DISPLAY,
+        }}
+      >
+        <CheckCircle2 className="h-2.5 w-2.5" strokeWidth={3} />
+        Completado
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase"
+      style={{
+        background: 'rgba(245,158,11,0.10)',
+        borderColor: 'rgba(245,158,11,0.40)',
+        color: '#F59E0B',
+        letterSpacing: '0.8px',
+        fontFamily: FONT_DISPLAY,
+      }}
+    >
+      <span
+        className="inline-block h-1.5 w-1.5 rounded-full"
+        style={{ background: '#F59E0B', boxShadow: '0 0 6px #F59E0B' }}
+      />
+      Pendiente
+    </span>
+  );
+}
+
+function StatColumn({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+}) {
   return (
     <div className="px-3 first:pl-0 last:pr-0">
       <div
-        className="text-[9px] font-semibold uppercase text-text-45"
+        className="text-[9.5px] font-semibold uppercase text-text-45"
         style={{ letterSpacing: '1px', fontFamily: FONT_DISPLAY }}
       >
         {label}
       </div>
       <div
-        className="mt-1 text-[13px] leading-none tabular-nums"
+        className="mt-1 text-[14px] font-medium leading-none tabular-nums"
         style={{
-          fontFamily: FONT_DISPLAY,
-          fontWeight: 600,
-          color: accent ?? 'var(--text-white)',
-          letterSpacing: '-0.015em',
+          fontFamily: FONT_MONO,
+          color: color ?? 'var(--text-white)',
+          letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums',
         }}
       >
         {value}
@@ -244,26 +435,28 @@ function StatColumn({ label, value, accent }: { label: string; value: string; ac
   );
 }
 
-/** Card — Mercury + Cash App style, sin gradients */
 function CompromisoCard({
   c,
   logoUrl,
   nombreAgrupacion,
   pagosParciales,
   onPagar,
+  delayMs = 0,
 }: {
   c: CompromisoDeuda;
   logoUrl: string | null;
   nombreAgrupacion: string;
   pagosParciales: PagoHistorial[];
   onPagar: () => void;
+  delayMs?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const isPaid = c.saldo <= 0.01;
-  const color = conceptoColor[c.concepto] ?? '#0891B2';
-  const colorLight = conceptoColorLight[c.concepto] ?? '#00E5FF';
+  const isCredencial = c.concepto === 'credencial' || c.concepto === 'credencial_unit';
+  const cfg = conceptoGrad[c.concepto] ?? conceptoGrad.inscripcion;
   const pct = c.monto_total > 0 ? Math.min(100, ((c.monto_total - c.saldo) / c.monto_total) * 100) : 0;
   const initial = (nombreAgrupacion || '?').charAt(0).toUpperCase();
+  const saldoCount = useCountUp(c.saldo, 700);
 
   const pagosSorted = useMemo(
     () => [...pagosParciales].sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? '')),
@@ -272,43 +465,80 @@ function CompromisoCard({
 
   return (
     <div
-      className="overflow-hidden rounded-2xl border border-white/[0.06] transition-colors hover:border-white/[0.10]"
-      style={{ background: '#0c0a1e' }}
+      className="group/card relative overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-px"
+      style={{
+        background: '#0a0817',
+        border: '1px solid rgba(255,255,255,0.07)',
+        boxShadow: '0 1px 0 0 rgba(255,255,255,0.025) inset',
+        animation: `fadeUp 0.5s ${delayMs}ms ease-out both`,
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.background = `linear-gradient(135deg, ${cfg.accent}10 0%, transparent 55%), #0a0817`;
+        (e.currentTarget as HTMLDivElement).style.borderColor = `${cfg.accent}38`;
+        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 1px 0 0 rgba(255,255,255,0.025) inset, 0 10px 32px -10px ${cfg.glow}`;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.background = '#0a0817';
+        (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 0 0 rgba(255,255,255,0.025) inset';
+      }}
     >
-      <div className="px-4 py-4">
-        {/* HEADER */}
-        <div className="flex items-start gap-3">
-          <div
-            className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-white/[0.08]"
-            style={{ background: '#171429' }}
-          >
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={nombreAgrupacion}
-                loading="lazy"
-                decoding="async"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div
-                className="grid h-full w-full place-items-center text-[13px] font-semibold"
-                style={{ color: colorLight, fontFamily: FONT_DISPLAY }}
-              >
-                {initial}
-              </div>
-            )}
+      <div className="relative px-5 py-5">
+        <div className="flex items-start gap-3.5">
+          {/* Logo con ring gradient sutil */}
+          <div className="relative h-11 w-11 shrink-0">
+            <div
+              className="absolute inset-0 rounded-full opacity-40"
+              style={{ background: cfg.grad, filter: 'blur(6px)' }}
+            />
+            <div
+              className="relative h-full w-full overflow-hidden rounded-full border border-white/[0.10]"
+              style={{ background: '#171429' }}
+            >
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={nombreAgrupacion}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div
+                  className="grid h-full w-full place-items-center text-[13px] font-semibold"
+                  style={{ color: cfg.accent, fontFamily: FONT_DISPLAY }}
+                >
+                  {initial}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="min-w-0 flex-1">
-            <h4
-              className="truncate text-[13.5px] font-semibold leading-tight text-text-white"
-              style={{ fontFamily: FONT_DISPLAY, letterSpacing: '-0.015em' }}
-            >
-              {c.descripcion}
-            </h4>
+            <div className="flex items-start justify-between gap-2">
+              <h4
+                className="truncate text-[13px] leading-tight"
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 600,
+                  letterSpacing: '-0.015em',
+                  color: cfg.accent,
+                }}
+              >
+                {isCredencial ? nombreAgrupacion : c.descripcion}
+              </h4>
+              <StatusBadge isPaid={isPaid} />
+            </div>
+            {isCredencial && (
+              <div
+                className="mt-0.5 text-[10px] font-medium text-text-65"
+                style={{ fontFamily: FONT_DISPLAY }}
+              >
+                {c.descripcion}
+              </div>
+            )}
             <div
-              className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-text-45"
+              className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[9.5px] text-text-45"
               style={{ fontFamily: FONT_DISPLAY }}
             >
               {c.subdivision && (
@@ -320,17 +550,19 @@ function CompromisoCard({
                 </>
               )}
               {c.bailarines != null && (
-                <span className="tabular-nums" style={{ fontFamily: FONT_MONO }}>
-                  {c.bailarines} {c.concepto === 'credencial' ? 'unid.' : 'bail.'}
+                <span style={{ fontFamily: FONT_MONO, fontVariantNumeric: 'tabular-nums' }}>
+                  {c.bailarines}{' '}
+                  {c.concepto === 'credencial'
+                    ? c.bailarines === 1 ? 'unidad' : 'unidades'
+                    : c.bailarines === 1 ? 'bailarín' : 'bailarines'}
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* MONTOS + botón */}
-        <div className="mt-4 flex items-end justify-between gap-3">
-          <div className="flex items-end gap-6">
+        <div className="mt-5 flex items-end justify-between gap-3">
+          <div className="flex items-end gap-7">
             <div>
               <div
                 className="text-[9px] font-semibold uppercase text-text-45"
@@ -339,8 +571,13 @@ function CompromisoCard({
                 Total
               </div>
               <div
-                className="mt-1 text-[14px] leading-none text-text-90 tabular-nums"
-                style={{ fontFamily: FONT_DISPLAY, fontWeight: 500, letterSpacing: '-0.015em' }}
+                className="mt-1 text-[13px] leading-none text-text-90 tabular-nums"
+                style={{
+                  fontFamily: FONT_MONO,
+                  fontWeight: 500,
+                  letterSpacing: '-0.015em',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
               >
                 {bs(c.monto_total)}
               </div>
@@ -355,84 +592,113 @@ function CompromisoCard({
               <div
                 className="mt-1 leading-none tabular-nums"
                 style={{
-                  fontFamily: FONT_DISPLAY,
-                  fontSize: '20px',
+                  fontFamily: FONT_MONO,
+                  fontSize: '13px',
                   fontWeight: 600,
                   color: isPaid ? 'var(--green)' : 'var(--text-white)',
-                  letterSpacing: '-0.025em',
+                  letterSpacing: '-0.015em',
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                {bs(c.saldo)}
+                {bs(saldoCount)}
               </div>
             </div>
           </div>
 
           {isPaid ? (
-            <div
-              className="flex shrink-0 items-center gap-1 rounded-full border border-green/40 px-2.5 py-1.5 text-[9px] font-bold uppercase text-green"
-              style={{ background: 'rgba(16,185,129,0.10)', letterSpacing: '0.8px', fontFamily: FONT_DISPLAY }}
-            >
-              <CheckCircle2 className="h-3 w-3" />
-              Pagado
-            </div>
+            <div className="shrink-0" />
           ) : (
             <button
               type="button"
               onClick={onPagar}
-              className="group/btn shrink-0 rounded-full px-3.5 py-2 text-[10px] font-semibold uppercase transition-all active:scale-[0.97]"
+              className="group/btn relative shrink-0 overflow-hidden rounded-full px-4 py-2 text-[10.5px] font-semibold uppercase text-white transition-transform active:scale-[0.96]"
               style={{
-                background: color,
+                background: cfg.grad,
                 color: '#FFFFFF',
-                letterSpacing: '1px',
+                letterSpacing: '0.9px',
                 fontFamily: FONT_DISPLAY,
-                boxShadow: `0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 0 rgba(255,255,255,0.22) inset, 0 4px 12px rgba(0,0,0,0.35)`,
+                boxShadow: `0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 0 rgba(255,255,255,0.25) inset, 0 6px 20px ${cfg.glow}`,
                 textShadow: '0 1px 2px rgba(0,0,0,0.4)',
               }}
             >
-              <span className="flex items-center gap-1">
+              {/* Shimmer sweep on hover */}
+              <span
+                className="absolute inset-0 -translate-x-full transition-transform duration-700 group-hover/btn:translate-x-full"
+                style={{
+                  background:
+                    'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)',
+                }}
+              />
+              <span className="relative flex items-center gap-1">
                 Pagar
-                <ArrowUpRight className="h-3 w-3" strokeWidth={2.5} />
+                <ArrowUpRight className="h-3 w-3 transition-transform duration-300 group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" strokeWidth={2.5} />
               </span>
             </button>
           )}
         </div>
 
-        {/* Progreso SÓLIDO color concepto — sin gradient */}
+        {/* Progress con gradient + shimmer */}
         {!isPaid && c.monto_total > 0 && (
-          <div className="mt-3">
+          <div className="mt-4">
             <div
-              className="relative h-[3px] overflow-hidden rounded-full"
-              style={{ background: 'rgba(255,255,255,0.05)' }}
+              className="relative h-1 overflow-hidden rounded-full"
+              style={{ background: 'rgba(255,255,255,0.04)' }}
             >
               <div
-                className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
-                style={{ width: `${pct}%`, background: colorLight }}
+                className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
+                style={{
+                  width: `${pct}%`,
+                  background: cfg.grad,
+                  boxShadow: `0 0 6px ${cfg.glow}`,
+                }}
               />
             </div>
           </div>
         )}
 
-        {/* Toggle pagos parciales */}
         {pagosSorted.length > 0 && (
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="mt-3 flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-[10.5px] font-medium text-text-65 transition hover:bg-white/[0.025] hover:text-text-90"
-            style={{ fontFamily: FONT_DISPLAY }}
+            className="mt-4 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors duration-200"
+            style={{
+              fontFamily: FONT_DISPLAY,
+              background: `${cfg.accent}14`,
+              border: `1px solid ${cfg.accent}33`,
+              color: cfg.accent,
+              letterSpacing: '0.2px',
+            }}
             aria-expanded={expanded}
           >
-            <span>
-              {pagosSorted.length} {pagosSorted.length === 1 ? 'pago parcial' : 'pagos parciales'}
+            <span className="flex items-center gap-1.5">
+              <span
+                className="grid h-4 w-4 place-items-center rounded-full text-[9px] font-bold tabular-nums"
+                style={{
+                  background: cfg.grad,
+                  color: '#FFFFFF',
+                  fontFamily: FONT_MONO,
+                }}
+              >
+                {pagosSorted.length}
+              </span>
+              {pagosSorted.length === 1 ? 'pago' : 'pagos'}
             </span>
             <ChevronDown
-              className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`}
+              className={`h-4 w-4 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
+              strokeWidth={2.5}
             />
           </button>
         )}
       </div>
 
-      {/* Drawer pagos parciales */}
-      {expanded && pagosSorted.length > 0 && (
+      {/* Drawer con animación slide */}
+      <div
+        className="overflow-hidden transition-all duration-400 ease-out"
+        style={{
+          maxHeight: expanded ? `${pagosSorted.length * 56 + 8}px` : '0px',
+          opacity: expanded ? 1 : 0,
+        }}
+      >
         <div
           className="border-t border-white/[0.04] divide-y divide-white/[0.03]"
           style={{ background: '#080614' }}
@@ -441,7 +707,7 @@ function CompromisoCard({
             <PagoParcialRow key={p.id_pago} p={p} />
           ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -464,33 +730,33 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
     <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.018]">
       <div
         className="grid h-7 w-7 shrink-0 place-items-center rounded-full"
-        style={{ background: `${e.dot}18`, color: e.dot }}
+        style={{ background: `${e.dot}1A`, color: e.dot }}
       >
         <Icon className="h-3 w-3" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
           <span
-            className="text-[12.5px] font-semibold tabular-nums text-text-white"
-            style={{ fontFamily: FONT_DISPLAY, letterSpacing: '-0.015em' }}
+            className="text-[12px] font-semibold text-text-90 tabular-nums"
+            style={{ fontFamily: FONT_MONO, letterSpacing: '-0.01em' }}
           >
             {bs(p.monto)}
           </span>
           <span
-            className="text-[9px] font-bold uppercase tabular-nums"
-            style={{ color: e.dot, letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
+            className="text-[9px] font-semibold uppercase"
+            style={{ color: e.dot, letterSpacing: '0.7px', fontFamily: FONT_DISPLAY }}
           >
             {e.label}
           </span>
         </div>
         <div
-          className="mt-0.5 flex items-center gap-1.5 text-[9.5px] text-text-45 tabular-nums"
-          style={{ fontFamily: FONT_MONO }}
+          className="mt-0.5 flex items-center gap-1.5 text-[9.5px] text-text-45"
+          style={{ fontFamily: FONT_DISPLAY }}
         >
-          <span>{p.fecha}</span>
-          {p.hora && <span>· {p.hora.slice(0, 5)}</span>}
+          <span style={{ fontFamily: FONT_MONO }}>{p.fecha}</span>
+          {p.hora && <span style={{ fontFamily: FONT_MONO }}>· {p.hora.slice(0, 5)}</span>}
           <span>·</span>
-          <span className="truncate" style={{ fontFamily: FONT_DISPLAY }}>{p.metodo_pago}</span>
+          <span className="truncate">{p.metodo_pago}</span>
         </div>
       </div>
       {p.comprobante_url && (
@@ -507,3 +773,27 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
     </div>
   );
 }
+
+/** CSS keyframes — aurora drift, shimmer sweep, fade-up stagger */
+const ANIM_CSS = `
+@keyframes aurora1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-20px, 30px) scale(1.1); }
+}
+@keyframes aurora2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(25px, -20px) scale(1.15); }
+}
+@keyframes aurora3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  50%      { transform: translate(-15px, -25px) scale(0.9); opacity: 1; }
+}
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+`;
