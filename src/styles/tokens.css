@@ -69,8 +69,9 @@
   --shadow-card:  0 10px 40px rgba(0, 0, 0, 0.4);
   --shadow-glow:  0 0 18px var(--cyan-glow);
 
-  --font-display: 'Inter', system-ui, sans-serif;
+  --font-display: 'Inter Tight', 'Inter', system-ui, sans-serif;
   --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'SF Mono', Menlo, monospace;
 
   /* === Tokens shadcn (compat con componentes UI festival) === */
   --background: var(--bg-base);
