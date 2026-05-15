@@ -99,10 +99,17 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
         background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(0,0,0,0.2) 100%)',
       }}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 p-4 text-left transition"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setOpen((v) => !v);
+          }
+        }}
+        className="flex w-full cursor-pointer items-center gap-3 p-4 text-left transition select-none"
         style={{
           background: open
             ? 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%)'
@@ -199,7 +206,7 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
             open ? 'rotate-180 text-fuchsia' : 'text-text-45'
           }`}
         />
-      </button>
+      </div>
 
       {open && (
         <div className="border-t border-glass-border anim-fade-in">

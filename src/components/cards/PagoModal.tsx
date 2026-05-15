@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Upload, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Upload, Loader2, AlertCircle, ShieldCheck, ArrowUpRight, Trash2 } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
 import type { CompromisoDeuda, MetodoPago } from '@/types/domain';
 
@@ -11,8 +11,18 @@ interface Props {
   onSaved: () => void;
 }
 
+const FONT_DISPLAY = "'Inter Tight', 'Inter', system-ui, sans-serif";
+const FONT_MONO = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
+
+const conceptoAccent: Record<string, { grad: string; accent: string; glow: string }> = {
+  inscripcion:       { grad: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)', accent: '#06B6D4', glow: 'rgba(6,182,212,0.35)' },
+  convenio_entradas: { grad: 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)', accent: '#EC4899', glow: 'rgba(236,72,153,0.35)' },
+  credencial:        { grad: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)', accent: '#F59E0B', glow: 'rgba(245,158,11,0.32)' },
+  credencial_unit:   { grad: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 100%)', accent: '#F59E0B', glow: 'rgba(245,158,11,0.32)' },
+};
+
 function bs(n: number): string {
-  return new Intl.NumberFormat('es-BO', { minimumFractionDigits: 2 }).format(n) + ' Bs';
+  return new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' Bs';
 }
 
 export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
@@ -34,7 +44,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
       setErr(null);
       return;
     }
-    setMonto(compromiso.saldo > 0 ? String(compromiso.saldo) : '');
+    setMonto(compromiso.saldo > 0 ? String(Math.round(compromiso.saldo)) : '');
     setIdMetodo(metodos[0]?.id_metodo ?? '');
   }, [compromiso, metodos]);
 
@@ -52,6 +62,8 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   }, [compromiso, onClose, submitting]);
 
   if (!compromiso) return null;
+
+  const cfg = conceptoAccent[compromiso.concepto] ?? conceptoAccent.inscripcion;
 
   function handleFile(f: File | null) {
     if (comprobanteUrl) {
@@ -108,210 +120,404 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   }
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[200] flex items-end justify-center bg-black/80 p-0 backdrop-blur-sm sm:items-center sm:p-6"
-      onClick={() => !submitting && onClose()}
-    >
+    <>
+      <style>{MODAL_CSS}</style>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[95vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-glass-border shadow-2xl sm:rounded-2xl"
-        style={{ background: 'var(--bg-elevated)' }}
+        className="fixed inset-0 z-[200] flex items-end justify-center bg-black/85 backdrop-blur-md sm:items-center sm:p-6"
+        onClick={() => !submitting && onClose()}
+        style={{ animation: 'modalFade 0.18s ease-out' }}
       >
-        <header className="flex items-center gap-2 border-b border-glass-border px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold uppercase text-cyan" style={{ letterSpacing: '0.8px' }}>
-              Registrar pago
-            </div>
-            <div className="mt-0.5 truncate text-[13px] font-medium text-text-90">{compromiso.descripcion}</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => !submitting && onClose()}
-            disabled={submitting}
-            aria-label="Cerrar"
-            className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md text-text-45 transition hover:bg-white/5 hover:text-white disabled:opacity-50"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative flex max-h-[95vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-white/[0.08] shadow-2xl sm:rounded-3xl"
+          style={{
+            background: '#0a0817',
+            animation: 'modalSlide 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
+            boxShadow: `0 1px 0 0 rgba(255,255,255,0.04) inset, 0 20px 80px -20px ${cfg.glow}`,
+          }}
+        >
+          {/* Aurora glow header */}
+          <div
+            className="pointer-events-none absolute -top-32 left-1/2 h-64 w-96 -translate-x-1/2 rounded-full blur-3xl opacity-50"
+            style={{ background: `radial-gradient(circle, ${cfg.glow} 0%, transparent 65%)` }}
+          />
 
-        <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-auto p-4">
-          {/* Resumen saldo */}
-          <div className="grid grid-cols-3 gap-2 rounded-xl border border-glass-border bg-glass-bg p-3 text-center text-[11px]">
-            <div>
-              <div className="text-text-45">Total</div>
-              <div className="font-semibold text-text-90 tabular-nums">{bs(compromiso.monto_total)}</div>
-            </div>
-            <div>
-              <div className="text-text-45">Pagado</div>
-              <div className="font-semibold text-green tabular-nums">{bs(compromiso.pagado_verificado)}</div>
-            </div>
-            <div>
-              <div className="text-text-45">Saldo</div>
-              <div className="font-semibold text-fuchsia tabular-nums">{bs(compromiso.saldo)}</div>
-            </div>
-          </div>
-
-          {/* Monto */}
-          <Field label="Monto a pagar (Bs)">
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max={compromiso.saldo}
-              value={monto}
-              onChange={(e) => setMonto(e.target.value)}
-              required
-              className="input-pago tabular-nums"
-              placeholder="0.00"
-            />
-            <p className="mt-1 text-[10px] text-text-45">Pagos parciales permitidos · Máx: {bs(compromiso.saldo)}</p>
-          </Field>
-
-          {/* Método */}
-          <Field label="Método de pago">
-            <select
-              value={idMetodo}
-              onChange={(e) => setIdMetodo(e.target.value)}
-              required
-              className="input-pago"
-            >
-              {metodos.length === 0 && <option value="">Sin métodos disponibles</option>}
-              {metodos.map((m) => (
-                <option key={m.id_metodo} value={m.id_metodo}>
-                  {m.metodo}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          {/* Comprobante */}
-          <Field label="Comprobante de pago">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-              className="hidden"
-            />
-            {!comprobante ? (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-cyan/40 bg-cyan/5 px-3 py-4 text-[12px] font-semibold uppercase text-cyan transition hover:bg-cyan/10"
-                style={{ letterSpacing: '0.6px' }}
+          <header className="relative flex items-center gap-3 border-b border-white/[0.05] px-5 py-4">
+            <div className="min-w-0 flex-1">
+              <div
+                className="text-[9.5px] font-bold uppercase"
+                style={{ letterSpacing: '1.6px', color: cfg.accent, fontFamily: FONT_DISPLAY }}
               >
-                <Upload className="h-4 w-4" />
-                Seleccionar archivo
-              </button>
-            ) : (
-              <div className="space-y-2">
-                {comprobanteUrl && (
-                  <img
-                    src={comprobanteUrl}
-                    alt="Preview comprobante"
-                    className="max-h-40 w-full rounded-lg object-contain"
-                    style={{ background: 'var(--bg-card)' }}
+                Registrar pago
+              </div>
+              <div
+                className="mt-1 truncate text-[14px] font-semibold text-text-white"
+                style={{ fontFamily: FONT_DISPLAY, letterSpacing: '-0.015em' }}
+              >
+                {compromiso.descripcion}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => !submitting && onClose()}
+              disabled={submitting}
+              aria-label="Cerrar"
+              className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-lg text-text-45 transition hover:bg-white/[0.05] hover:text-white disabled:opacity-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+
+          <form onSubmit={handleSubmit} className="relative flex-1 space-y-5 overflow-auto px-5 py-5">
+            {/* Resumen saldo — grid 3 con dividers */}
+            <div
+              className="grid grid-cols-3 divide-x divide-white/[0.06] rounded-2xl border border-white/[0.06] py-3"
+              style={{ background: 'rgba(255,255,255,0.02)' }}
+            >
+              <StatBox label="Total" value={bs(compromiso.monto_total)} />
+              <StatBox label="Pagado" value={bs(compromiso.pagado_verificado)} color="#10B981" />
+              <StatBox label="Saldo" value={bs(compromiso.saldo)} color={cfg.accent} bold />
+            </div>
+
+            {/* Monto a pagar — hero input */}
+            <div>
+              <label className="block">
+                <span
+                  className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
+                  style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
+                >
+                  Monto a pagar
+                </span>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    max={compromiso.saldo}
+                    value={monto}
+                    onChange={(e) => setMonto(e.target.value)}
+                    required
+                    placeholder="0"
+                    className="pago-input-hero w-full"
+                    style={{
+                      fontFamily: FONT_MONO,
+                      fontSize: '28px',
+                      fontWeight: 600,
+                      letterSpacing: '-0.025em',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
                   />
-                )}
-                <div className="flex items-center justify-between gap-2 rounded-lg border border-glass-border bg-glass-bg p-2 text-[11px]">
-                  <span className="truncate text-text-90">{comprobante.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleFile(null)}
-                    className="rounded-md px-2 py-1 text-[10px] text-text-45 transition hover:bg-white/5 hover:text-red-400"
+                  <span
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-text-45"
+                    style={{ fontFamily: FONT_DISPLAY }}
                   >
-                    Quitar
-                  </button>
+                    Bs
+                  </span>
                 </div>
+              </label>
+              <div className="mt-2 flex items-center justify-between text-[10px]">
+                <span className="text-text-45" style={{ fontFamily: FONT_DISPLAY }}>
+                  Máx: <span style={{ fontFamily: FONT_MONO }}>{bs(compromiso.saldo)}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMonto(String(Math.round(compromiso.saldo)))}
+                  className="rounded-full border px-2.5 py-0.5 text-[9.5px] font-bold uppercase transition hover:bg-white/[0.04]"
+                  style={{
+                    borderColor: `${cfg.accent}40`,
+                    color: cfg.accent,
+                    letterSpacing: '0.8px',
+                    fontFamily: FONT_DISPLAY,
+                  }}
+                >
+                  Pagar todo
+                </button>
+              </div>
+            </div>
+
+            {/* Método de pago — chips */}
+            <div>
+              <span
+                className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
+                style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
+              >
+                Método de pago
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                {metodos.length === 0 && (
+                  <p className="col-span-2 text-[12px] text-text-45">Sin métodos disponibles</p>
+                )}
+                {metodos.map((m) => {
+                  const active = idMetodo === m.id_metodo;
+                  return (
+                    <button
+                      key={m.id_metodo}
+                      type="button"
+                      onClick={() => setIdMetodo(m.id_metodo)}
+                      className="rounded-xl border px-3 py-2.5 text-[11px] font-semibold uppercase transition-all"
+                      style={{
+                        borderColor: active ? cfg.accent : 'rgba(255,255,255,0.08)',
+                        background: active ? `${cfg.accent}14` : 'rgba(255,255,255,0.015)',
+                        color: active ? cfg.accent : 'var(--text-90)',
+                        fontFamily: FONT_DISPLAY,
+                        letterSpacing: '0.5px',
+                        boxShadow: active ? `0 0 0 1px ${cfg.accent}30 inset` : undefined,
+                      }}
+                    >
+                      {m.metodo}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Comprobante */}
+            <div>
+              <span
+                className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
+                style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
+              >
+                Comprobante de pago
+              </span>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+              {!comprobante ? (
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed py-6 text-[11px] font-semibold uppercase transition-colors"
+                  style={{
+                    borderColor: `${cfg.accent}40`,
+                    background: `${cfg.accent}08`,
+                    color: cfg.accent,
+                    letterSpacing: '0.8px',
+                    fontFamily: FONT_DISPLAY,
+                  }}
+                >
+                  <Upload className="h-5 w-5" strokeWidth={2.2} />
+                  <span>Seleccionar archivo</span>
+                  <span className="text-[9px] font-medium text-text-45" style={{ letterSpacing: '0.3px' }}>
+                    JPG · PNG · WEBP · PDF · máx 5 MB
+                  </span>
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  {comprobanteUrl && (
+                    <img
+                      src={comprobanteUrl}
+                      alt="Preview comprobante"
+                      className="max-h-48 w-full rounded-xl object-contain"
+                      style={{ background: '#171429', border: '1px solid rgba(255,255,255,0.06)' }}
+                    />
+                  )}
+                  <div
+                    className="flex items-center justify-between gap-2 rounded-xl border border-white/[0.06] px-3 py-2 text-[11px]"
+                    style={{ background: 'rgba(255,255,255,0.02)' }}
+                  >
+                    <span
+                      className="truncate text-text-90"
+                      style={{ fontFamily: FONT_DISPLAY }}
+                    >
+                      {comprobante.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleFile(null)}
+                      className="flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold uppercase text-text-45 transition hover:bg-red-500/10 hover:text-red-400"
+                      style={{ letterSpacing: '0.5px', fontFamily: FONT_DISPLAY }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Observación */}
+            <div>
+              <label className="block">
+                <span
+                  className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
+                  style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
+                >
+                  Observación <span className="text-text-25">· opcional</span>
+                </span>
+                <textarea
+                  value={observacion}
+                  onChange={(e) => setObservacion(e.target.value)}
+                  rows={2}
+                  maxLength={300}
+                  className="pago-input w-full resize-none"
+                  placeholder="Detalles adicionales..."
+                  style={{ fontFamily: FONT_DISPLAY }}
+                />
+              </label>
+            </div>
+
+            {err && (
+              <div
+                className="flex items-start gap-2 rounded-xl border border-red-500/35 px-3 py-2.5 text-[11.5px] text-red-400"
+                style={{ background: 'rgba(239,68,68,0.05)', fontFamily: FONT_DISPLAY }}
+              >
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{err}</span>
               </div>
             )}
-            <p className="mt-1 text-[10px] text-text-45">JPG / PNG / WEBP / PDF · máx 5 MB</p>
-          </Field>
 
-          {/* Observación */}
-          <Field label="Observación (opcional)">
-            <textarea
-              value={observacion}
-              onChange={(e) => setObservacion(e.target.value)}
-              rows={2}
-              maxLength={300}
-              className="input-pago resize-none"
-              placeholder="Detalles adicionales..."
-            />
-          </Field>
-
-          {err && (
-            <div className="flex items-start gap-2 rounded-md border border-red-400/40 bg-red-400/5 px-3 py-2 text-[12px] text-red-400">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>{err}</span>
-            </div>
-          )}
-
-          <div className="rounded-md border border-cyan/30 bg-cyan/5 px-3 py-2 text-[11px] text-cyan">
-            <div className="flex items-start gap-2">
-              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div
+              className="flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[10.5px]"
+              style={{
+                borderColor: `${cfg.accent}30`,
+                background: `${cfg.accent}08`,
+                color: cfg.accent,
+                fontFamily: FONT_DISPLAY,
+              }}
+            >
+              <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Una vez registrado, su pago quedará en <strong>estado "enviado"</strong> para verificación.
+                Una vez registrado, su pago quedará en{' '}
+                <strong style={{ fontWeight: 700 }}>estado enviado</strong> para verificación.
               </span>
             </div>
-          </div>
-        </form>
+          </form>
 
-        <footer className="flex gap-2 border-t border-glass-border p-3">
-          <button
-            type="button"
-            onClick={() => !submitting && onClose()}
-            disabled={submitting}
-            className="flex-1 rounded-lg border border-glass-border px-4 py-2.5 text-[12px] font-semibold uppercase text-text-65 transition hover:bg-white/5 disabled:opacity-50"
-            style={{ letterSpacing: '0.6px' }}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            onClick={handleSubmit}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-cyan px-4 py-2.5 text-[12px] font-semibold uppercase text-[#04020F] transition hover:bg-[#66F0FF] disabled:opacity-50"
-            style={{ letterSpacing: '0.6px' }}
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Registrar pago'}
-          </button>
-        </footer>
+          <footer className="relative flex gap-2 border-t border-white/[0.05] px-5 py-4">
+            <button
+              type="button"
+              onClick={() => !submitting && onClose()}
+              disabled={submitting}
+              className="flex-1 rounded-full border border-white/[0.08] px-4 py-3 text-[10.5px] font-bold uppercase text-text-65 transition hover:bg-white/[0.04] disabled:opacity-50"
+              style={{ letterSpacing: '0.9px', fontFamily: FONT_DISPLAY }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              onClick={handleSubmit}
+              className="group/btn relative flex flex-[1.5] items-center justify-center gap-1.5 overflow-hidden rounded-full px-4 py-3 text-[10.5px] font-bold uppercase text-white transition-transform active:scale-[0.97] disabled:opacity-50"
+              style={{
+                background: cfg.grad,
+                letterSpacing: '0.9px',
+                fontFamily: FONT_DISPLAY,
+                boxShadow: `0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 0 rgba(255,255,255,0.22) inset, 0 6px 20px ${cfg.glow}`,
+                textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+              }}
+            >
+              <span
+                className="absolute inset-0 -translate-x-full transition-transform duration-700 group-hover/btn:translate-x-full"
+                style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)' }}
+              />
+              <span className="relative flex items-center gap-1.5">
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Procesando
+                  </>
+                ) : (
+                  <>
+                    Registrar pago
+                    <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.8} />
+                  </>
+                )}
+              </span>
+            </button>
+          </footer>
+        </div>
       </div>
-
-      <style>{`
-        .input-pago {
-          width: 100%;
-          border-radius: 0.5rem;
-          border: 1px solid var(--glass-border);
-          background: rgba(8, 5, 30, 0.6);
-          padding: 0.6rem 0.85rem;
-          font-size: 13px;
-          color: var(--text-white);
-          outline: none;
-          transition: border-color 0.15s, background 0.15s;
-        }
-        .input-pago:focus {
-          border-color: var(--cyan);
-          background: rgba(8, 5, 30, 0.9);
-        }
-      `}</style>
-    </div>,
+    </>,
     document.body,
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function StatBox({
+  label,
+  value,
+  color,
+  bold,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+  bold?: boolean;
+}) {
   return (
-    <label className="block">
-      <span
-        className="mb-1 block text-[10px] font-semibold uppercase text-text-65"
-        style={{ letterSpacing: '0.6px' }}
+    <div className="px-3 text-center first:pl-3 last:pr-3">
+      <div
+        className="text-[9px] font-bold uppercase text-text-45"
+        style={{ letterSpacing: '1px', fontFamily: FONT_DISPLAY }}
       >
         {label}
-      </span>
-      {children}
-    </label>
+      </div>
+      <div
+        className="mt-1 leading-none tabular-nums"
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: '13.5px',
+          fontWeight: bold ? 700 : 600,
+          color: color ?? 'var(--text-white)',
+          letterSpacing: '-0.02em',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </div>
+    </div>
   );
 }
+
+const MODAL_CSS = `
+@keyframes modalFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalSlide {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.pago-input-hero {
+  border-radius: 1rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.02);
+  padding: 1rem 3rem 1rem 1.25rem;
+  color: var(--text-white);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.pago-input-hero:focus {
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+}
+.pago-input-hero::-webkit-outer-spin-button,
+.pago-input-hero::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pago-input-hero[type=number] {
+  -moz-appearance: textfield;
+}
+.pago-input {
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  padding: 0.7rem 0.9rem;
+  font-size: 12.5px;
+  color: var(--text-white);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pago-input:focus {
+  border-color: rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.04);
+}
+.pago-input::placeholder {
+  color: var(--text-25);
+}
+`;
