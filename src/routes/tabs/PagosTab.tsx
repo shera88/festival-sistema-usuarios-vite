@@ -770,7 +770,7 @@ function CompromisoCard({
       <div
         className="overflow-hidden transition-all duration-400 ease-out"
         style={{
-          maxHeight: expanded ? `${pagosSorted.length * 56 + 8}px` : '0px',
+          maxHeight: expanded ? `${pagosSorted.length * 88 + 64}px` : '0px',
           opacity: expanded ? 1 : 0,
         }}
       >
@@ -782,7 +782,7 @@ function CompromisoCard({
           <div className="flex items-center gap-3 px-5 py-2" style={{ background: '#06030f' }}>
             <div className="h-3 w-7 shrink-0" />
             <div className="min-w-0 flex-1" />
-            <div className="grid shrink-0 grid-cols-2 gap-2.5" style={{ width: '14.5rem' }}>
+            <div className="mr-3 grid shrink-0 grid-cols-2 gap-2" style={{ width: '12rem' }}>
               <div
                 className="text-center text-[8.5px] font-bold uppercase text-text-45"
                 style={{ letterSpacing: '0.16em', fontFamily: FONT_DISPLAY }}
@@ -849,7 +849,7 @@ function ActionButton({
       aria-label={ariaLabel}
       title={title}
       disabled={loading}
-      className="group/btn relative flex h-7 w-full shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-md px-1.5 text-[8.5px] font-bold uppercase text-white transition-transform active:scale-[0.94] disabled:opacity-90"
+      className="group/btn relative flex h-7 w-full shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-md px-1 text-[8.5px] font-bold uppercase text-white transition-transform active:scale-[0.94] disabled:opacity-90"
       style={{
         background: grad,
         letterSpacing: '0.6px',
@@ -973,7 +973,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
           <span className="truncate">{p.metodo_pago}</span>
         </div>
       </div>
-      <div className="grid shrink-0 grid-cols-2 gap-2.5" style={{ width: '14.5rem' }}>
+      <div className="mr-3 grid shrink-0 grid-cols-2 gap-2" style={{ width: '12rem' }}>
         {/* Columna Recibo */}
         <div className="flex w-full">
           {p.estado === 'verificado' && p.recibo_pdf_url ? (
