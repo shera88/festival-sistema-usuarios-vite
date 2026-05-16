@@ -1037,7 +1037,9 @@ function YearTabs({
   onChange: (a: number) => void;
 }) {
   const ANO_ACTUAL = 2026;
-  const anosSet = new Set<number>([ANO_ACTUAL]);
+  // Siempre mostrar el filtro con 2025 (historico) + 2026 (actual) como mínimo,
+  // así el usuario puede consultar histórico aunque su agrupación no tenga registros aún.
+  const anosSet = new Set<number>([ANO_ACTUAL, 2025]);
   for (const a of anosDisponibles) anosSet.add(a.ano);
   const anos = [...anosSet].sort((x, y) => y - x);
 
