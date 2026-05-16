@@ -778,6 +778,25 @@ function CompromisoCard({
           className="border-t border-white/[0.04] divide-y divide-white/[0.03]"
           style={{ background: '#080614' }}
         >
+          {/* Encabezados de columna */}
+          <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: '#06030f' }}>
+            <div className="h-3 w-7 shrink-0" />
+            <div className="min-w-0 flex-1" />
+            <div className="mr-3 grid shrink-0 grid-cols-2 gap-2" style={{ width: '4.25rem' }}>
+              <div
+                className="text-center text-[7.5px] font-bold uppercase text-text-65"
+                style={{ letterSpacing: '0.04em', fontFamily: FONT_DISPLAY }}
+              >
+                Recibo
+              </div>
+              <div
+                className="text-center text-[7.5px] font-bold uppercase text-text-65"
+                style={{ letterSpacing: '0.04em', fontFamily: FONT_DISPLAY }}
+              >
+                Comp.
+              </div>
+            </div>
+          </div>
           {pagosSorted.map((p) => (
             <PagoParcialRow key={p.id_pago} p={p} nombreAgrupacion={nombreAgrupacion} />
           ))}
@@ -932,20 +951,20 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 whitespace-nowrap">
           <span
-            className="text-[11px] font-semibold text-text-90 tabular-nums"
+            className="text-[12.5px] font-semibold text-text-90 tabular-nums"
             style={{ fontFamily: FONT_MONO, letterSpacing: '-0.01em' }}
           >
             {bs(p.monto)}
           </span>
           <span
-            className="text-[7.5px] font-semibold uppercase"
-            style={{ color: e.dot, letterSpacing: '0.4px', fontFamily: FONT_DISPLAY }}
+            className="text-[8.5px] font-semibold uppercase"
+            style={{ color: e.dot, letterSpacing: '0.5px', fontFamily: FONT_DISPLAY }}
           >
             {e.label}
           </span>
         </div>
         <div
-          className="mt-0.5 flex items-center gap-1 truncate text-[8.5px] text-text-45"
+          className="mt-0.5 flex items-center gap-1 truncate text-[9.5px] text-text-45"
           style={{ fontFamily: FONT_DISPLAY }}
         >
           <span style={{ fontFamily: FONT_MONO }}>{p.fecha}</span>
