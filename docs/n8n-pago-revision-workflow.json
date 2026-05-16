@@ -1,0 +1,107 @@
+{
+  "name": "Festival Danzarte — Pago en Revisión (YCloud WhatsApp)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pago-revision",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook PHP (pago nuevo)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 200],
+      "webhookId": "pago-revision-entrada"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"body\"][\"secret\"] || $json[\"secret\"]}}",
+              "operation": "equal",
+              "value2": "=dba176baa6127feca1657aa99e0c2f358408c715c1a5fa43d202d4aa5c55674e"
+            }
+          ]
+        }
+      },
+      "name": "Verifica secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [420, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $items('Webhook PHP (pago nuevo)')[0].json.body || $items('Webhook PHP (pago nuevo)')[0].json;\nconst adminsCsv = ('59175571497' || '').toString();\nconst admins = adminsCsv.split(',').map(s => s.trim()).filter(Boolean);\nreturn admins.map(phone => {\n  const to = phone.startsWith('+') ? phone : '+' + phone;\n  return { json: { to, pago: body } };\n});"
+      },
+      "name": "Loop por admin",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [640, 140]
+    },
+    {
+      "parameters": {
+        "url": "https://api.ycloud.com/v2/whatsapp/messages/sendDirectly",
+        "authentication": "none",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "=2a98d6fcfacb400f9dbe625b50d21fc8" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"+59162180085\",\n  \"to\": \"{{$json.to}}\",\n  \"type\": \"interactive\",\n  \"interactive\": {\n    \"type\": \"button\",\n    \"header\": {\n      \"type\": \"image\",\n      \"image\": { \"link\": \"{{$json.pago.comprobante_url || 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/logo-color-navy.png'}}\" }\n    },\n    \"body\": {\n      \"text\": \"💰 *PAGO PENDIENTE DE VERIFICACIÓN*\\n\\n*Monto:* {{$json.pago.monto}} Bs\\n*Método:* {{$json.pago.metodo_pago}}\\n*Fecha:* {{$json.pago.fecha}} · {{$json.pago.hora}}\\n\\n*Pagador:* {{$json.pago.nombre_pagador}}\\n*Tel:* {{$json.pago.telefono_pagador || 's/d'}}\\n\\n*Agrupación:* {{$json.pago.agrupacion || 's/d'}}\\n*Obra:* {{$json.pago.nombre_obra || 's/d'}}\\n*Concepto:* {{$json.pago.concepto}}\\n\\n*Recibo N°:* {{$json.pago.numero_recibo || $json.pago.id_pago}}\"\n    },\n    \"footer\": { \"text\": \"Festival Danzarte 2026\" },\n    \"action\": {\n      \"buttons\": [\n        {\n          \"type\": \"reply\",\n          \"reply\": {\n            \"id\": \"confirmar:{{$json.pago.id_pago}}\",\n            \"title\": \"✅ Confirmar\"\n          }\n        },\n        {\n          \"type\": \"reply\",\n          \"reply\": {\n            \"id\": \"rechazar:{{$json.pago.id_pago}}\",\n            \"title\": \"❌ Rechazar\"\n          }\n        }\n      ]\n    }\n  },\n  \"externalId\": \"pago-revision-{{$json.pago.id_pago}}-{{$json.to}}\"\n}",
+        "options": {}
+      },
+      "name": "YCloud: enviar template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [860, 140]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\": true, \"notified\": {{$node['Loop por admin'].context.totalItems || 1}} }"
+      },
+      "name": "Responder al PHP",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1080, 140]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 401,
+        "responseBody": "={\"error\": \"secret inválido\"}"
+      },
+      "name": "Rechaza unauth",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [640, 320]
+    }
+  ],
+  "connections": {
+    "Webhook PHP (pago nuevo)": {
+      "main": [[{ "node": "Verifica secret", "type": "main", "index": 0 }]]
+    },
+    "Verifica secret": {
+      "main": [
+        [{ "node": "Loop por admin", "type": "main", "index": 0 }],
+        [{ "node": "Rechaza unauth", "type": "main", "index": 0 }]
+      ]
+    },
+    "Loop por admin": {
+      "main": [[{ "node": "YCloud: enviar template", "type": "main", "index": 0 }]]
+    },
+    "YCloud: enviar template": {
+      "main": [[{ "node": "Responder al PHP", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "festival-danzarte-pago-revision-ycloud"
+}

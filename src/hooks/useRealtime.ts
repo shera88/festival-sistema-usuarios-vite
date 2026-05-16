@@ -9,6 +9,7 @@ const WATCHED_TABLES = [
   'registro_solicitud_2026',
   'instituciones',
   'coreografos',
+  'pagos_2026',
 ];
 
 const INVALIDATIONS: Record<string, string[][]> = {
@@ -18,6 +19,7 @@ const INVALIDATIONS: Record<string, string[][]> = {
   registro_solicitud_2026: [['solicitudes']],
   instituciones: [['mis-agrupaciones'], ['agrupaciones']],
   coreografos: [['coreografos']],
+  pagos_2026: [['pagos-resumen'], ['pagos-historial'], ['pagos-anos']],
 };
 
 export function useRealtime() {
@@ -40,8 +42,8 @@ export function useRealtime() {
 
     function schedule(keys: string[][]) {
       for (const key of keys) pendingKeys.add(key.join('|'));
-      if (timer) return;
-      timer = setTimeout(flush, 500);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(flush, 200);
     }
 
     const channel = supabase.channel('app-realtime');

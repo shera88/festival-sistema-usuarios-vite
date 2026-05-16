@@ -194,6 +194,51 @@ try {
     exit;
 }
 
+// Notificar a n8n para que avise a admins por WhatsApp
+$cfgFull = require __DIR__ . '/config.php';
+$n8nUrl = $cfgFull['webhooks']['pago_revision'] ?? '';
+$n8nSecret = $cfgFull['webhook_shared_secret'] ?? '';
+if ($n8nUrl) {
+    // Datos contextuales para enriquecer la notificación
+    $obra = '';
+    $agrupacion = '';
+    if ($concepto === 'inscripcion') {
+        $insRow = $sb->selectOne('registro_de_inscripcion_2026', 'nombre_de_la_obra,agrupacion', ['id_inscripcion' => 'eq.' . $id_referencia]);
+        $obra = (string)($insRow['nombre_de_la_obra'] ?? '');
+        $agrupacion = (string)($insRow['agrupacion'] ?? '');
+    }
+    $payload = [
+        'secret'           => $n8nSecret,
+        'id_pago'          => $id_pago,
+        'numero_recibo'    => $numero_recibo,
+        'concepto'         => $concepto,
+        'id_referencia'    => $id_referencia,
+        'monto'            => $monto,
+        'fecha'            => $row['fecha'],
+        'hora'             => $row['hora'],
+        'metodo_pago'      => $row['metodo_pago'],
+        'nombre_pagador'   => $row['nombre_pagador'],
+        'telefono_pagador' => $row['telefono_pagador'],
+        'comprobante_url'  => $comprobante_url,
+        'agrupacion'       => $agrupacion,
+        'nombre_obra'      => $obra,
+    ];
+    // Fire-and-forget, 2s timeout para no demorar la respuesta al usuario
+    $ch = curl_init($n8nUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 2,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+    ]);
+    curl_exec($ch);
+    if (curl_errno($ch)) {
+        error_log('[pago-crear] n8n notify falló: ' . curl_error($ch));
+    }
+    curl_close($ch);
+}
+
 sendJson([
     'ok' => true,
     'id_pago' => $id_pago,

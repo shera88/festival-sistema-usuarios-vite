@@ -100,6 +100,9 @@ export function PagosTab() {
     queryKey: ['pagos-resumen'],
     queryFn: () => pagosApi.resumen(),
     enabled: anoActivo === ANO_ACTUAL,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: false,
   });
 
   // Renderizar vista histórica si el año activo no es el actual
@@ -823,9 +826,9 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
           <span className="truncate">{p.metodo_pago}</span>
         </div>
       </div>
-      {p.estado === 'verificado' && (
+      {p.estado === 'verificado' && p.recibo_pdf_url && (
         <a
-          href={pagosApi.reciboUrl(p.id_pago)}
+          href={p.recibo_pdf_url}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Ver recibo PDF"
@@ -836,6 +839,17 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
           <Receipt className="h-3 w-3" strokeWidth={2.4} />
           Recibo
         </a>
+      )}
+      {p.estado === 'verificado' && !p.recibo_pdf_url && (
+        <span
+          aria-label="Generando recibo PDF"
+          title="Generando recibo, aparecerá en segundos"
+          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 text-[9.5px] font-bold uppercase text-text-45"
+          style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
+        >
+          <Receipt className="h-3 w-3 animate-pulse" strokeWidth={2.4} />
+          Generando…
+        </span>
       )}
       {p.comprobante_url && (
         <a

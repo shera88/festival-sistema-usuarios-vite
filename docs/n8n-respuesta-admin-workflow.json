@@ -1,0 +1,265 @@
+{
+  "name": "Festival Danzarte — Respuesta Admin (YCloud Inbound)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ycloud-inbound",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook YCloud (inbound)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [180, 220],
+      "webhookId": "ycloud-inbound-pago"
+    },
+    {
+      "parameters": {
+        "functionCode": "// YCloud inbound webhook — payload típico para button replies:\n// {\n//   type: 'whatsapp.inbound_message.received',\n//   whatsappInboundMessage: {\n//     from: '59175571497',\n//     wabaId: '...',\n//     phoneNumber: '+59162180085',\n//     type: 'button' | 'interactive',\n//     button: { payload: 'confirmar:abc123', text: '✅ Confirmar' },\n//     interactive: { type: 'button_reply', buttonReply: { id: 'confirmar:abc123', title: '✅ Confirmar' } }\n//   }\n// }\nconst body = $items('Webhook YCloud (inbound)')[0].json.body || $items('Webhook YCloud (inbound)')[0].json;\nconst inbound = body.whatsappInboundMessage || body;\nif (!inbound) return [{ json: { ignored: true, reason: 'no inbound' } }];\n\nlet payload = '';\nlet senderPhone = (inbound.from || '').toString().replace(/^\\+/, '');\n\nif (inbound.type === 'button' && inbound.button && inbound.button.payload) {\n  payload = inbound.button.payload;\n} else if (inbound.type === 'interactive' && inbound.interactive && inbound.interactive.buttonReply) {\n  payload = inbound.interactive.buttonReply.id;\n} else {\n  return [{ json: { ignored: true, reason: 'not button reply', type: inbound.type } }];\n}\n\nconst [accion, idPago] = payload.split(':');\nif (!accion || !idPago) return [{ json: { ignored: true, reason: 'payload malformado', payload } }];\n\nreturn [{ json: { senderPhone, accion, idPago, payload } }];"
+      },
+      "name": "Parse button reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [400, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{$json.ignored === true}}", "value2": true }
+          ]
+        }
+      },
+      "name": "IF ignorar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [620, 220]
+    },
+    {
+      "parameters": {
+        "functionCode": "const admins = ('59175571497' || '').split(',').map(s => s.trim().replace(/^\\+/, '')).filter(Boolean);\nconst sender = ($items('Parse button reply')[0].json.senderPhone || '').replace(/^\\+/, '');\nconst autorizado = admins.includes(sender);\nreturn [{ json: { ...$items('Parse button reply')[0].json, autorizado } }];"
+      },
+      "name": "Valida admin autorizado",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [840, 320]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            { "value1": "={{$json.autorizado}}", "value2": true }
+          ]
+        }
+      },
+      "name": "IF autorizado",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1060, 320]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{$json.accion}}", "operation": "equal", "value2": "confirmar" }
+          ]
+        }
+      },
+      "name": "IF accion=confirmar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1280, 260]
+    },
+    {
+      "parameters": {
+        "url": "=https://supabase.imaginarte.cloud/rest/v1/pagos_2026?id_pago=eq.{{$json.idPago}}",
+        "method": "PATCH",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI" },
+            { "name": "Authorization", "value": "=Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"estado\": \"verificado\",\n  \"verificado_en\": \"{{$now.toISO()}}\",\n  \"verificado_por\": \"WA:{{$json.senderPhone}}\"\n}",
+        "options": {}
+      },
+      "name": "Supabase: marcar verificado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1500, 180]
+    },
+    {
+      "parameters": {
+        "url": "https://festivaldanzarte.com/api/recibo-generar.php",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Internal-Secret", "value": "=" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"id_pago\": \"{{$node[\\\"Parse button reply\\\"].json.idPago}}\"\n}",
+        "options": {}
+      },
+      "name": "Generar recibo PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1720, 180]
+    },
+    {
+      "parameters": {
+        "url": "https://api.ycloud.com/v2/whatsapp/messages/sendDirectly",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "=2a98d6fcfacb400f9dbe625b50d21fc8" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"+59162180085\",\n  \"to\": \"+{{$node[\\\"Parse button reply\\\"].json.senderPhone}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"✅ Pago {{$node[\\\"Parse button reply\\\"].json.idPago}} marcado como VERIFICADO. Recibo PDF generado.\" }\n}",
+        "options": {}
+      },
+      "name": "ACK al admin (confirmado)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1940, 180]
+    },
+    {
+      "parameters": {
+        "url": "=https://supabase.imaginarte.cloud/rest/v1/pagos_2026?id_pago=eq.{{$json.idPago}}",
+        "method": "PATCH",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI" },
+            { "name": "Authorization", "value": "=Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"estado\": \"rechazado\",\n  \"verificado_en\": \"{{$now.toISO()}}\",\n  \"verificado_por\": \"WA:{{$json.senderPhone}}\"\n}",
+        "options": {}
+      },
+      "name": "Supabase: marcar rechazado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1500, 360]
+    },
+    {
+      "parameters": {
+        "url": "https://api.ycloud.com/v2/whatsapp/messages/sendDirectly",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "=2a98d6fcfacb400f9dbe625b50d21fc8" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"+59162180085\",\n  \"to\": \"+{{$node[\\\"Parse button reply\\\"].json.senderPhone}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"❌ Pago {{$node[\\\"Parse button reply\\\"].json.idPago}} marcado como RECHAZADO.\" }\n}",
+        "options": {}
+      },
+      "name": "ACK al admin (rechazado)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1720, 360]
+    },
+    {
+      "parameters": {
+        "url": "https://api.ycloud.com/v2/whatsapp/messages/sendDirectly",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-API-Key", "value": "=2a98d6fcfacb400f9dbe625b50d21fc8" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"+59162180085\",\n  \"to\": \"+{{$node[\\\"Valida admin autorizado\\\"].json.senderPhone}}\",\n  \"type\": \"text\",\n  \"text\": { \"body\": \"⚠️ Tu número no está autorizado para verificar pagos. Contacta al administrador principal.\" }\n}",
+        "options": {}
+      },
+      "name": "Reject unauthorized",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1280, 460]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK"
+      },
+      "name": "Respuesta a YCloud",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2160, 260]
+    }
+  ],
+  "connections": {
+    "Webhook YCloud (inbound)": {
+      "main": [[{ "node": "Parse button reply", "type": "main", "index": 0 }]]
+    },
+    "Parse button reply": {
+      "main": [[{ "node": "IF ignorar", "type": "main", "index": 0 }]]
+    },
+    "IF ignorar": {
+      "main": [
+        [{ "node": "Respuesta a YCloud", "type": "main", "index": 0 }],
+        [{ "node": "Valida admin autorizado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Valida admin autorizado": {
+      "main": [[{ "node": "IF autorizado", "type": "main", "index": 0 }]]
+    },
+    "IF autorizado": {
+      "main": [
+        [{ "node": "IF accion=confirmar", "type": "main", "index": 0 }],
+        [{ "node": "Reject unauthorized", "type": "main", "index": 0 }]
+      ]
+    },
+    "IF accion=confirmar": {
+      "main": [
+        [{ "node": "Supabase: marcar verificado", "type": "main", "index": 0 }],
+        [{ "node": "Supabase: marcar rechazado", "type": "main", "index": 0 }]
+      ]
+    },
+    "Supabase: marcar verificado": {
+      "main": [[{ "node": "Generar recibo PDF", "type": "main", "index": 0 }]]
+    },
+    "Generar recibo PDF": {
+      "main": [[{ "node": "ACK al admin (confirmado)", "type": "main", "index": 0 }]]
+    },
+    "ACK al admin (confirmado)": {
+      "main": [[{ "node": "Respuesta a YCloud", "type": "main", "index": 0 }]]
+    },
+    "Supabase: marcar rechazado": {
+      "main": [[{ "node": "ACK al admin (rechazado)", "type": "main", "index": 0 }]]
+    },
+    "ACK al admin (rechazado)": {
+      "main": [[{ "node": "Respuesta a YCloud", "type": "main", "index": 0 }]]
+    },
+    "Reject unauthorized": {
+      "main": [[{ "node": "Respuesta a YCloud", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": "festival-danzarte-respuesta-admin-ycloud"
+}

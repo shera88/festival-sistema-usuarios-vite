@@ -27,8 +27,19 @@ register_shutdown_function(function () {
 handlePreflight();
 requireMethod('POST');
 
-$user = requireAuth();
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
+// Auth dual: shared secret (server-to-server desde n8n) o sesión (frontend)
+$cfg = require __DIR__ . '/config.php';
+$sharedSecret = (string)($cfg['webhook_shared_secret'] ?? '');
+$reqSecret = (string)($_SERVER['HTTP_X_WEBHOOK_SECRET'] ?? '');
+$isServerToServer = $sharedSecret !== '' && hash_equals($sharedSecret, $reqSecret);
+
+if ($isServerToServer) {
+    $user = ['id_global' => 'n8n', 'rol' => 'admin', 'id_agrupacion' => ''];
+    $userAgrups = [];
+} else {
+    $user = requireAuth();
+    $userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
+}
 
 $rawBody = file_get_contents('php://input') ?: '';
 $body = json_decode($rawBody, true) ?: [];
@@ -46,10 +57,12 @@ if (!$pago) {
     exit;
 }
 
-$idAgrupPago = (string)($pago['id_agrupacion'] ?? '');
-if (!in_array($idAgrupPago, $userAgrups, true) && ($user['rol'] ?? '') !== 'admin') {
-    sendJson(['error' => 'No autorizado'], 403);
-    exit;
+if (!$isServerToServer) {
+    $idAgrupPago = (string)($pago['id_agrupacion'] ?? '');
+    if (!in_array($idAgrupPago, $userAgrups, true) && ($user['rol'] ?? '') !== 'admin') {
+        sendJson(['error' => 'No autorizado'], 403);
+        exit;
+    }
 }
 
 if (($pago['estado'] ?? '') !== 'verificado') {

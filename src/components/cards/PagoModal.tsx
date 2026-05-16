@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Upload, Loader2, AlertCircle, ShieldCheck, ArrowUpRight, Trash2, TrendingDown, CheckCircle2 } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
+import { webpProxy } from '@/lib/utils/img';
 import type { CompromisoDeuda, MetodoPago } from '@/types/domain';
 
 interface Props {
@@ -32,6 +33,9 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrLightbox, setQrLightbox] = useState(false);
+  const QR_URL = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-inscripcion.png';
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Solo QR habilitado en portal de usuarios
@@ -45,7 +49,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
       setErr(null);
       return;
     }
-    setMonto(compromiso.saldo > 0 ? String(Math.round(compromiso.saldo)) : '');
+    setMonto('');
     setIdMetodo(metodosQR[0]?.id_metodo ?? '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compromiso, metodos]);
@@ -149,7 +153,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
     <>
       <style>{MODAL_CSS}</style>
       <div
-        className="fixed inset-0 z-[200] flex items-end justify-center bg-black/85 backdrop-blur-md sm:items-center sm:p-6"
+        className="fixed inset-0 z-[200] flex items-end justify-center bg-black/92 sm:items-center sm:p-6"
         onClick={() => !submitting && onClose()}
         style={{ animation: 'modalFade 0.18s ease-out' }}
       >
@@ -159,14 +163,11 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
           style={{
             background: '#0a0817',
             animation: 'modalSlide 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
-            boxShadow: `0 1px 0 0 rgba(255,255,255,0.04) inset, 0 20px 80px -20px ${cfg.glow}`,
+            boxShadow: `0 1px 0 0 rgba(255,255,255,0.04) inset, 0 20px 60px -20px ${cfg.glow}`,
+            contain: 'paint',
+            transform: 'translateZ(0)',
           }}
         >
-          {/* Aurora glow header */}
-          <div
-            className="pointer-events-none absolute -top-32 left-1/2 h-64 w-96 -translate-x-1/2 rounded-full blur-3xl opacity-50"
-            style={{ background: `radial-gradient(circle, ${cfg.glow} 0%, transparent 65%)` }}
-          />
 
           <header className="relative flex items-center gap-3 border-b border-white/[0.05] px-5 py-4">
             <div className="min-w-0 flex-1">
@@ -194,7 +195,15 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
             </button>
           </header>
 
-          <form onSubmit={handleSubmit} className="relative flex-1 space-y-5 overflow-auto px-5 py-5">
+          <form
+            onSubmit={handleSubmit}
+            className="relative flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-5 py-5"
+            style={{
+              overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch',
+              transform: 'translateZ(0)',
+            }}
+          >
             {/* Resumen saldo — grid 3 con dividers · saldo es LIVE */}
             <div
               className="grid grid-cols-3 divide-x divide-white/[0.06] rounded-2xl border border-white/[0.06] py-3"
@@ -386,7 +395,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
             <div>
               <button
                 type="button"
-                onClick={() => setErr('La generación automática de QR estará disponible pronto. Por favor, suba el comprobante manualmente.')}
+                onClick={() => setQrOpen((v) => !v)}
                 className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3 text-[11.5px] font-bold uppercase text-white transition-transform active:scale-[0.98]"
                 style={{
                   background: cfg.grad,
@@ -396,7 +405,6 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                   textShadow: '0 1px 2px rgba(0,0,0,0.35)',
                 }}
               >
-                {/* Shimmer sweep on hover — suave */}
                 <span
                   className="pointer-events-none absolute inset-0 -translate-x-full transition-transform ease-in-out group-hover:translate-x-full"
                   style={{
@@ -412,20 +420,87 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                     <path d="M14 14h3v3M17 17v4M21 14v3M14 21h7" />
                   </svg>
                 </span>
-                <span className="relative">Generar QR de pago</span>
-                <span
-                  className="relative ml-1 rounded-full px-2 py-0.5 text-[8px] font-bold tracking-wider text-white"
-                  style={{ background: 'rgba(255,255,255,0.22)' }}
-                >
-                  PRÓXIMAMENTE
-                </span>
+                <span className="relative">{qrOpen ? 'Ocultar QR' : 'Generar QR de pago'}</span>
               </button>
-              <p
-                className="mt-2 text-center text-[10px] text-text-45"
-                style={{ fontFamily: FONT_DISPLAY }}
-              >
-                Mientras tanto suba su comprobante manualmente
-              </p>
+
+              {/* QR placeholder — imagen estática hasta integrar API banco */}
+              {qrOpen && (
+                <div
+                  className="mt-3 overflow-hidden rounded-2xl border anim-fade-in"
+                  style={{
+                    borderColor: `${cfg.accent}40`,
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)',
+                  }}
+                >
+                  <div className="px-4 py-3 text-center" style={{ background: `${cfg.accent}10` }}>
+                    <div
+                      className="text-[9.5px] font-bold uppercase"
+                      style={{
+                        color: cfg.accent,
+                        letterSpacing: '0.22em',
+                        fontFamily: FONT_DISPLAY,
+                      }}
+                    >
+                      Escanee con su app bancaria
+                    </div>
+                    <div
+                      className="mt-1 text-[10.5px] text-text-45"
+                      style={{ fontFamily: FONT_DISPLAY }}
+                    >
+                      Monto a transferir: <span className="font-semibold text-text-white" style={{ fontFamily: FONT_MONO }}>{bs(montoNum)}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQrLightbox(true)}
+                    aria-label="Ampliar QR"
+                    className="block w-full cursor-pointer transition-opacity hover:opacity-95"
+                  >
+                    <img
+                      src={webpProxy(QR_URL, 600) ?? QR_URL}
+                      alt="QR de pago Festival Danzarte"
+                      className="block h-auto w-full"
+                      loading="lazy"
+                      decoding="async"
+                      width={600}
+                      height={848}
+                    />
+                  </button>
+                  <div className="flex px-3 py-2.5" style={{ background: 'rgba(0,0,0,0.25)' }}>
+                    <a
+                      href={QR_URL}
+                      download="festival-danzarte-qr.png"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md px-3 py-2 text-[10px] font-bold uppercase text-white transition-transform active:scale-[0.97]"
+                      style={{
+                        background: cfg.grad,
+                        fontFamily: FONT_DISPLAY,
+                        letterSpacing: '0.6px',
+                        boxShadow: `0 0 0 1px rgba(255,255,255,0.18) inset, 0 4px 12px ${cfg.glow}`,
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3 w-3">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Descargar
+                    </a>
+                  </div>
+                  <div
+                    className="px-4 py-2 text-center text-[9.5px]"
+                    style={{
+                      background: 'rgba(0,0,0,0.25)',
+                      color: 'var(--text-45)',
+                      fontFamily: FONT_DISPLAY,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    Después de pagar, suba el comprobante abajo
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Comprobante */}
@@ -568,6 +643,53 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
           </footer>
         </div>
       </div>
+
+      {/* Lightbox QR — overlay sobre el modal */}
+      {qrLightbox && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 p-4"
+          onClick={() => setQrLightbox(false)}
+          style={{ animation: 'modalFade 0.18s ease-out' }}
+        >
+          <button
+            type="button"
+            onClick={() => setQrLightbox(false)}
+            aria-label="Cerrar"
+            className="absolute right-4 top-4 grid h-10 w-10 cursor-pointer place-items-center rounded-full text-white transition hover:bg-white/10"
+            style={{ background: 'rgba(255,255,255,0.06)' }}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <a
+            href={QR_URL}
+            download="festival-danzarte-qr.png"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full px-5 py-2.5 text-[11px] font-bold uppercase text-white transition-transform active:scale-[0.97]"
+            style={{
+              background: cfg.grad,
+              fontFamily: FONT_DISPLAY,
+              letterSpacing: '0.9px',
+              boxShadow: `0 0 0 1px rgba(255,255,255,0.18) inset, 0 8px 24px ${cfg.glow}`,
+            }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3.5 w-3.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Descargar QR
+          </a>
+          <img
+            src={webpProxy(QR_URL, 1200) ?? QR_URL}
+            alt="QR de pago Festival Danzarte"
+            className="max-h-[85vh] max-w-[90vw] rounded-xl shadow-2xl"
+            decoding="async"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>,
     document.body,
   );

@@ -194,7 +194,7 @@ function reciboRenderHtml(array $data): string
 
   /* Big amount block */
   .amount-block { margin-bottom: 12mm; }
-  .amount-big { font-size: 22pt; font-weight: 600; color: #0a2540; letter-spacing: -0.02em; line-height: 1.15; }
+  .amount-big { font-size: 16pt; font-weight: 600; color: #0a2540; letter-spacing: -0.015em; line-height: 1.2; }
   .amount-thanks { margin-top: 4mm; font-size: 10pt; color: #0a2540; font-weight: 400; }
 
   /* Items table — Stripe style hairlines */
@@ -310,15 +310,10 @@ function reciboRenderHtml(array $data): string
     </tr>
   </table>
 
-  <!-- Bill from + Bill to — minimalista -->
+  <!-- Pagado por (alineado a la izquierda) -->
   <table class="bill">
     <tr>
-      <td style="width:50%">
-        <table cellpadding="0" cellspacing="0">
-          <tr><td style="font-size:9.5pt; font-weight:600; color:#0a2540;">Festival Danzarte 2026</td></tr>
-        </table>
-      </td>
-      <td style="width:50%">
+      <td>
         <table cellpadding="0" cellspacing="0">
           <tr><td style="padding-bottom:3mm; font-size:10pt; font-weight:600; color:#0a2540;">Pagado por</td></tr>
           <tr><td style="padding-bottom:2.5mm; font-size:9.5pt; font-weight:600; color:#0a2540;">$repNombre</td></tr>
