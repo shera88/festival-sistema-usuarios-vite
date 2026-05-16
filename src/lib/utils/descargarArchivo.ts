@@ -58,31 +58,35 @@ export interface DescargaResult {
 /**
  * Descarga archivo. Capacitor: Filesystem.writeFile -> Directory.External (sin permisos).
  * Web: blob + <a download>. Retorna URI para reabrir más tarde (Share / blob).
+ *
+ * @param url URL pública del archivo
+ * @param filename Nombre con que se guarda en disco
+ * @param label Etiqueta corta para el toast (ej: "Recibo", "Comprobante")
  */
-export async function descargarArchivo(url: string, suggestedName?: string): Promise<DescargaResult> {
-  const filename = suggestedName || getFilenameFromUrl(url);
+export async function descargarArchivo(
+  url: string,
+  filename?: string,
+  label: string = 'Archivo',
+): Promise<DescargaResult> {
+  const finalName = filename || getFilenameFromUrl(url);
 
   if (Capacitor.isNativePlatform()) {
-    const tid = toast.loading(`Descargando ${filename}…`);
+    const tid = toast.loading(`Descargando ${label.toLowerCase()}…`);
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const data = await blobToBase64(blob);
       const write = await Filesystem.writeFile({
-        path: filename,
+        path: finalName,
         data,
         directory: Directory.External,
         recursive: true,
       });
-      toast.success(`Descargado: ${filename}`, {
-        id: tid,
-        description: 'Use el botón "Abrir" en la fila para visualizar',
-        duration: 4000,
-      });
-      return { uri: write.uri, filename, mime: blob.type || null };
+      toast.success(`${label} descargado`, { id: tid, duration: 2500 });
+      return { uri: write.uri, filename: finalName, mime: blob.type || null };
     } catch (e) {
-      toast.error('No se pudo descargar', {
+      toast.error(`No se pudo descargar ${label.toLowerCase()}`, {
         id: tid,
         description: (e as Error).message,
       });
@@ -91,7 +95,7 @@ export async function descargarArchivo(url: string, suggestedName?: string): Pro
   }
 
   // Web
-  const tid = toast.loading(`Descargando ${filename}…`);
+  const tid = toast.loading(`Descargando ${label.toLowerCase()}…`);
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -99,15 +103,14 @@ export async function descargarArchivo(url: string, suggestedName?: string): Pro
     const objectUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = objectUrl;
-    a.download = filename;
+    a.download = finalName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    // Mantén objectURL vivo para Abrir; web no usa Share, abre en nueva pestaña.
-    toast.success(`Descargado: ${filename}`, { id: tid });
-    return { uri: objectUrl, filename, mime: blob.type || null };
+    toast.success(`${label} descargado`, { id: tid, duration: 2500 });
+    return { uri: objectUrl, filename: finalName, mime: blob.type || null };
   } catch (e) {
-    toast.error('No se pudo descargar', {
+    toast.error(`No se pudo descargar ${label.toLowerCase()}`, {
       id: tid,
       description: (e as Error).message,
     });

@@ -779,6 +779,25 @@ function CompromisoCard({
           className="border-t border-white/[0.04] divide-y divide-white/[0.03]"
           style={{ background: '#080614' }}
         >
+          {/* Encabezados de columna: RECIBO | COMPROBANTE */}
+          <div className="flex items-center gap-3 px-4 py-1.5" style={{ background: '#06030f' }}>
+            <div className="h-3 w-7 shrink-0" />
+            <div className="min-w-0 flex-1" />
+            <div className="grid shrink-0 grid-cols-2 gap-1.5" style={{ width: '11.5rem' }}>
+              <div
+                className="text-center text-[8.5px] font-bold uppercase text-text-45"
+                style={{ letterSpacing: '0.16em', fontFamily: FONT_DISPLAY }}
+              >
+                Recibo
+              </div>
+              <div
+                className="text-center text-[8.5px] font-bold uppercase text-text-45"
+                style={{ letterSpacing: '0.16em', fontFamily: FONT_DISPLAY }}
+              >
+                Comprobante
+              </div>
+            </div>
+          </div>
           {pagosSorted.map((p) => (
             <PagoParcialRow key={p.id_pago} p={p} nombreAgrupacion={nombreAgrupacion} />
           ))}
@@ -877,9 +896,10 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
     if (!confirmTipo) return;
     const url = confirmTipo === 'recibo' ? p.recibo_pdf_url : p.comprobante_url;
     if (!url) return;
+    const label = confirmTipo === 'recibo' ? 'Recibo' : 'Comprobante';
     setDownloading(true);
     try {
-      const result = await descargarArchivo(url, buildFilename(confirmTipo));
+      const result = await descargarArchivo(url, buildFilename(confirmTipo), label);
       if (confirmTipo === 'recibo') setReciboDl(result);
       else setComprobanteDl(result);
       setConfirmTipo(null);
@@ -928,67 +948,76 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
           <span className="truncate">{p.metodo_pago}</span>
         </div>
       </div>
-      {p.estado === 'verificado' && p.recibo_pdf_url && (
-        <ActionButton
-          onClick={() => setConfirmTipo('recibo')}
-          grad={RECIBO_GRAD}
-          glow={RECIBO_GLOW}
-          ariaLabel="Descargar recibo PDF"
-          title="Descargar recibo PDF"
-        >
-          <Receipt className="h-3 w-3" strokeWidth={2.5} />
-          Recibo
-        </ActionButton>
-      )}
-      {reciboDl && (
-        <ActionButton
-          onClick={() => onAbrir('recibo')}
-          grad={ABRIR_RECIBO_GRAD}
-          glow={ABRIR_RECIBO_GLOW}
-          ariaLabel="Abrir recibo descargado"
-          title="Abrir recibo descargado"
-          pulse
-        >
-          <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
-          Abrir
-        </ActionButton>
-      )}
-      {p.estado === 'verificado' && !p.recibo_pdf_url && (
-        <span
-          aria-label="Generando recibo PDF"
-          title="Generando recibo, aparecerá en segundos"
-          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 text-[9.5px] font-bold uppercase text-text-45"
-          style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
-        >
-          <Receipt className="h-3 w-3 animate-pulse" strokeWidth={2.4} />
-          Generando…
-        </span>
-      )}
-      {p.comprobante_url && (
-        <ActionButton
-          onClick={() => setConfirmTipo('comprobante')}
-          grad={COMPROBANTE_GRAD}
-          glow={COMPROBANTE_GLOW}
-          ariaLabel="Descargar comprobante"
-          title="Descargar comprobante subido"
-        >
-          <FileText className="h-3 w-3" strokeWidth={2.5} />
-          Comprobante
-        </ActionButton>
-      )}
-      {comprobanteDl && (
-        <ActionButton
-          onClick={() => onAbrir('comprobante')}
-          grad={ABRIR_COMPROBANTE_GRAD}
-          glow={ABRIR_COMPROBANTE_GLOW}
-          ariaLabel="Abrir comprobante descargado"
-          title="Abrir comprobante descargado"
-          pulse
-        >
-          <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
-          Abrir
-        </ActionButton>
-      )}
+      <div className="grid shrink-0 grid-cols-2 gap-1.5" style={{ width: '11.5rem' }}>
+        {/* Columna Recibo */}
+        <div className="flex justify-center">
+          {reciboDl ? (
+            <ActionButton
+              onClick={() => onAbrir('recibo')}
+              grad={ABRIR_RECIBO_GRAD}
+              glow={ABRIR_RECIBO_GLOW}
+              ariaLabel="Abrir recibo descargado"
+              title="Abrir recibo descargado"
+              pulse
+            >
+              <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
+              Abrir
+            </ActionButton>
+          ) : p.estado === 'verificado' && p.recibo_pdf_url ? (
+            <ActionButton
+              onClick={() => setConfirmTipo('recibo')}
+              grad={RECIBO_GRAD}
+              glow={RECIBO_GLOW}
+              ariaLabel="Descargar recibo PDF"
+              title="Descargar recibo PDF"
+            >
+              <Receipt className="h-3 w-3" strokeWidth={2.5} />
+              Recibo
+            </ActionButton>
+          ) : p.estado === 'verificado' ? (
+            <span
+              aria-label="Generando recibo PDF"
+              title="Generando recibo, aparecerá en segundos"
+              className="flex h-7 items-center gap-1 rounded-md border border-white/8 bg-white/2 px-2 text-[9.5px] font-bold uppercase text-text-45"
+              style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
+            >
+              <Receipt className="h-3 w-3 animate-pulse" strokeWidth={2.4} />
+              Generando…
+            </span>
+          ) : (
+            <span className="h-7" />
+          )}
+        </div>
+        {/* Columna Comprobante */}
+        <div className="flex justify-center">
+          {comprobanteDl ? (
+            <ActionButton
+              onClick={() => onAbrir('comprobante')}
+              grad={ABRIR_COMPROBANTE_GRAD}
+              glow={ABRIR_COMPROBANTE_GLOW}
+              ariaLabel="Abrir comprobante descargado"
+              title="Abrir comprobante descargado"
+              pulse
+            >
+              <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
+              Abrir
+            </ActionButton>
+          ) : p.comprobante_url ? (
+            <ActionButton
+              onClick={() => setConfirmTipo('comprobante')}
+              grad={COMPROBANTE_GRAD}
+              glow={COMPROBANTE_GLOW}
+              ariaLabel="Descargar comprobante"
+              title="Descargar comprobante subido"
+            >
+              <FileText className="h-3 w-3" strokeWidth={2.5} />
+              Comprobante
+            </ActionButton>
+          ) : (
+            <span className="h-7" />
+          )}
+        </div>
+      </div>
       <ConfirmDialog
         open={confirmTipo !== null}
         title={confirmTipo === 'recibo' ? 'Descargar recibo' : 'Descargar comprobante'}
