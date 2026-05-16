@@ -6,7 +6,8 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { PagoModal } from '@/components/cards/PagoModal';
 import { webpProxy } from '@/lib/utils/img';
-import { openExternalUrl } from '@/lib/utils/openUrl';
+import { descargarArchivo } from '@/lib/utils/descargarArchivo';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import type { CompromisoDeuda, PagoHistorial, PagoEstado, PagoHistorialAno, AnoConPagos } from '@/types/domain';
 
 function bs(n: number): string {
@@ -794,6 +795,23 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
     p.estado === 'verificado' ? CheckCircle2
     : p.estado === 'rechazado' || p.estado === 'anulado' ? AlertCircle
     : Clock;
+  const [confirmTipo, setConfirmTipo] = useState<'recibo' | 'comprobante' | null>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function onConfirm() {
+    if (!confirmTipo) return;
+    const url = confirmTipo === 'recibo' ? p.recibo_pdf_url : p.comprobante_url;
+    if (!url) return;
+    setDownloading(true);
+    try {
+      await descargarArchivo(url);
+      setConfirmTipo(null);
+    } catch {
+      // toast lo muestra
+    } finally {
+      setDownloading(false);
+    }
+  }
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.018]">
       <div
@@ -830,9 +848,9 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
       {p.estado === 'verificado' && p.recibo_pdf_url && (
         <button
           type="button"
-          onClick={() => openExternalUrl(p.recibo_pdf_url!)}
-          aria-label="Ver recibo PDF"
-          title="Ver recibo PDF"
+          onClick={() => setConfirmTipo('recibo')}
+          aria-label="Descargar recibo PDF"
+          title="Descargar recibo PDF"
           className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-green/40 bg-green/10 px-2 text-[9.5px] font-bold uppercase text-green transition hover:bg-green/20"
           style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
         >
@@ -854,9 +872,9 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
       {p.comprobante_url && (
         <button
           type="button"
-          onClick={() => openExternalUrl(p.comprobante_url!)}
-          aria-label="Ver comprobante"
-          title="Ver comprobante de pago subido"
+          onClick={() => setConfirmTipo('comprobante')}
+          aria-label="Descargar comprobante"
+          title="Descargar comprobante subido"
           className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 text-[9.5px] font-bold uppercase text-text-65 transition hover:bg-white/[0.06] hover:text-cyan"
           style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
         >
@@ -864,6 +882,16 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
           Comprobante
         </button>
       )}
+      <ConfirmDialog
+        open={confirmTipo !== null}
+        title={confirmTipo === 'recibo' ? 'Descargar recibo' : 'Descargar comprobante'}
+        message={`¿Desea descargar el ${confirmTipo === 'recibo' ? 'recibo PDF' : 'comprobante'} a su dispositivo?`}
+        confirmText="Descargar"
+        variant="primary"
+        loading={downloading}
+        onConfirm={onConfirm}
+        onClose={() => !downloading && setConfirmTipo(null)}
+      />
     </div>
   );
 }
