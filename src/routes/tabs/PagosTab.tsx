@@ -779,7 +779,7 @@ function CompromisoCard({
           style={{ background: '#080614' }}
         >
           {/* Encabezados de columna: RECIBO | COMPROBANTE */}
-          <div className="flex items-center gap-3 px-5 py-2" style={{ background: '#06030f' }}>
+          <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: '#06030f' }}>
             <div className="h-3 w-7 shrink-0" />
             <div className="min-w-0 flex-1" />
             <div className="mr-3 grid shrink-0 grid-cols-2 gap-2" style={{ width: '12rem' }}>
@@ -849,7 +849,7 @@ function ActionButton({
       aria-label={ariaLabel}
       title={title}
       disabled={loading}
-      className="group/btn relative flex h-7 w-full shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-md px-1 text-[8.5px] font-bold uppercase text-white transition-transform active:scale-[0.94] disabled:opacity-90"
+      className="group/btn relative flex h-6 w-full shrink-0 items-center justify-center gap-0.5 overflow-hidden whitespace-nowrap rounded px-1 text-[7.5px] font-bold uppercase text-white transition-transform active:scale-[0.94] disabled:opacity-90"
       style={{
         background: grad,
         letterSpacing: '0.6px',
@@ -866,7 +866,7 @@ function ActionButton({
         }}
       />
       <span className="relative flex items-center gap-1">
-        {loading ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={2.6} /> : children}
+        {loading ? <Loader2 className="h-2.5 w-2.5 animate-spin" strokeWidth={2.6} /> : children}
       </span>
     </button>
   );
@@ -941,7 +941,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
     }
   }
   return (
-    <div className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.018]">
+    <div className="flex items-center gap-2.5 px-4 py-2.5 transition-colors hover:bg-white/[0.018]">
       <div
         className="grid h-7 w-7 shrink-0 place-items-center rounded-full"
         style={{ background: `${e.dot}1A`, color: e.dot }}
@@ -949,22 +949,22 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
         <Icon className="h-3 w-3" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-baseline gap-2 whitespace-nowrap">
           <span
-            className="text-[12px] font-semibold text-text-90 tabular-nums"
+            className="text-[11px] font-semibold text-text-90 tabular-nums"
             style={{ fontFamily: FONT_MONO, letterSpacing: '-0.01em' }}
           >
             {bs(p.monto)}
           </span>
           <span
-            className="text-[9px] font-semibold uppercase"
-            style={{ color: e.dot, letterSpacing: '0.7px', fontFamily: FONT_DISPLAY }}
+            className="text-[7.5px] font-semibold uppercase"
+            style={{ color: e.dot, letterSpacing: '0.4px', fontFamily: FONT_DISPLAY }}
           >
             {e.label}
           </span>
         </div>
         <div
-          className="mt-0.5 flex items-center gap-1.5 text-[9.5px] text-text-45"
+          className="mt-0.5 flex items-center gap-1 truncate text-[8.5px] text-text-45"
           style={{ fontFamily: FONT_DISPLAY }}
         >
           <span style={{ fontFamily: FONT_MONO }}>{p.fecha}</span>
@@ -986,7 +986,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
               loading={loading.recibo}
               pulse={!!reciboDl}
             >
-              <Receipt className="h-3 w-3" strokeWidth={2.5} />
+              <Receipt className="h-2.5 w-2.5" strokeWidth={2.6} />
               Recibo
             </ActionButton>
           ) : p.estado === 'verificado' ? (
@@ -996,7 +996,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
               className="flex h-7 w-full items-center justify-center gap-1 rounded-md border border-white/8 bg-white/2 px-2 text-[9.5px] font-bold uppercase text-text-45"
               style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
             >
-              <Receipt className="h-3 w-3 animate-pulse" strokeWidth={2.4} />
+              <Receipt className="h-2.5 w-2.5 animate-pulse" strokeWidth={2.4} />
               Generando…
             </span>
           ) : (
@@ -1015,7 +1015,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
               loading={loading.comprobante}
               pulse={!!comprobanteDl}
             >
-              <FileText className="h-3 w-3" strokeWidth={2.5} />
+              <FileText className="h-2.5 w-2.5" strokeWidth={2.6} />
               Comprobante
             </ActionButton>
           ) : (
