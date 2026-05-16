@@ -45,12 +45,12 @@ export async function descargarArchivo(url: string, suggestedName?: string): Pro
       const result = await Filesystem.writeFile({
         path: filename,
         data,
-        directory: Directory.Documents,
+        directory: Directory.External,
         recursive: true,
       });
       toast.success(`Descargado: ${filename}`, {
         id: tid,
-        description: 'Guardado en Documentos',
+        description: 'Guardado en almacenamiento de la app',
       });
       return void result;
     } catch (e) {
