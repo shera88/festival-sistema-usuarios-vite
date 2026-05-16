@@ -778,25 +778,6 @@ function CompromisoCard({
           className="border-t border-white/[0.04] divide-y divide-white/[0.03]"
           style={{ background: '#080614' }}
         >
-          {/* Encabezados de columna: RECIBO | COMPROBANTE */}
-          <div className="flex items-center gap-2.5 px-4 py-1.5" style={{ background: '#06030f' }}>
-            <div className="h-3 w-7 shrink-0" />
-            <div className="min-w-0 flex-1" />
-            <div className="mr-3 grid shrink-0 grid-cols-2 gap-2" style={{ width: '12rem' }}>
-              <div
-                className="text-center text-[8.5px] font-bold uppercase text-text-45"
-                style={{ letterSpacing: '0.16em', fontFamily: FONT_DISPLAY }}
-              >
-                Recibo
-              </div>
-              <div
-                className="text-center text-[8.5px] font-bold uppercase text-text-45"
-                style={{ letterSpacing: '0.16em', fontFamily: FONT_DISPLAY }}
-              >
-                Comprobante
-              </div>
-            </div>
-          </div>
           {pagosSorted.map((p) => (
             <PagoParcialRow key={p.id_pago} p={p} nombreAgrupacion={nombreAgrupacion} />
           ))}
@@ -849,7 +830,7 @@ function ActionButton({
       aria-label={ariaLabel}
       title={title}
       disabled={loading}
-      className="group/btn relative flex h-6 w-full shrink-0 items-center justify-center gap-0.5 overflow-hidden whitespace-nowrap rounded px-1 text-[7.5px] font-bold uppercase text-white transition-transform active:scale-[0.94] disabled:opacity-90"
+      className="group/btn relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md text-white transition-transform active:scale-[0.90] disabled:opacity-90"
       style={{
         background: grad,
         letterSpacing: '0.6px',
@@ -866,7 +847,7 @@ function ActionButton({
         }}
       />
       <span className="relative flex items-center gap-1">
-        {loading ? <Loader2 className="h-2.5 w-2.5 animate-spin" strokeWidth={2.6} /> : children}
+        {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2.4} /> : children}
       </span>
     </button>
   );
@@ -973,7 +954,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
           <span className="truncate">{p.metodo_pago}</span>
         </div>
       </div>
-      <div className="mr-3 grid shrink-0 grid-cols-2 gap-2" style={{ width: '12rem' }}>
+      <div className="mr-3 grid shrink-0 grid-cols-2 gap-2" style={{ width: '4.25rem' }}>
         {/* Columna Recibo */}
         <div className="flex w-full">
           {p.estado === 'verificado' && p.recibo_pdf_url ? (
@@ -986,18 +967,15 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
               loading={loading.recibo}
               pulse={!!reciboDl}
             >
-              <Receipt className="h-2.5 w-2.5" strokeWidth={2.6} />
-              Recibo
+              <Receipt className="h-3.5 w-3.5" strokeWidth={2.3} />
             </ActionButton>
           ) : p.estado === 'verificado' ? (
             <span
               aria-label="Generando recibo PDF"
               title="Generando recibo, aparecerá en segundos"
-              className="flex h-7 w-full items-center justify-center gap-1 rounded-md border border-white/8 bg-white/2 px-2 text-[9.5px] font-bold uppercase text-text-45"
-              style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
+              className="flex h-7 w-7 items-center justify-center rounded-md border border-white/8 bg-white/2 text-text-45"
             >
-              <Receipt className="h-2.5 w-2.5 animate-pulse" strokeWidth={2.4} />
-              Generando…
+              <Receipt className="h-3.5 w-3.5 animate-pulse" strokeWidth={2.3} />
             </span>
           ) : (
             <span className="h-7 w-full" />
@@ -1015,8 +993,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
               loading={loading.comprobante}
               pulse={!!comprobanteDl}
             >
-              <FileText className="h-2.5 w-2.5" strokeWidth={2.6} />
-              Comprobante
+              <FileText className="h-3.5 w-3.5" strokeWidth={2.3} />
             </ActionButton>
           ) : (
             <span className="h-7 w-full" />
