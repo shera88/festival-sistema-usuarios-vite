@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Upload, Loader2, AlertCircle, ShieldCheck, ArrowUpRight, Trash2 } from 'lucide-react';
+import { X, Upload, Loader2, AlertCircle, ShieldCheck, ArrowUpRight, Trash2, TrendingDown, CheckCircle2 } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
 import type { CompromisoDeuda, MetodoPago } from '@/types/domain';
 
@@ -28,24 +28,26 @@ function bs(n: number): string {
 export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   const [monto, setMonto] = useState<string>('');
   const [idMetodo, setIdMetodo] = useState<string>('');
-  const [observacion, setObservacion] = useState('');
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Solo QR habilitado en portal de usuarios
+  const metodosQR = metodos.filter((m) => /qr/i.test(m.metodo));
+
   useEffect(() => {
     if (!compromiso) {
       setMonto('');
-      setObservacion('');
       setComprobante(null);
       setComprobanteUrl(null);
       setErr(null);
       return;
     }
     setMonto(compromiso.saldo > 0 ? String(Math.round(compromiso.saldo)) : '');
-    setIdMetodo(metodos[0]?.id_metodo ?? '');
+    setIdMetodo(metodosQR[0]?.id_metodo ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compromiso, metodos]);
 
   useEffect(() => {
@@ -64,6 +66,31 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   if (!compromiso) return null;
 
   const cfg = conceptoAccent[compromiso.concepto] ?? conceptoAccent.inscripcion;
+
+  const montoNum = (() => {
+    const n = Number(monto);
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.min(n, compromiso.saldo);
+  })();
+  const saldoRestante = Math.max(0, compromiso.saldo - montoNum);
+  const cubreTotal = montoNum > 0 && montoNum >= compromiso.saldo - 0.5;
+  const progresoActual = compromiso.monto_total > 0
+    ? Math.min(1, compromiso.pagado_verificado / compromiso.monto_total)
+    : 0;
+  const progresoPreview = compromiso.monto_total > 0
+    ? Math.min(1, (compromiso.pagado_verificado + montoNum) / compromiso.monto_total)
+    : 0;
+
+  function handleMontoChange(raw: string) {
+    if (raw === '') { setMonto(''); return; }
+    const n = Number(raw);
+    if (!isFinite(n) || n < 0) return;
+    if (n > compromiso!.saldo) {
+      setMonto(String(Math.round(compromiso!.saldo)));
+      return;
+    }
+    setMonto(raw);
+  }
 
   function handleFile(f: File | null) {
     if (comprobanteUrl) {
@@ -108,7 +135,6 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
         id_referencia: c.id_referencia,
         monto: m,
         id_metodo_pago: idMetodo,
-        observacion: observacion.trim() || undefined,
         comprobante,
       });
       onSaved();
@@ -169,14 +195,20 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
           </header>
 
           <form onSubmit={handleSubmit} className="relative flex-1 space-y-5 overflow-auto px-5 py-5">
-            {/* Resumen saldo — grid 3 con dividers */}
+            {/* Resumen saldo — grid 3 con dividers · saldo es LIVE */}
             <div
               className="grid grid-cols-3 divide-x divide-white/[0.06] rounded-2xl border border-white/[0.06] py-3"
               style={{ background: 'rgba(255,255,255,0.02)' }}
             >
               <StatBox label="Total" value={bs(compromiso.monto_total)} />
-              <StatBox label="Pagado" value={bs(compromiso.pagado_verificado)} color="#10B981" />
-              <StatBox label="Saldo" value={bs(compromiso.saldo)} color={cfg.accent} bold />
+              <StatBox label="Pagado" value={bs(compromiso.pagado_verificado + montoNum)} color="#10B981" />
+              <StatBox
+                label={montoNum > 0 ? 'Quedará' : 'Saldo'}
+                value={bs(saldoRestante)}
+                color={cubreTotal ? '#10B981' : cfg.accent}
+                bold
+                hint={montoNum > 0 ? `de ${bs(compromiso.saldo)}` : undefined}
+              />
             </div>
 
             {/* Monto a pagar — hero input */}
@@ -191,11 +223,12 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                 <div className="relative">
                   <input
                     type="number"
+                    inputMode="numeric"
                     step="1"
-                    min="1"
+                    min="0"
                     max={compromiso.saldo}
                     value={monto}
-                    onChange={(e) => setMonto(e.target.value)}
+                    onChange={(e) => handleMontoChange(e.target.value)}
                     required
                     placeholder="0"
                     className="pago-input-hero w-full"
@@ -215,27 +248,121 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                   </span>
                 </div>
               </label>
-              <div className="mt-2 flex items-center justify-between text-[10px]">
-                <span className="text-text-45" style={{ fontFamily: FONT_DISPLAY }}>
-                  Máx: <span style={{ fontFamily: FONT_MONO }}>{bs(compromiso.saldo)}</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMonto(String(Math.round(compromiso.saldo)))}
-                  className="rounded-full border px-2.5 py-0.5 text-[9.5px] font-bold uppercase transition hover:bg-white/[0.04]"
-                  style={{
-                    borderColor: `${cfg.accent}40`,
-                    color: cfg.accent,
-                    letterSpacing: '0.8px',
-                    fontFamily: FONT_DISPLAY,
-                  }}
+
+              {/* Quick chips: 25/50/75/100% */}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {[0.25, 0.5, 0.75, 1].map((frac) => {
+                  const amount = Math.round(compromiso.saldo * frac);
+                  if (amount <= 0) return null;
+                  const isAll = frac === 1;
+                  const label = isAll ? 'Todo' : `${Math.round(frac * 100)}%`;
+                  const isActive = Math.abs(montoNum - amount) < 1;
+                  return (
+                    <button
+                      key={frac}
+                      type="button"
+                      onClick={() => setMonto(String(amount))}
+                      className="rounded-full border px-2.5 py-0.5 text-[9.5px] font-bold uppercase transition hover:bg-white/[0.04]"
+                      style={{
+                        borderColor: isActive ? cfg.accent : `${cfg.accent}30`,
+                        background: isActive ? `${cfg.accent}14` : 'transparent',
+                        color: cfg.accent,
+                        letterSpacing: '0.8px',
+                        fontFamily: FONT_DISPLAY,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                <span
+                  className="ml-auto text-[10px] text-text-45"
+                  style={{ fontFamily: FONT_DISPLAY }}
                 >
-                  Pagar todo
-                </button>
+                  Máx <span style={{ fontFamily: FONT_MONO, color: 'var(--text-65)' }}>{bs(compromiso.saldo)}</span>
+                </span>
+              </div>
+
+              {/* Preview en vivo: barra progreso + delta */}
+              <div
+                className="mt-3 rounded-2xl border px-3.5 py-3"
+                style={{
+                  borderColor: cubreTotal ? 'rgba(16,185,129,0.32)' : 'rgba(255,255,255,0.06)',
+                  background: cubreTotal ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.015)',
+                  transition: 'background 0.25s, border-color 0.25s',
+                }}
+              >
+                <div className="flex items-center justify-between text-[10px]" style={{ fontFamily: FONT_DISPLAY }}>
+                  <span className="font-semibold uppercase text-text-45" style={{ letterSpacing: '1px' }}>
+                    Progreso deuda
+                  </span>
+                  <span
+                    className="font-bold tabular-nums"
+                    style={{ fontFamily: FONT_MONO, color: cubreTotal ? '#10B981' : 'var(--text-90)' }}
+                  >
+                    {Math.round(progresoPreview * 100)}%
+                  </span>
+                </div>
+                <div
+                  className="relative mt-2 h-2 overflow-hidden rounded-full"
+                  style={{ background: 'rgba(255,255,255,0.06)' }}
+                >
+                  {/* Pagado actual */}
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-full"
+                    style={{
+                      width: `${progresoActual * 100}%`,
+                      background: '#10B981',
+                      transition: 'width 0.4s cubic-bezier(0.22, 1, 0.36, 1)',
+                    }}
+                  />
+                  {/* Preview (este pago) */}
+                  <div
+                    className="absolute inset-y-0 rounded-r-full"
+                    style={{
+                      left: `${progresoActual * 100}%`,
+                      width: `${Math.max(0, (progresoPreview - progresoActual) * 100)}%`,
+                      background: cubreTotal
+                        ? 'linear-gradient(90deg, #10B981, #34D399)'
+                        : `linear-gradient(90deg, ${cfg.accent}, ${cfg.accent}99)`,
+                      transition: 'width 0.18s ease-out, background 0.25s',
+                      boxShadow: montoNum > 0 ? `0 0 12px ${cfg.glow}` : undefined,
+                    }}
+                  />
+                </div>
+                <div
+                  className="mt-2 flex items-center justify-between text-[10.5px]"
+                  style={{ fontFamily: FONT_DISPLAY }}
+                >
+                  {montoNum > 0 ? (
+                    <span
+                      className="flex items-center gap-1 font-semibold"
+                      style={{ color: cubreTotal ? '#10B981' : cfg.accent }}
+                    >
+                      <TrendingDown className="h-3 w-3" strokeWidth={2.5} />
+                      Saldo baja <span style={{ fontFamily: FONT_MONO, fontWeight: 700 }}>{bs(montoNum)}</span>
+                    </span>
+                  ) : (
+                    <span className="text-text-45">Ingrese un monto para ver el impacto</span>
+                  )}
+                  {cubreTotal && (
+                    <span
+                      className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase"
+                      style={{
+                        background: 'rgba(16,185,129,0.14)',
+                        color: '#10B981',
+                        letterSpacing: '0.8px',
+                      }}
+                    >
+                      <CheckCircle2 className="h-3 w-3" strokeWidth={2.6} />
+                      Saldará deuda
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Método de pago — chips */}
+            {/* Método de pago — texto fijo (solo QR habilitado) */}
             <div>
               <span
                 className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
@@ -243,32 +370,62 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
               >
                 Método de pago
               </span>
-              <div className="grid grid-cols-2 gap-2">
-                {metodos.length === 0 && (
-                  <p className="col-span-2 text-[12px] text-text-45">Sin métodos disponibles</p>
-                )}
-                {metodos.map((m) => {
-                  const active = idMetodo === m.id_metodo;
-                  return (
-                    <button
-                      key={m.id_metodo}
-                      type="button"
-                      onClick={() => setIdMetodo(m.id_metodo)}
-                      className="rounded-xl border px-3 py-2.5 text-[11px] font-semibold uppercase transition-all"
-                      style={{
-                        borderColor: active ? cfg.accent : 'rgba(255,255,255,0.08)',
-                        background: active ? `${cfg.accent}14` : 'rgba(255,255,255,0.015)',
-                        color: active ? cfg.accent : 'var(--text-90)',
-                        fontFamily: FONT_DISPLAY,
-                        letterSpacing: '0.5px',
-                        boxShadow: active ? `0 0 0 1px ${cfg.accent}30 inset` : undefined,
-                      }}
-                    >
-                      {m.metodo}
-                    </button>
-                  );
-                })}
-              </div>
+              {metodosQR.length === 0 ? (
+                <p className="text-[12px] text-text-45">Sin métodos disponibles</p>
+              ) : (
+                <div
+                  className="text-[13px] font-semibold uppercase text-text-white"
+                  style={{ fontFamily: FONT_DISPLAY, letterSpacing: '0.5px' }}
+                >
+                  {metodosQR[0].metodo}
+                </div>
+              )}
+            </div>
+
+            {/* Generar QR — placeholder hasta integrar API banco */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setErr('La generación automática de QR estará disponible pronto. Por favor, suba el comprobante manualmente.')}
+                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl px-4 py-3 text-[11.5px] font-bold uppercase text-white transition-transform active:scale-[0.98]"
+                style={{
+                  background: cfg.grad,
+                  fontFamily: FONT_DISPLAY,
+                  letterSpacing: '0.9px',
+                  boxShadow: `0 0 0 1px rgba(255,255,255,0.18) inset, 0 1px 0 0 rgba(255,255,255,0.25) inset, 0 8px 24px ${cfg.glow}`,
+                  textShadow: '0 1px 2px rgba(0,0,0,0.35)',
+                }}
+              >
+                {/* Shimmer sweep on hover — suave */}
+                <span
+                  className="pointer-events-none absolute inset-0 -translate-x-full transition-transform ease-in-out group-hover:translate-x-full"
+                  style={{
+                    background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.28) 50%, transparent 100%)',
+                    transitionDuration: '1800ms',
+                  }}
+                />
+                <span className="relative grid h-5 w-5 place-items-center rounded-md" style={{ background: 'rgba(255,255,255,0.22)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" className="h-3 w-3">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <path d="M14 14h3v3M17 17v4M21 14v3M14 21h7" />
+                  </svg>
+                </span>
+                <span className="relative">Generar QR de pago</span>
+                <span
+                  className="relative ml-1 rounded-full px-2 py-0.5 text-[8px] font-bold tracking-wider text-white"
+                  style={{ background: 'rgba(255,255,255,0.22)' }}
+                >
+                  PRÓXIMAMENTE
+                </span>
+              </button>
+              <p
+                className="mt-2 text-center text-[10px] text-text-45"
+                style={{ fontFamily: FONT_DISPLAY }}
+              >
+                Mientras tanto suba su comprobante manualmente
+              </p>
             </div>
 
             {/* Comprobante */}
@@ -339,26 +496,6 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
               )}
             </div>
 
-            {/* Observación */}
-            <div>
-              <label className="block">
-                <span
-                  className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
-                  style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
-                >
-                  Observación <span className="text-text-25">· opcional</span>
-                </span>
-                <textarea
-                  value={observacion}
-                  onChange={(e) => setObservacion(e.target.value)}
-                  rows={2}
-                  maxLength={300}
-                  className="pago-input w-full resize-none"
-                  placeholder="Detalles adicionales..."
-                  style={{ fontFamily: FONT_DISPLAY }}
-                />
-              </label>
-            </div>
 
             {err && (
               <div
@@ -441,11 +578,13 @@ function StatBox({
   value,
   color,
   bold,
+  hint,
 }: {
   label: string;
   value: string;
   color?: string;
   bold?: boolean;
+  hint?: string;
 }) {
   return (
     <div className="px-3 text-center first:pl-3 last:pr-3">
@@ -456,7 +595,7 @@ function StatBox({
         {label}
       </div>
       <div
-        className="mt-1 leading-none tabular-nums"
+        className="mt-1 leading-none tabular-nums transition-colors"
         style={{
           fontFamily: FONT_MONO,
           fontSize: '13.5px',
@@ -468,6 +607,14 @@ function StatBox({
       >
         {value}
       </div>
+      {hint && (
+        <div
+          className="mt-0.5 text-[8.5px] font-medium text-text-45"
+          style={{ letterSpacing: '0.3px', fontFamily: FONT_DISPLAY }}
+        >
+          {hint}
+        </div>
+      )}
     </div>
   );
 }

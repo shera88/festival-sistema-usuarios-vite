@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles, Receipt } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { PagoModal } from '@/components/cards/PagoModal';
 import { webpProxy } from '@/lib/utils/img';
-import type { CompromisoDeuda, PagoHistorial, PagoEstado } from '@/types/domain';
+import type { CompromisoDeuda, PagoHistorial, PagoEstado, PagoHistorialAno, AnoConPagos } from '@/types/domain';
 
 function bs(n: number): string {
   return new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' Bs';
@@ -73,10 +73,13 @@ function useCountUp(value: number, durationMs = 900) {
   return current;
 }
 
+const ANO_ACTUAL = 2026;
+
 export function PagosTab() {
   const qc = useQueryClient();
   const [pagoTarget, setPagoTarget] = useState<CompromisoDeuda | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [anoActivo, setAnoActivo] = useState<number>(ANO_ACTUAL);
 
   const toggleSection = (key: string) => {
     setCollapsedSections((prev) => {
@@ -86,10 +89,29 @@ export function PagosTab() {
     });
   };
 
+  // Lista de años disponibles (siempre cargada — para construir tabs)
+  const anosQ = useQuery({
+    queryKey: ['pagos-anos'],
+    queryFn: () => pagosApi.historial(),
+    staleTime: 5 * 60_000,
+  });
+
   const q = useQuery({
     queryKey: ['pagos-resumen'],
     queryFn: () => pagosApi.resumen(),
+    enabled: anoActivo === ANO_ACTUAL,
   });
+
+  // Renderizar vista histórica si el año activo no es el actual
+  if (anoActivo !== ANO_ACTUAL) {
+    return (
+      <HistorialAnoView
+        ano={anoActivo}
+        anosDisponibles={anosQ.data?.anos_disponibles ?? []}
+        onChangeAno={setAnoActivo}
+      />
+    );
+  }
 
   if (q.isLoading) return <div className="p-4"><LoadingSkeleton rows={4} /></div>;
   if (q.error) {
@@ -112,9 +134,9 @@ export function PagosTab() {
     (pagosByCompromiso[k] ??= []).push(p);
   }
 
-  const totalPagado = totales.pagado_verificado + totales.pagado_pendiente;
+  const saldoReal = Math.max(0, totales.total_deuda - totales.pagado_verificado);
   const progresoTotal =
-    totales.total_deuda > 0 ? Math.min(100, (totalPagado / totales.total_deuda) * 100) : 0;
+    totales.total_deuda > 0 ? Math.min(100, (totales.pagado_verificado / totales.total_deuda) * 100) : 0;
 
   const logoUrl = enlace_del_logo ? webpProxy(enlace_del_logo, 96) : null;
 
@@ -122,9 +144,14 @@ export function PagosTab() {
     <>
       <style>{ANIM_CSS}</style>
       <div className="space-y-7 px-3 py-5 sm:px-6 sm:py-6">
-        {/* HERO con aurora animada + count-up */}
+        <YearTabs
+          anoActivo={anoActivo}
+          anosDisponibles={anosQ.data?.anos_disponibles ?? []}
+          onChange={setAnoActivo}
+        />
+        {/* HERO con aurora animada + count-up — saldo solo descuenta verificados */}
         <HeroSaldo
-          saldo={totales.saldo}
+          saldo={saldoReal}
           deuda={totales.total_deuda}
           pagado={totales.pagado_verificado}
           pendiente={totales.pagado_pendiente}
@@ -137,6 +164,7 @@ export function PagosTab() {
           Object.entries(porConcepto).map(([concepto, items], sectionIdx) => {
             const isCollapsed = collapsedSections.has(concepto);
             const pendingCount = items.filter((c) => c.saldo > 0.01).length;
+            const reviewCount = items.filter((c) => c.saldo <= 0.01 && c.pagado_pendiente > 0.01).length;
             return (
               <section key={concepto} style={{ animation: `fadeUp 0.55s ${100 + sectionIdx * 80}ms ease-out both` }}>
                 <button
@@ -166,6 +194,19 @@ export function PagosTab() {
                       }}
                     >
                       {pendingCount} pendiente{pendingCount > 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {reviewCount > 0 && (
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums"
+                      style={{
+                        background: 'rgba(6,182,212,0.15)',
+                        color: '#06B6D4',
+                        fontFamily: FONT_MONO,
+                        letterSpacing: '0.2px',
+                      }}
+                    >
+                      {reviewCount} en revisión
                     </span>
                   )}
                   <span
@@ -328,7 +369,7 @@ function HeroSaldo({
           <StatColumn label="Deuda" value={bs(deuda)} />
           <StatColumn label="Pagado" value={bs(pagado)} color="#10B981" />
           <StatColumn
-            label="Pendiente"
+            label="En revisión"
             value={bs(pendiente)}
             color={pendiente > 0 ? '#06B6D4' : undefined}
           />
@@ -355,7 +396,7 @@ function HeroSaldo({
               style={{ fontFamily: FONT_MONO }}
             >
               <span>{Math.round(progreso)}% pagado</span>
-              <span>{bs(deuda - (pagado + pendiente))} restantes</span>
+              <span>{bs(deuda - pagado)} restantes</span>
             </div>
           </div>
         )}
@@ -365,8 +406,10 @@ function HeroSaldo({
 }
 function totales(d: number): boolean { return d > 0; }
 
-function StatusBadge({ isPaid }: { isPaid: boolean }) {
-  if (isPaid) {
+type EstadoBadge = 'completado' | 'revision' | 'pendiente';
+
+function StatusBadge({ estado }: { estado: EstadoBadge }) {
+  if (estado === 'completado') {
     return (
       <span
         className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase"
@@ -380,6 +423,23 @@ function StatusBadge({ isPaid }: { isPaid: boolean }) {
       >
         <CheckCircle2 className="h-2.5 w-2.5" strokeWidth={3} />
         Completado
+      </span>
+    );
+  }
+  if (estado === 'revision') {
+    return (
+      <span
+        className="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-bold uppercase"
+        style={{
+          background: 'rgba(6,182,212,0.10)',
+          borderColor: 'rgba(6,182,212,0.40)',
+          color: '#06B6D4',
+          letterSpacing: '0.8px',
+          fontFamily: FONT_DISPLAY,
+        }}
+      >
+        <Clock className="h-2.5 w-2.5" strokeWidth={2.8} />
+        En revisión
       </span>
     );
   }
@@ -451,12 +511,16 @@ function CompromisoCard({
   delayMs?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const isPaid = c.saldo <= 0.01;
+  const saldoVerificado = Math.max(0, c.monto_total - c.pagado_verificado);
+  const isCompletado = saldoVerificado <= 0.01;
+  const isRevision = !isCompletado && c.saldo <= 0.01 && c.pagado_pendiente > 0.01;
+  const isPaid = isCompletado;
+  const estadoBadge: EstadoBadge = isCompletado ? 'completado' : isRevision ? 'revision' : 'pendiente';
   const isCredencial = c.concepto === 'credencial' || c.concepto === 'credencial_unit';
   const cfg = conceptoGrad[c.concepto] ?? conceptoGrad.inscripcion;
-  const pct = c.monto_total > 0 ? Math.min(100, ((c.monto_total - c.saldo) / c.monto_total) * 100) : 0;
+  const pct = c.monto_total > 0 ? Math.min(100, (c.pagado_verificado / c.monto_total) * 100) : 0;
   const initial = (nombreAgrupacion || '?').charAt(0).toUpperCase();
-  const saldoCount = useCountUp(c.saldo, 700);
+  const saldoCount = useCountUp(saldoVerificado, 700);
 
   const pagosSorted = useMemo(
     () => [...pagosParciales].sort((a, b) => (b.fecha ?? '').localeCompare(a.fecha ?? '')),
@@ -527,7 +591,7 @@ function CompromisoCard({
               >
                 {isCredencial ? nombreAgrupacion : c.descripcion}
               </h4>
-              <StatusBadge isPaid={isPaid} />
+              <StatusBadge estado={estadoBadge} />
             </div>
             {isCredencial && (
               <div
@@ -605,7 +669,7 @@ function CompromisoCard({
             </div>
           </div>
 
-          {isPaid ? (
+          {isPaid || isRevision ? (
             <div className="shrink-0" />
           ) : (
             <button
@@ -759,17 +823,393 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
           <span className="truncate">{p.metodo_pago}</span>
         </div>
       </div>
+      {p.estado === 'verificado' && (
+        <a
+          href={pagosApi.reciboUrl(p.id_pago)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Ver recibo PDF"
+          title="Ver recibo PDF"
+          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-green/40 bg-green/10 px-2 text-[9.5px] font-bold uppercase text-green transition hover:bg-green/20"
+          style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
+        >
+          <Receipt className="h-3 w-3" strokeWidth={2.4} />
+          Recibo
+        </a>
+      )}
       {p.comprobante_url && (
         <a
           href={p.comprobante_url}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Ver comprobante"
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-45 transition hover:bg-white/[0.04] hover:text-cyan"
+          title="Ver comprobante de pago subido"
+          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 text-[9.5px] font-bold uppercase text-text-65 transition hover:bg-white/[0.06] hover:text-cyan"
+          style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
         >
-          <FileText className="h-3 w-3" />
+          <FileText className="h-3 w-3" strokeWidth={2.4} />
+          Comprobante
         </a>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tabs por año + vista de historial read-only (años pasados)
+// ─────────────────────────────────────────────────────────────
+
+function YearTabs({
+  anoActivo,
+  anosDisponibles,
+  onChange,
+}: {
+  anoActivo: number;
+  anosDisponibles: AnoConPagos[];
+  onChange: (a: number) => void;
+}) {
+  const ANO_ACTUAL = 2026;
+  const anosSet = new Set<number>([ANO_ACTUAL]);
+  for (const a of anosDisponibles) anosSet.add(a.ano);
+  const anos = [...anosSet].sort((x, y) => y - x);
+
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  if (anos.length < 2) return null;
+
+  return (
+    <div ref={ref} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="group/dd flex items-center gap-2.5 rounded-full px-4 py-2 transition-all"
+        style={{
+          background: open
+            ? 'linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.05) 100%)'
+            : 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: open
+            ? '0 1px 0 0 rgba(255,255,255,0.10) inset, 0 4px 14px rgba(0,0,0,0.28)'
+            : '0 1px 0 0 rgba(255,255,255,0.04) inset',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        <span
+          className="text-[8.5px] font-bold uppercase"
+          style={{
+            color: 'var(--text-45)',
+            letterSpacing: '0.25em',
+            fontFamily: FONT_DISPLAY,
+          }}
+        >
+          Año
+        </span>
+        <span
+          className="tabular-nums"
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--text-white)',
+            letterSpacing: '-0.005em',
+          }}
+        >
+          {anoActivo}
+        </span>
+        <ChevronDown
+          className="transition-transform duration-200"
+          style={{
+            width: 13,
+            height: 13,
+            color: 'var(--text-65)',
+            transform: open ? 'rotate(180deg)' : 'rotate(0)',
+          }}
+          strokeWidth={2.4}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 z-20 mt-2 min-w-[160px] overflow-hidden rounded-xl"
+          style={{
+            background: 'rgba(15,13,30,0.96)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 16px 40px rgba(0,0,0,0.45), 0 1px 0 0 rgba(255,255,255,0.04) inset',
+            backdropFilter: 'blur(20px)',
+            animation: 'dropDown 0.16s cubic-bezier(0.22, 1, 0.36, 1)',
+          }}
+        >
+          {anos.map((a) => {
+            const active = a === anoActivo;
+            const isActual = a === ANO_ACTUAL;
+            return (
+              <button
+                key={a}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onChange(a);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center justify-between gap-3 px-3.5 py-2.5 transition-colors"
+                style={{
+                  background: active ? 'rgba(6,182,212,0.10)' : 'transparent',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)';
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  <span
+                    className="tabular-nums"
+                    style={{
+                      fontFamily: FONT_MONO,
+                      fontSize: '13px',
+                      fontWeight: active ? 700 : 500,
+                      color: active ? 'var(--cyan)' : 'var(--text-90)',
+                      letterSpacing: '-0.005em',
+                    }}
+                  >
+                    {a}
+                  </span>
+                  {isActual && (
+                    <span
+                      className="rounded-full px-1.5 py-0.5"
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'var(--text-45)',
+                        fontSize: '7.5px',
+                        fontWeight: 700,
+                        letterSpacing: '0.18em',
+                        fontFamily: FONT_DISPLAY,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Actual
+                    </span>
+                  )}
+                </span>
+                {active && (
+                  <CheckCircle2 className="h-3.5 w-3.5" style={{ color: 'var(--cyan)' }} strokeWidth={2.4} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const conceptoLabelHist: Record<string, string> = {
+  inscripcion: 'Inscripción',
+  convenio_entradas: 'Pre-venta entradas',
+  credencial: 'Credenciales',
+  credencial_unit: 'Credencial unitaria',
+  kardex: 'Kardex',
+  otro: 'Otro',
+};
+
+function HistorialAnoView({
+  ano,
+  anosDisponibles,
+  onChangeAno,
+}: {
+  ano: number;
+  anosDisponibles: AnoConPagos[];
+  onChangeAno: (a: number) => void;
+}) {
+  const q = useQuery({
+    queryKey: ['pagos-historial', ano],
+    queryFn: () => pagosApi.historial(ano),
+  });
+
+  return (
+    <>
+      <style>{ANIM_CSS}</style>
+      <div className="space-y-5 px-3 py-5 sm:px-6 sm:py-6">
+        <YearTabs anoActivo={ano} anosDisponibles={anosDisponibles} onChange={onChangeAno} />
+
+        <div
+          className="rounded-2xl border border-glass-border px-4 py-3"
+          style={{ background: 'rgba(255,255,255,0.02)' }}
+        >
+          <div
+            className="text-[10px] font-bold uppercase text-text-45"
+            style={{ letterSpacing: '1.5px', fontFamily: FONT_DISPLAY }}
+          >
+            Historial · {ano}
+          </div>
+          <div
+            className="mt-1 text-[12px] text-text-65"
+            style={{ fontFamily: FONT_DISPLAY }}
+          >
+            Pagos registrados en el sistema festival de ese año.
+            Solo lectura — no se pueden agregar pagos retroactivos.
+          </div>
+        </div>
+
+        {q.isLoading && <LoadingSkeleton rows={4} />}
+        {q.error && (
+          <EmptyState>Error al cargar historial. {(q.error as Error).message}</EmptyState>
+        )}
+        {q.data && q.data.historial.length === 0 && (
+          <EmptyState>No se encontraron pagos en {ano}.</EmptyState>
+        )}
+        {q.data && q.data.historial.length > 0 && (
+          <HistorialAgrupadoList items={q.data.historial} />
+        )}
+      </div>
+    </>
+  );
+}
+
+function HistorialAgrupadoList({ items }: { items: PagoHistorialAno[] }) {
+  const porConcepto = useMemo(() => {
+    const map: Record<string, PagoHistorialAno[]> = {};
+    for (const p of items) (map[p.concepto] ??= []).push(p);
+    return map;
+  }, [items]);
+
+  const totalPagado = items.reduce((s, p) => s + (p.monto || 0), 0);
+
+  return (
+    <>
+      {/* Total año */}
+      <div
+        className="rounded-2xl border border-glass-border px-5 py-4"
+        style={{ background: 'linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.05))' }}
+      >
+        <div
+          className="text-[9.5px] font-bold uppercase text-text-45"
+          style={{ letterSpacing: '1.5px', fontFamily: FONT_DISPLAY }}
+        >
+          Total pagado
+        </div>
+        <div
+          className="mt-1 leading-none"
+          style={{
+            fontSize: '24px',
+            fontWeight: 700,
+            fontFamily: FONT_MONO,
+            color: 'var(--text-white)',
+            letterSpacing: '-0.025em',
+          }}
+        >
+          {bs(totalPagado)}
+        </div>
+        <div
+          className="mt-1 text-[10.5px] text-text-45"
+          style={{ fontFamily: FONT_DISPLAY }}
+        >
+          {items.length} pago{items.length === 1 ? '' : 's'}
+        </div>
+      </div>
+
+      {/* Secciones por concepto */}
+      {Object.entries(porConcepto).map(([concepto, pagos]) => (
+        <section key={concepto}>
+          <h3
+            className="mb-3 px-2 text-[10.5px] font-semibold uppercase text-text-90"
+            style={{ letterSpacing: '1.8px', fontFamily: FONT_DISPLAY }}
+          >
+            {conceptoLabelHist[concepto] ?? concepto}
+            <span
+              className="ml-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular-nums"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                color: 'var(--text-65)',
+                fontFamily: FONT_MONO,
+              }}
+            >
+              {pagos.length}
+            </span>
+          </h3>
+          <div className="space-y-2">
+            {pagos.map((p) => (
+              <HistorialPagoCard key={p.id_pago} p={p} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  );
+}
+
+function HistorialPagoCard({ p }: { p: PagoHistorialAno }) {
+  const isCredencial = p.concepto === 'credencial' || p.concepto === 'credencial_unit';
+  const titulo = isCredencial ? p.agrupacion : (p.nombre_obra || p.agrupacion || '—');
+  return (
+    <div
+      className="rounded-xl border border-glass-border px-3 py-2.5"
+      style={{ background: '#0a0817' }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div
+            className="truncate text-[11.5px] text-text-white"
+            style={{ fontFamily: FONT_DISPLAY, fontWeight: 350, letterSpacing: '-0.005em' }}
+          >
+            {titulo}
+          </div>
+          <div
+            className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[8.5px] text-text-45"
+            style={{ fontFamily: FONT_DISPLAY }}
+          >
+            {p.fecha && <span style={{ fontFamily: FONT_MONO }}>{p.fecha}</span>}
+            {p.hora && <span style={{ fontFamily: FONT_MONO }}>· {p.hora.slice(0, 5)}</span>}
+            {p.metodo_pago && (
+              <>
+                <span>·</span>
+                <span className="truncate">{p.metodo_pago}</span>
+              </>
+            )}
+            {p.subdivision && (
+              <>
+                <span>·</span>
+                <span>{p.subdivision}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div
+          className="shrink-0 text-right tabular-nums"
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: '12px',
+            fontWeight: 700,
+            color: 'var(--green)',
+            letterSpacing: '-0.015em',
+          }}
+        >
+          {bs(p.monto)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -795,5 +1235,9 @@ const ANIM_CSS = `
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes dropDown {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 `;

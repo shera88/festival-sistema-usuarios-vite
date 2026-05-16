@@ -224,6 +224,43 @@ export interface PagosResumen {
   metodos_pago: MetodoPago[];
 }
 
+/** Item del historial multi-año (vista normalizada `pagos_historial_all`). */
+export interface PagoHistorialAno {
+  ano: number;
+  id_pago: string;
+  numero_recibo: string | null;
+  fecha: string | null;
+  hora: string | null;
+  concepto: PagoConcepto | 'otro' | 'kardex';
+  id_referencia: string | null;
+  metodo_pago: string;
+  id_metodo_pago: string | null;
+  monto: number;
+  estado: PagoEstado;
+  nombre_pagador: string | null;
+  telefono_pagador: string | null;
+  nombre_obra: string;
+  id_agrupacion: string | null;
+  agrupacion: string;
+  subdivision: string | null;
+  bailarines: number | null;
+  comprobante_url: string | null;
+  recibo_pdf_url: string | null;
+}
+
+export interface AnoConPagos {
+  ano: number;
+  total_pagos: number;
+  total_monto: number;
+}
+
+export interface PagosHistorialRes {
+  ok: true;
+  ano: number | null;
+  historial: PagoHistorialAno[];
+  anos_disponibles: AnoConPagos[];
+}
+
 export interface PagoCrearReq {
   concepto: PagoConcepto;
   id_referencia: string;

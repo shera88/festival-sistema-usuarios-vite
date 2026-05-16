@@ -40,6 +40,9 @@ php-backend/config.php
 php-backend/rate-limit-data
 php-backend/stderr.log
 php-backend/webhook-log.txt
+php-backend/_test_recibo.php
+php-backend/_fonts/
+php-backend/vendor/
 
 # playwright
 test-results

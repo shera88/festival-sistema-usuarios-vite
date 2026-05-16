@@ -1,0 +1,17 @@
+{
+  "name": "festival-danzarte/php-backend",
+  "description": "Backend PHP del sistema de usuarios del festival Danzarte 2026.",
+  "type": "project",
+  "require": {
+    "php": ">=8.1",
+    "mpdf/mpdf": "^8.2",
+    "endroid/qr-code": "^5.0"
+  },
+  "config": {
+    "platform": {
+      "php": "8.1"
+    },
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}
