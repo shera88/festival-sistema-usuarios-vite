@@ -119,6 +119,31 @@ export async function descargarArchivo(
 }
 
 /**
+ * Verifica si archivo ya existe en Filesystem (Capacitor only).
+ * Devuelve DescargaResult listo para state, o null si no existe / web.
+ *
+ * Se usa al montar la fila para restaurar el estado "ya descargado"
+ * después de cerrar y reabrir la app.
+ */
+export async function checkArchivoLocal(filename: string, mime?: string | null): Promise<DescargaResult | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const stat = await Filesystem.stat({
+      path: filename,
+      directory: Directory.External,
+    });
+    if (stat.type !== 'file') return null;
+    const uri = await Filesystem.getUri({
+      path: filename,
+      directory: Directory.External,
+    });
+    return { uri: uri.uri, filename, mime: mime ?? null };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Abre archivo localmente. Capacitor -> Share sheet (visor PDF/imagen).
  * Web -> nueva pestaña con objectURL.
  */

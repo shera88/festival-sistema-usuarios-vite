@@ -9,6 +9,7 @@ import { webpProxy } from '@/lib/utils/img';
 import {
   descargarArchivo,
   abrirArchivoLocal,
+  checkArchivoLocal,
   sanitizeFilename,
   extFromUrl,
   type DescargaResult,
@@ -896,6 +897,27 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
       : extFromUrl(p.comprobante_url || '', '.bin');
     return sanitizeFilename(base) + ext;
   }
+
+  // Restaurar estado "ya descargado" al montar: chequea Filesystem (Capacitor).
+  // Persiste entre reinicios de app sin localStorage — verdad la tiene el filesystem.
+  useEffect(() => {
+    let cancelled = false;
+    async function restore() {
+      if (p.estado === 'verificado' && p.recibo_pdf_url) {
+        const dl = await checkArchivoLocal(buildFilename('recibo'), 'application/pdf');
+        if (!cancelled && dl) setReciboDl(dl);
+      }
+      if (p.comprobante_url) {
+        const dl = await checkArchivoLocal(buildFilename('comprobante'));
+        if (!cancelled && dl) setComprobanteDl(dl);
+      }
+    }
+    void restore();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.id_pago, p.recibo_pdf_url, p.comprobante_url, p.nombre_pagador, nombreAgrupacion]);
 
   async function handleClick(tipo: 'recibo' | 'comprobante') {
     if (loading[tipo]) return;
