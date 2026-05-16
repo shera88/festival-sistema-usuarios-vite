@@ -6,7 +6,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { PagoModal } from '@/components/cards/PagoModal';
 import { webpProxy } from '@/lib/utils/img';
-import { descargarArchivo } from '@/lib/utils/descargarArchivo';
+import { descargarArchivo, sanitizeFilename, extFromUrl } from '@/lib/utils/descargarArchivo';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import type { CompromisoDeuda, PagoHistorial, PagoEstado, PagoHistorialAno, AnoConPagos } from '@/types/domain';
 
@@ -773,7 +773,7 @@ function CompromisoCard({
           style={{ background: '#080614' }}
         >
           {pagosSorted.map((p) => (
-            <PagoParcialRow key={p.id_pago} p={p} />
+            <PagoParcialRow key={p.id_pago} p={p} nombreAgrupacion={nombreAgrupacion} />
           ))}
         </div>
       </div>
@@ -789,7 +789,7 @@ const estadoConfig: Record<PagoEstado, { dot: string; label: string }> = {
   anulado:    { dot: '#ef4444',         label: 'Anulado'     },
 };
 
-function PagoParcialRow({ p }: { p: PagoHistorial }) {
+function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrupacion: string }) {
   const e = estadoConfig[p.estado] ?? estadoConfig.pendiente;
   const Icon =
     p.estado === 'verificado' ? CheckCircle2
@@ -798,13 +798,26 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
   const [confirmTipo, setConfirmTipo] = useState<'recibo' | 'comprobante' | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  function buildFilename(tipo: 'recibo' | 'comprobante'): string {
+    const persona = (p.nombre_pagador || 'Pagador').toUpperCase();
+    const agrup = (nombreAgrupacion || 'Agrupacion').toUpperCase();
+    const concepto = conceptoLabel[p.concepto] ?? p.concepto;
+    const metodo = p.metodo_pago || 'Pago';
+    const prefix = tipo === 'recibo' ? 'Recibo de Pago' : 'Comprobante';
+    const base = `${prefix} - ${persona} - ${agrup} - ${concepto} - ${metodo}`;
+    const ext = tipo === 'recibo'
+      ? '.pdf'
+      : extFromUrl(p.comprobante_url || '', '.bin');
+    return sanitizeFilename(base) + ext;
+  }
+
   async function onConfirm() {
     if (!confirmTipo) return;
     const url = confirmTipo === 'recibo' ? p.recibo_pdf_url : p.comprobante_url;
     if (!url) return;
     setDownloading(true);
     try {
-      await descargarArchivo(url);
+      await descargarArchivo(url, buildFilename(confirmTipo));
       setConfirmTipo(null);
     } catch {
       // toast lo muestra
