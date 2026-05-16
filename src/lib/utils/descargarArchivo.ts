@@ -48,14 +48,18 @@ export function extFromUrl(url: string, fallback = ''): string {
   }
 }
 
+export interface DescargaResult {
+  /** URI local (Capacitor) o objectURL (web). Disponible para reabrir desde toast/botón. */
+  uri: string | null;
+  filename: string;
+  mime: string | null;
+}
+
 /**
- * Descarga archivo. En Capacitor: Filesystem.writeFile -> Directory.External
- * (app-scoped, sin permisos). Toast con botón "Abrir" que dispara Share sheet.
- * En web: blob + <a download>.
- *
- * Filename: si se omite, se infiere de la URL.
+ * Descarga archivo. Capacitor: Filesystem.writeFile -> Directory.External (sin permisos).
+ * Web: blob + <a download>. Retorna URI para reabrir más tarde (Share / blob).
  */
-export async function descargarArchivo(url: string, suggestedName?: string): Promise<void> {
+export async function descargarArchivo(url: string, suggestedName?: string): Promise<DescargaResult> {
   const filename = suggestedName || getFilenameFromUrl(url);
 
   if (Capacitor.isNativePlatform()) {
@@ -73,16 +77,10 @@ export async function descargarArchivo(url: string, suggestedName?: string): Pro
       });
       toast.success(`Descargado: ${filename}`, {
         id: tid,
-        description: 'Toque "Abrir" para visualizar',
-        action: {
-          label: 'Abrir',
-          onClick: () => {
-            void abrirArchivo(write.uri, filename, blob.type);
-          },
-        },
-        duration: 8000,
+        description: 'Use el botón "Abrir" en la fila para visualizar',
+        duration: 4000,
       });
-      return;
+      return { uri: write.uri, filename, mime: blob.type || null };
     } catch (e) {
       toast.error('No se pudo descargar', {
         id: tid,
@@ -105,8 +103,9 @@ export async function descargarArchivo(url: string, suggestedName?: string): Pro
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    // Mantén objectURL vivo para Abrir; web no usa Share, abre en nueva pestaña.
     toast.success(`Descargado: ${filename}`, { id: tid });
+    return { uri: objectUrl, filename, mime: blob.type || null };
   } catch (e) {
     toast.error('No se pudo descargar', {
       id: tid,
@@ -116,18 +115,25 @@ export async function descargarArchivo(url: string, suggestedName?: string): Pro
   }
 }
 
-async function abrirArchivo(fileUri: string, filename: string, mimeType?: string): Promise<void> {
-  try {
-    await Share.share({
-      url: fileUri,
-      title: filename,
-      dialogTitle: 'Abrir con',
-      ...(mimeType ? { text: mimeType } : {}),
-    });
-  } catch (e) {
-    const msg = (e as Error).message || '';
-    // Usuario canceló el share sheet — no es error
-    if (msg.toLowerCase().includes('cancel')) return;
-    toast.error('No se pudo abrir el archivo', { description: msg });
+/**
+ * Abre archivo localmente. Capacitor -> Share sheet (visor PDF/imagen).
+ * Web -> nueva pestaña con objectURL.
+ */
+export async function abrirArchivoLocal(uri: string, filename: string, mime?: string | null): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await Share.share({
+        url: uri,
+        title: filename,
+        dialogTitle: 'Abrir con',
+        ...(mime ? { text: mime } : {}),
+      });
+    } catch (e) {
+      const msg = (e as Error).message || '';
+      if (msg.toLowerCase().includes('cancel')) return;
+      toast.error('No se pudo abrir el archivo', { description: msg });
+    }
+    return;
   }
+  window.open(uri, '_blank', 'noopener,noreferrer');
 }

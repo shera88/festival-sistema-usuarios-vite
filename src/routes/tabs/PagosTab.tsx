@@ -6,8 +6,15 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { PagoModal } from '@/components/cards/PagoModal';
 import { webpProxy } from '@/lib/utils/img';
-import { descargarArchivo, sanitizeFilename, extFromUrl } from '@/lib/utils/descargarArchivo';
+import {
+  descargarArchivo,
+  abrirArchivoLocal,
+  sanitizeFilename,
+  extFromUrl,
+  type DescargaResult,
+} from '@/lib/utils/descargarArchivo';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { ExternalLink } from 'lucide-react';
 import type { CompromisoDeuda, PagoHistorial, PagoEstado, PagoHistorialAno, AnoConPagos } from '@/types/domain';
 
 function bs(n: number): string {
@@ -789,6 +796,59 @@ const estadoConfig: Record<PagoEstado, { dot: string; label: string }> = {
   anulado:    { dot: '#ef4444',         label: 'Anulado'     },
 };
 
+const RECIBO_GRAD = 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
+const RECIBO_GLOW = 'rgba(16,185,129,0.40)';
+const COMPROBANTE_GRAD = 'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)';
+const COMPROBANTE_GLOW = 'rgba(59,130,246,0.40)';
+const ABRIR_RECIBO_GRAD = 'linear-gradient(135deg, #6EE7B7 0%, #10B981 100%)';
+const ABRIR_RECIBO_GLOW = 'rgba(110,231,183,0.45)';
+const ABRIR_COMPROBANTE_GRAD = 'linear-gradient(135deg, #93C5FD 0%, #3B82F6 100%)';
+const ABRIR_COMPROBANTE_GLOW = 'rgba(147,197,253,0.45)';
+
+function ActionButton({
+  onClick,
+  grad,
+  glow,
+  children,
+  ariaLabel,
+  title,
+  pulse = false,
+}: {
+  onClick: () => void;
+  grad: string;
+  glow: string;
+  children: React.ReactNode;
+  ariaLabel: string;
+  title: string;
+  pulse?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      title={title}
+      className="group/btn relative flex h-7 shrink-0 items-center gap-1 overflow-hidden rounded-md px-2.5 text-[9.5px] font-bold uppercase text-white transition-transform active:scale-[0.94]"
+      style={{
+        background: grad,
+        letterSpacing: '0.6px',
+        fontFamily: FONT_DISPLAY,
+        boxShadow: `0 0 0 1px rgba(255,255,255,0.20) inset, 0 1px 0 0 rgba(255,255,255,0.28) inset, 0 4px 14px ${glow}`,
+        textShadow: '0 1px 1px rgba(0,0,0,0.30)',
+        animation: pulse ? 'fadeUpBtn 0.4s ease-out both, pulseGlow 2.4s ease-in-out 0.5s infinite' : undefined,
+      }}
+    >
+      <span
+        className="absolute inset-0 -translate-x-full transition-transform duration-700 group-hover/btn:translate-x-full"
+        style={{
+          background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.40) 50%, transparent 100%)',
+        }}
+      />
+      <span className="relative flex items-center gap-1">{children}</span>
+    </button>
+  );
+}
+
 function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrupacion: string }) {
   const e = estadoConfig[p.estado] ?? estadoConfig.pendiente;
   const Icon =
@@ -797,6 +857,8 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
     : Clock;
   const [confirmTipo, setConfirmTipo] = useState<'recibo' | 'comprobante' | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [reciboDl, setReciboDl] = useState<DescargaResult | null>(null);
+  const [comprobanteDl, setComprobanteDl] = useState<DescargaResult | null>(null);
 
   function buildFilename(tipo: 'recibo' | 'comprobante'): string {
     const persona = (p.nombre_pagador || 'Pagador').toUpperCase();
@@ -817,13 +879,21 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
     if (!url) return;
     setDownloading(true);
     try {
-      await descargarArchivo(url, buildFilename(confirmTipo));
+      const result = await descargarArchivo(url, buildFilename(confirmTipo));
+      if (confirmTipo === 'recibo') setReciboDl(result);
+      else setComprobanteDl(result);
       setConfirmTipo(null);
     } catch {
       // toast lo muestra
     } finally {
       setDownloading(false);
     }
+  }
+
+  function onAbrir(tipo: 'recibo' | 'comprobante') {
+    const dl = tipo === 'recibo' ? reciboDl : comprobanteDl;
+    if (!dl?.uri) return;
+    void abrirArchivoLocal(dl.uri, dl.filename, dl.mime);
   }
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.018]">
@@ -859,17 +929,29 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
         </div>
       </div>
       {p.estado === 'verificado' && p.recibo_pdf_url && (
-        <button
-          type="button"
+        <ActionButton
           onClick={() => setConfirmTipo('recibo')}
-          aria-label="Descargar recibo PDF"
+          grad={RECIBO_GRAD}
+          glow={RECIBO_GLOW}
+          ariaLabel="Descargar recibo PDF"
           title="Descargar recibo PDF"
-          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-green/40 bg-green/10 px-2 text-[9.5px] font-bold uppercase text-green transition hover:bg-green/20"
-          style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
         >
-          <Receipt className="h-3 w-3" strokeWidth={2.4} />
+          <Receipt className="h-3 w-3" strokeWidth={2.5} />
           Recibo
-        </button>
+        </ActionButton>
+      )}
+      {reciboDl && (
+        <ActionButton
+          onClick={() => onAbrir('recibo')}
+          grad={ABRIR_RECIBO_GRAD}
+          glow={ABRIR_RECIBO_GLOW}
+          ariaLabel="Abrir recibo descargado"
+          title="Abrir recibo descargado"
+          pulse
+        >
+          <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
+          Abrir
+        </ActionButton>
       )}
       {p.estado === 'verificado' && !p.recibo_pdf_url && (
         <span
@@ -883,17 +965,29 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
         </span>
       )}
       {p.comprobante_url && (
-        <button
-          type="button"
+        <ActionButton
           onClick={() => setConfirmTipo('comprobante')}
-          aria-label="Descargar comprobante"
+          grad={COMPROBANTE_GRAD}
+          glow={COMPROBANTE_GLOW}
+          ariaLabel="Descargar comprobante"
           title="Descargar comprobante subido"
-          className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 text-[9.5px] font-bold uppercase text-text-65 transition hover:bg-white/[0.06] hover:text-cyan"
-          style={{ letterSpacing: '0.6px', fontFamily: FONT_DISPLAY }}
         >
-          <FileText className="h-3 w-3" strokeWidth={2.4} />
+          <FileText className="h-3 w-3" strokeWidth={2.5} />
           Comprobante
-        </button>
+        </ActionButton>
+      )}
+      {comprobanteDl && (
+        <ActionButton
+          onClick={() => onAbrir('comprobante')}
+          grad={ABRIR_COMPROBANTE_GRAD}
+          glow={ABRIR_COMPROBANTE_GLOW}
+          ariaLabel="Abrir comprobante descargado"
+          title="Abrir comprobante descargado"
+          pulse
+        >
+          <ExternalLink className="h-3 w-3" strokeWidth={2.5} />
+          Abrir
+        </ActionButton>
       )}
       <ConfirmDialog
         open={confirmTipo !== null}
@@ -1293,5 +1387,13 @@ const ANIM_CSS = `
 @keyframes dropDown {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fadeUpBtn {
+  from { opacity: 0; transform: translateY(6px) scale(0.92); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pulseGlow {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 0 transparent); }
+  50%      { filter: brightness(1.10) drop-shadow(0 0 6px rgba(255,255,255,0.30)); }
 }
 `;
