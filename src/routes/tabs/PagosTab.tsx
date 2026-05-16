@@ -779,10 +779,10 @@ function CompromisoCard({
           style={{ background: '#080614' }}
         >
           {/* Encabezados de columna: RECIBO | COMPROBANTE */}
-          <div className="flex items-center gap-3 px-4 py-1.5" style={{ background: '#06030f' }}>
+          <div className="flex items-center gap-3 px-5 py-2" style={{ background: '#06030f' }}>
             <div className="h-3 w-7 shrink-0" />
             <div className="min-w-0 flex-1" />
-            <div className="grid shrink-0 grid-cols-2 gap-2" style={{ width: '13.5rem' }}>
+            <div className="grid shrink-0 grid-cols-2 gap-2.5" style={{ width: '13.5rem' }}>
               <div
                 className="text-center text-[8.5px] font-bold uppercase text-text-45"
                 style={{ letterSpacing: '0.16em', fontFamily: FONT_DISPLAY }}
@@ -941,7 +941,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
     }
   }
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.018]">
+    <div className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.018]">
       <div
         className="grid h-7 w-7 shrink-0 place-items-center rounded-full"
         style={{ background: `${e.dot}1A`, color: e.dot }}
@@ -973,7 +973,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
           <span className="truncate">{p.metodo_pago}</span>
         </div>
       </div>
-      <div className="grid shrink-0 grid-cols-2 gap-2" style={{ width: '13.5rem' }}>
+      <div className="grid shrink-0 grid-cols-2 gap-2.5" style={{ width: '13.5rem' }}>
         {/* Columna Recibo */}
         <div className="flex w-full">
           {p.estado === 'verificado' && p.recibo_pdf_url ? (
