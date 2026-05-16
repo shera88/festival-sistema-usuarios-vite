@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { PagoModal } from '@/components/cards/PagoModal';
 import { webpProxy } from '@/lib/utils/img';
+import { openExternalUrl } from '@/lib/utils/openUrl';
 import type { CompromisoDeuda, PagoHistorial, PagoEstado, PagoHistorialAno, AnoConPagos } from '@/types/domain';
 
 function bs(n: number): string {
@@ -827,10 +828,9 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
         </div>
       </div>
       {p.estado === 'verificado' && p.recibo_pdf_url && (
-        <a
-          href={p.recibo_pdf_url}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => openExternalUrl(p.recibo_pdf_url!)}
           aria-label="Ver recibo PDF"
           title="Ver recibo PDF"
           className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-green/40 bg-green/10 px-2 text-[9.5px] font-bold uppercase text-green transition hover:bg-green/20"
@@ -838,7 +838,7 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
         >
           <Receipt className="h-3 w-3" strokeWidth={2.4} />
           Recibo
-        </a>
+        </button>
       )}
       {p.estado === 'verificado' && !p.recibo_pdf_url && (
         <span
@@ -852,10 +852,9 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
         </span>
       )}
       {p.comprobante_url && (
-        <a
-          href={p.comprobante_url}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => openExternalUrl(p.comprobante_url!)}
           aria-label="Ver comprobante"
           title="Ver comprobante de pago subido"
           className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-white/[0.08] bg-white/[0.02] px-2 text-[9.5px] font-bold uppercase text-text-65 transition hover:bg-white/[0.06] hover:text-cyan"
@@ -863,7 +862,7 @@ function PagoParcialRow({ p }: { p: PagoHistorial }) {
         >
           <FileText className="h-3 w-3" strokeWidth={2.4} />
           Comprobante
-        </a>
+        </button>
       )}
     </div>
   );
