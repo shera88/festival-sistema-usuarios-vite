@@ -12,6 +12,7 @@ import { AudioPlayer } from './AudioPlayer';
 import { MultimediaDialog } from './MultimediaDialog';
 import { multimediaApi } from '@/lib/api/multimedia';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { generoDeModalidad, GENERO_LABEL } from '@/lib/schemas/inscripcion';
 
 interface Props {
   insc: Inscripcion;
@@ -212,7 +213,11 @@ export function InscripcionCard({ insc, notas, year }: Props) {
             <>
               <div className="grid gap-3 sm:grid-cols-[repeat(auto-fit,minmax(140px,1fr))] py-1 pb-3.5">
                 <Field label="Orden" value={insc.orden} />
-                <Field label="Género" value={insc.genero} />
+                {/* Género derivado de la modalidad (correcto aunque el dato en BD venga mal). */}
+                <Field
+                  label="Género"
+                  value={(() => { const g = generoDeModalidad(insc.modalidad); return g ? GENERO_LABEL[g] : insc.genero; })()}
+                />
                 <Field label="Bloque" value={insc.bloque} />
                 <Field label="Día" value={insc.dia} />
                 <Field label="Coreógrafo" value={insc.coreografo} />

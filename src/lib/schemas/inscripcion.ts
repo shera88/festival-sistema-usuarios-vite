@@ -72,6 +72,46 @@ export const MODALIDADES = [
 ] as const;
 
 /**
+ * Género de danza derivado de la modalidad (FOLKLORE / ACADEMICO / URBANO),
+ * según la convocatoria. El género NO es seleccionable: lo determina la
+ * modalidad. Valores en MAYÚSCULA = los que persiste la BD
+ * (`registro_de_inscripcion_2026.genero`). Debe coincidir con el backend
+ * derive_genero().
+ */
+export const MODALIDAD_GENERO: Record<(typeof MODALIDADES)[number], "FOLKLORE" | "ACADEMICO" | "URBANO"> = {
+  "FOLCLORE ORIENTAL": "FOLKLORE",
+  "FOLCLORE ANDINO": "FOLKLORE",
+  "FOLCLORE DEL VALLE": "FOLKLORE",
+  "FOLCLORE DEL CHACO": "FOLKLORE",
+  "FOLCLORE LATINOAMERICANO": "FOLKLORE",
+  "FOLCLORE ANDINO TINKU": "FOLKLORE",
+  "FOLCLORE POPULAR SAYA Y CAPORAL": "FOLKLORE",
+  "DANZA ÉTNICA": "FOLKLORE",
+  "BALLET CLÁSICO Y NEOCLÁSICO": "ACADEMICO",
+  "JAZZ DANCE CONTEMPORÁNEO": "ACADEMICO",
+  "BAILES TROPICALES": "ACADEMICO",
+  "BAILES DE SALÓN": "ACADEMICO",
+  "MODALIDAD LIBRE": "ACADEMICO",
+  "DANZA ÁRABE O INDÚ": "ACADEMICO",
+  "HIP HOP": "URBANO",
+  "COMERCIAL DANCE": "URBANO",
+  "DANZA URBANA LIBRE": "URBANO",
+};
+
+/** Etiqueta legible del género (para mostrar en UI). */
+export const GENERO_LABEL: Record<"FOLKLORE" | "ACADEMICO" | "URBANO", string> = {
+  FOLKLORE: "Folklore",
+  ACADEMICO: "Académico",
+  URBANO: "Urbano",
+};
+
+/** Devuelve el género de una modalidad (vacío si aún no se eligió modalidad). */
+export function generoDeModalidad(modalidad?: string): "" | "FOLKLORE" | "ACADEMICO" | "URBANO" {
+  if (!modalidad) return "";
+  return MODALIDAD_GENERO[modalidad as (typeof MODALIDADES)[number]] ?? "ACADEMICO";
+}
+
+/**
  * Step 1 — datos personales del representante.
  *
  * `foto_url_actual` viene del match con un participante existente (URL de su

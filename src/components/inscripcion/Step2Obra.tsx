@@ -9,6 +9,8 @@ import {
   DIVISIONES,
   SUBDIVISIONES,
   MODALIDADES,
+  GENERO_LABEL,
+  generoDeModalidad,
 } from "@/lib/schemas/inscripcion";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
@@ -55,6 +57,12 @@ export function Step2Obra({ onBack, onSubmit, submitting, idContacto }: Props) {
 
   const subdivision = watch("subdivision");
   const subdivisionInfo = SUBDIVISIONES.find((s) => s.value === subdivision);
+
+  // Género: NO seleccionable. Se deriva automáticamente de la modalidad elegida
+  // (convocatoria) y se actualiza al cambiar la modalidad.
+  const modalidad = watch("modalidad");
+  const generoCode = generoDeModalidad(modalidad);
+  const generoLabel = generoCode ? GENERO_LABEL[generoCode] : "";
 
   // Textos observados para los autocompletes inline (agrupación y coreógrafo).
   const agrupacion = watch("agrupacion") ?? "";
@@ -263,6 +271,23 @@ export function Step2Obra({ onBack, onSubmit, submitting, idContacto }: Props) {
         {errors.modalidad && (
           <p className="mt-1.5 text-xs text-[var(--amber-accent)]">Seleccione una modalidad</p>
         )}
+      </div>
+
+      {/* Género — NO seleccionable. Se determina solo por la modalidad elegida
+          (según la convocatoria) y se actualiza al cambiar la modalidad. */}
+      <div data-field-anchor="genero">
+        <Label>Género</Label>
+        <div
+          aria-readonly="true"
+          className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-card/40 px-4 py-3 text-sm"
+        >
+          <span className={generoLabel ? "font-semibold text-foreground" : "text-foreground/50"}>
+            {generoLabel || "Se asigna automáticamente al elegir la modalidad"}
+          </span>
+          <span className="rounded-md bg-[rgba(34,211,238,0.1)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground/60">
+            Automático
+          </span>
+        </div>
       </div>
 
       {/* Logo de la agrupación — si la agrupación coincidió con una existente

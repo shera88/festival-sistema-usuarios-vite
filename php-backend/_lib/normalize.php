@@ -107,7 +107,9 @@ function slugify(string $s): string {
 /** modalidad → "FOLKLORE" | "ACADEMICO" | "URBANO". */
 function derive_genero(string $modalidad): string {
     $m = mb_strtoupper(trim($modalidad), 'UTF-8');
-    if (str_starts_with($m, 'FOLKLORE') || $m === 'DANZA ETNICA' || $m === 'DANZA ÉTNICA') {
+    // Folclore usa "FOLCLORE" (con C) en el formulario/BD; aceptar ambas grafías.
+    if (str_starts_with($m, 'FOLCLORE') || str_starts_with($m, 'FOLKLORE')
+        || $m === 'DANZA ETNICA' || $m === 'DANZA ÉTNICA') {
         return 'FOLKLORE';
     }
     if ($m === 'HIP HOP' || $m === 'COMERCIAL DANCE' || $m === 'DANZA URBANA LIBRE') {
