@@ -1,9 +1,20 @@
 <?php
 declare(strict_types=1);
 
-function buildContextFilter(array $user): ?string
+function buildContextFilter(array $user, bool $includeContacto = false): ?string
 {
     $conditions = [];
+
+    // Match por id_contacto (la persona logueada ES el contacto de la inscripción).
+    // Captura inscripciones donde la persona figura como encargado aunque la
+    // agrupación NO la tenga vinculada en instituciones.encargados ni la
+    // inscripción tenga id_encargado. Solo en tablas que tienen id_contacto
+    // (registro_de_inscripcion_2026+); las históricas no, por eso es opt-in.
+    if ($includeContacto) {
+        foreach (parseIdCsv($user['id_contacto'] ?? '') as $id) {
+            $conditions[] = 'id_contacto.eq.' . quoteIfNeeded($id);
+        }
+    }
 
     foreach (parseIdCsv($user['id_agrupacion'] ?? '') as $id) {
         $conditions[] = 'id_agrupacion.eq.' . quoteIfNeeded($id);

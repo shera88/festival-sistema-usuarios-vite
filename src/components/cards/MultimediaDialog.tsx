@@ -286,7 +286,6 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
             <Section
               icon={<Video className="h-4 w-4" />}
               title="Video para pantallas LED (opcional)"
-              hint="MP4, MOV, AVI, MKV, WEBM · máx 2 GB"
               accent="fuchsia"
             >
               {pendingVideo ? (
@@ -403,7 +402,7 @@ function Section({
 }: {
   icon: React.ReactNode;
   title: string;
-  hint: string;
+  hint?: string;
   accent: 'cyan' | 'fuchsia';
   children: React.ReactNode;
 }) {
@@ -423,7 +422,7 @@ function Section({
           <h4 className="text-[12px] font-semibold uppercase text-text-white" style={{ letterSpacing: '0.5px' }}>
             {title}
           </h4>
-          <p className="text-[10px] text-text-45">{hint}</p>
+          {hint ? <p className="text-[10px] text-text-45">{hint}</p> : null}
         </div>
       </div>
       <div>{children}</div>

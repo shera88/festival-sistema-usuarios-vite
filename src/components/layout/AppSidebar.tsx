@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
-import { FilePlus, FileText, IdCard, Home, X } from 'lucide-react';
+import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, Video, CreditCard, type LucideIcon } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Props {
   open: boolean;
@@ -15,24 +16,32 @@ const PREFETCH: Record<string, () => Promise<unknown>> = {
   '/solicitud': () => import('@/routes/SolicitudPage'),
 };
 
-const SECTIONS = [
-  {
-    label: 'Navegación',
-    items: [
-      { to: '/inscripciones', label: 'Inicio', icon: Home },
-    ],
-  },
-  {
-    label: 'Formularios',
-    items: [
-      { to: '/inscripcion', label: 'Inscripción', icon: FilePlus },
-      { to: '/kardex-form', label: 'Kardex', icon: IdCard },
-      { to: '/solicitud', label: 'Solicitud', icon: FileText },
-    ],
-  },
-] as const;
+const FORM_ITEMS = [
+  { to: '/inscripcion', label: 'Inscripción', icon: FilePlus },
+  { to: '/kardex-form', label: 'Kardex', icon: IdCard },
+  { to: '/solicitud', label: 'Solicitud', icon: FileText },
+];
+
+type NavSection = { label: string; items: { to: string; label: string; icon: LucideIcon }[] };
 
 export function AppSidebar({ open, onClose }: Props) {
+  const { puedeEditar } = useAuth();
+
+  // Secciones (los mismos tabs) + Formularios solo para quien puede editar.
+  const sections: NavSection[] = [
+    {
+      label: 'Secciones',
+      items: [
+        { to: '/inscripciones', label: puedeEditar ? 'Inscripciones' : 'Mis Participaciones', icon: ClipboardList },
+        { to: '/kardex', label: puedeEditar ? 'Kardex' : 'Mis Agrupaciones', icon: Users },
+        { to: '/calificaciones', label: 'Calificaciones', icon: Award },
+        { to: '/videos', label: 'Videos', icon: Video },
+        { to: '/pagos', label: 'Pagos', icon: CreditCard },
+      ],
+    },
+    ...(puedeEditar ? [{ label: 'Formularios', items: FORM_ITEMS }] : []),
+  ];
+
   function prefetch(to: string) {
     PREFETCH[to]?.();
   }
@@ -68,7 +77,7 @@ export function AppSidebar({ open, onClose }: Props) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3">
-          {SECTIONS.map((section) => (
+          {sections.map((section) => (
             <div key={section.label} className="mb-2">
               <div
                 className="px-6 pb-2 pt-3 text-[10px] font-bold uppercase text-text-45"

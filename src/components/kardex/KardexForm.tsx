@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { z } from "zod";
 import { kardexSchema, type KardexData, CARGOS } from "@/lib/schemas/kardex";
 import { apiUrl } from "@/lib/api/url";
+import { fetchWithTimeout } from "@/lib/api/fetch-timeout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -152,7 +153,7 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
           fd.append(k, String(v));
         }
       }
-      const res = await fetch(apiUrl("kardex.php"), { method: "POST", credentials: "include", body: fd });
+      const res = await fetchWithTimeout(apiUrl("kardex.php"), { method: "POST", credentials: "include", body: fd });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) {
         toast.error(json.error || `Error ${res.status}: no se pudo registrar el kárdex`);
@@ -162,7 +163,11 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
       navigate("/kardex/gracias");
     } catch (e) {
       console.error(e);
-      toast.error("Error de red. Intente nuevamente en unos segundos.");
+      toast.error(
+        e instanceof Error && /tardó demasiado/.test(e.message)
+          ? e.message
+          : "Error de red. Intente nuevamente en unos segundos.",
+      );
     } finally {
       setSubmitting(false);
     }

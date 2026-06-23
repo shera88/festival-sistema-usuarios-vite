@@ -10,7 +10,7 @@ requireMethod('GET');
 
 $user = requireAuth();
 $year = preg_replace('/\D/', '', (string)($_GET['year'] ?? '2025'));
-if (!in_array($year, ['2023', '2024', '2025'], true)) {
+if (!in_array($year, ['2023', '2024', '2025', '2026'], true)) {
     sendJson([$year => []]);
     exit;
 }
@@ -30,7 +30,9 @@ $inscMap = [];
 foreach ($insc as $i) $inscMap[$i['id_inscripcion']] = $i;
 
 $inFilter = buildInFilter('id_inscripcion', $idsInsc);
-$notas = supabase()->selectRaw("recepcion_notas_$year", "$inFilter&select=*&limit=2000");
+// 2026 está en juzgamiento: solo mostrar notas enviadas/bloqueadas (no borradores/anuladas).
+$estadoFilter = $year === '2026' ? '&estado=in.(enviada,bloqueada)' : '';
+$notas = supabase()->selectRaw("recepcion_notas_$year", "$inFilter$estadoFilter&select=*&limit=2000");
 if (count($notas) === 0) { sendJson([$year => []]); exit; }
 
 $idsJurado = array_values(array_unique(array_filter(array_column($notas, 'id_jurado'))));

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles, Receipt, Loader2 } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
+import { useAuth } from '@/hooks/useAuth';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { PagoModal } from '@/components/cards/PagoModal';
@@ -83,8 +84,63 @@ function useCountUp(value: number, durationMs = 900) {
 
 const ANO_ACTUAL = 2026;
 
+const PAGOS_WHITELIST = ['YACU SERRANO', 'SHERA SERRANO'];
+
+function ProximamentePagos() {
+  return (
+    <div className="flex items-center justify-center py-24 px-4">
+      <div
+        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-glass-border bg-glass-bg p-10 text-center backdrop-blur-md"
+        style={{
+          boxShadow: '0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)',
+        }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            background:
+              'radial-gradient(circle at 30% 20%, rgba(0,229,255,0.25), transparent 55%), radial-gradient(circle at 75% 80%, rgba(255,31,168,0.22), transparent 60%)',
+          }}
+        />
+        <div className="relative">
+          <div
+            className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full"
+            style={{
+              background: 'linear-gradient(135deg, #00E5FF 0%, #FF1FA8 100%)',
+              boxShadow: '0 8px 24px rgba(0,229,255,0.35)',
+            }}
+          >
+            <Sparkles className="h-7 w-7 text-white" />
+          </div>
+          <h2
+            className="mb-2 text-2xl font-semibold tracking-tight text-text-90"
+            style={{ fontFamily: FONT_DISPLAY, letterSpacing: '0.5px' }}
+          >
+            Próximamente
+          </h2>
+          <p className="text-sm leading-relaxed text-text-45">
+            La sección de Pagos estará disponible en los próximos días.
+            <br />
+            Estamos terminando los últimos detalles para usted.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function PagosTab() {
+  const { user } = useAuth();
+  const nombre = (user?.nombre_y_apellido ?? '').toUpperCase();
+  const autorizado = PAGOS_WHITELIST.some((w) => nombre.includes(w));
+  if (!autorizado) return <ProximamentePagos />;
+  return <PagosTabContent />;
+}
+
+function PagosTabContent() {
   const qc = useQueryClient();
+  const { puedeEditar } = useAuth();
   const [pagoTarget, setPagoTarget] = useState<CompromisoDeuda | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [anoActivo, setAnoActivo] = useState<number>(ANO_ACTUAL);
@@ -243,6 +299,7 @@ export function PagosTab() {
                         nombreAgrupacion={nombre_agrupacion}
                         pagosParciales={pagosByCompromiso[`${c.concepto}::${c.id_referencia}`] ?? []}
                         onPagar={() => setPagoTarget(c)}
+                        canPay={puedeEditar}
                         delayMs={sectionIdx * 80 + idx * 50}
                       />
                     ))}
@@ -512,6 +569,7 @@ function CompromisoCard({
   nombreAgrupacion,
   pagosParciales,
   onPagar,
+  canPay = true,
   delayMs = 0,
 }: {
   c: CompromisoDeuda;
@@ -519,6 +577,7 @@ function CompromisoCard({
   nombreAgrupacion: string;
   pagosParciales: PagoHistorial[];
   onPagar: () => void;
+  canPay?: boolean;
   delayMs?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -680,7 +739,7 @@ function CompromisoCard({
             </div>
           </div>
 
-          {isPaid || isRevision ? (
+          {isPaid || isRevision || !canPay ? (
             <div className="shrink-0" />
           ) : (
             <button

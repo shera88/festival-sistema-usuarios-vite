@@ -28,7 +28,7 @@ KEY = CRED["api_key"]
 WF2_ID = "JFvN1ByShgodQqIO"
 
 SUPABASE_URL = "https://supabase.imaginarte.cloud"
-SERVICE_ROLE_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI"
+SERVICE_ROLE_KEY = "__SUPABASE_SERVICE_ROLE_KEY__"
 
 ALLOWED_KEYS = {"name", "nodes", "connections", "settings", "staticData"}
 ALLOWED_SETTINGS_KEYS = {
@@ -142,6 +142,25 @@ def main():
 
     if not (pdf_node and rechaz_supa and ack_conf and ack_rech):
         raise RuntimeError("Nodos esperados no encontrados en el workflow")
+
+    # Defensa anti-regresión: forzar config correcta del nodo Generar recibo PDF
+    # cada vez que corre este script. Cualquier edición manual en n8n UI que rompa
+    # la URL/header se sobrescribe acá.
+    SHARED_SECRET = "dba176baa6127feca1657aa99e0c2f358408c715c1a5fa43d202d4aa5c55674e"
+    pdf_node["parameters"]["url"] = "https://festivaldanzarte.com/app-portal/php/recibo-generar.php"
+    pdf_node["parameters"]["sendHeaders"] = True
+    pdf_node["parameters"]["headerParameters"] = {
+        "parameters": [
+            {"name": "Content-Type", "value": "application/json"},
+            {"name": "X-Webhook-Secret", "value": SHARED_SECRET},
+        ]
+    }
+    pdf_node["parameters"]["sendBody"] = True
+    pdf_node["parameters"]["specifyBody"] = "json"
+    pdf_node["parameters"]["jsonBody"] = '={{ JSON.stringify({ id_pago: $node["Parse button reply"].json.idPago }) }}'
+    pdf_node["parameters"].pop("bodyParameters", None)
+    pdf_node["parameters"].setdefault("options", {})["timeout"] = 30000
+    pdf_node["onError"] = "continueRegularOutput"
 
     # Posiciones: insertar entre nodos existentes
     detalle_conf_pos = [pdf_node["position"][0] + 180, pdf_node["position"][1]]

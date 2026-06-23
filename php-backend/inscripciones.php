@@ -16,7 +16,8 @@ if (!in_array($year, ['2023', '2024', '2025', '2026'], true)) {
     exit;
 }
 
-$filter = buildContextFilter($user);
+// id_contacto solo existe en registro_de_inscripcion_2026+ (las históricas no).
+$filter = buildContextFilter($user, (int)$year >= 2026);
 if (!$filter) {
     sendJson([$year => []]);
     exit;

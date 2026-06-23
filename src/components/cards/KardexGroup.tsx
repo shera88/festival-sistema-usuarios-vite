@@ -6,6 +6,7 @@ import { KardexRow } from './KardexRow';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { kardexApi } from '@/lib/api/kardex';
 import { webpProxy } from '@/lib/utils/img';
+import { useAuth } from '@/hooks/useAuth';
 import type { AgrupacionMeta } from '@/routes/tabs/KardexTab';
 
 interface Props {
@@ -49,10 +50,11 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
   const initials = initialsOf(agrupacion);
   const showImg = !!logo && !logoFailed;
 
+  const { puedeEditar } = useAuth();
   const cerrada = (meta?.estado_credenciales ?? '').toLowerCase() === 'completo';
   const isCurrentYear = year === '2026';
-  const canEdit = isCurrentYear && !cerrada;
-  const canClose = isCurrentYear && !cerrada && !!meta?.id_agrupacion;
+  const canEdit = puedeEditar && isCurrentYear && !cerrada;
+  const canClose = puedeEditar && isCurrentYear && !cerrada && !!meta?.id_agrupacion;
 
   const sortedRows = useMemo(
     () =>

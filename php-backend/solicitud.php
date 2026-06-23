@@ -193,6 +193,31 @@ try {
         }
     }
 
+    // NUEVO (2026-06-10): si la agrupación NO tiene representante todavía,
+    // registrar a esta persona como representante de esa agrupación (además de
+    // quedar en `solicitantes`) y vincularla en instituciones.encargados.
+    // Defensivo: jamás debe romper el guardado de la solicitud.
+    try {
+        $idEncVinc = vincular_representante_agrupacion(
+            $sb, (string)$id_agrupacion, $id_contacto_final ?: null,
+            [
+                'nombre_y_apellido'  => $norm['nombre_y_apellido'],
+                'numero_de_carnet'   => (int)$ci,
+                'telefono'           => (int)$telefono,
+                'ciudad'             => $norm['ciudad'],
+                'correo_electronico' => $norm['correo_electronico'],
+                'agrupacion'         => $norm['agrupacion'],
+                'categoria'          => $categoriaLabel,
+                'genero'             => $generoLabel,
+            ],
+            $id_encargado_final,
+            true   // solicitud → insertar representante si la agrupación no tiene
+        );
+        if ($idEncVinc && !$id_encargado_final) $id_encargado_final = $idEncVinc;
+    } catch (Throwable $e) {
+        error_log('[solicitud] vincular_representante_agrupacion: ' . $e->getMessage());
+    }
+
     rate_limit_record($rlDir, $ip);
 
     dispatch_webhook($CFG['webhooks']['solicitud'] ?? null, [

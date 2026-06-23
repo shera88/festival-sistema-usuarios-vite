@@ -5,6 +5,7 @@ import { useRealtime } from '@/hooks/useRealtime';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { UserHero } from '@/components/layout/UserHero';
 import { TabsNav } from '@/components/layout/TabsNav';
+import { BottomNav } from '@/components/layout/BottomNav';
 import { InscripcionesTab } from './tabs/InscripcionesTab';
 import { KardexTab } from './tabs/KardexTab';
 import { CalificacionesTab } from './tabs/CalificacionesTab';
@@ -45,7 +46,7 @@ export function DashboardPage() {
   const isFormPage = FORM_PATHS.has(location.pathname);
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className={`flex min-h-screen flex-col ${!isFormPage ? 'pb-14 lg:pb-0' : ''}`}>
       <AppHeader />
       {!isFormPage && (
         <>
@@ -76,6 +77,7 @@ export function DashboardPage() {
       >
         &copy; 2026 Festival Danzarte. Todos los derechos reservados.
       </footer>
+      {!isFormPage && <BottomNav />}
     </div>
   );
 }

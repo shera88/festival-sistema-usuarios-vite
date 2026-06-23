@@ -207,3 +207,83 @@ function ensure_coreografo(SupabaseClient $sb, array $input): string {
     ]);
     return $id;
 }
+
+/**
+ * Vincula a una persona como REPRESENTANTE de una agrupación cuando ésta todavía
+ * NO tiene representante. Decisión de producto (2026-06-10):
+ *   - SOLICITUD: si la agrupación no tiene representante, la persona se inserta
+ *     también en `representantes` (sigue además en `solicitantes`) y se vincula
+ *     en instituciones.encargados / encargados_nombres.
+ *   - INSCRIPCIÓN: la persona ya entra a `representantes` por trigger; aquí solo
+ *     se rellena instituciones.encargados si estaba vacío.
+ * NUNCA pisa un representante ya registrado. Idempotente. El llamador DEBE
+ * envolver esto en try/catch para que jamás rompa el guardado principal.
+ *
+ * @param array  $persona  ['nombre_y_apellido','numero_de_carnet','telefono',
+ *                          'ciudad','correo_electronico','agrupacion','categoria','genero']
+ * @param bool   $insertarRepresentante  true en solicitud; false en inscripción.
+ * @return string|null  id_encargado vinculado, o null si no se hizo nada.
+ */
+function vincular_representante_agrupacion(
+    SupabaseClient $sb,
+    string $idAgrupacion,
+    ?string $idContacto,
+    array $persona,
+    ?string $idEncargadoConocido = null,
+    bool $insertarRepresentante = false
+): ?string {
+    if (trim($idAgrupacion) === '') return null;
+
+    // 1) ¿La agrupación ya tiene representante? (fila en `representantes`).
+    $reps = $sb->select('representantes', 'id_encargado',
+        ['id_agrupacion' => "eq.$idAgrupacion"], 1);
+    $yaTieneRepr = !empty($reps);
+
+    $idEncargado = $idEncargadoConocido ?: ($reps[0]['id_encargado'] ?? null);
+
+    // 2) SOLICITUD: la agrupación no tiene representante → registrar a esta persona.
+    if ($insertarRepresentante && !$yaTieneRepr && $idContacto) {
+        if (!$idEncargado) {
+            // Reusar el id_encargado que ya tenga la persona (representantes o
+            // solicitantes — el trigger de solicitud acaba de crear la fila), o nuevo.
+            $rep = $sb->selectOne('representantes', 'id_encargado', ['id_contacto' => "eq.$idContacto"]);
+            $sol = $sb->selectOne('solicitantes',   'id_encargado', ['id_contacto' => "eq.$idContacto"]);
+            $idEncargado = $rep['id_encargado'] ?? $sol['id_encargado'] ?? new_id8();
+        }
+        // No duplicar fila para (id_contacto + id_agrupacion).
+        $dup = $sb->selectOne('representantes', 'id_encargado',
+            ['id_contacto' => "eq.$idContacto", 'id_agrupacion' => "eq.$idAgrupacion"]);
+        if (!$dup) {
+            $sb->insert('representantes', [
+                'id_encargado'          => $idEncargado,
+                'id_contacto'           => $idContacto,
+                'id_agrupacion'         => $idAgrupacion,
+                'nombre_y_apellido'     => $persona['nombre_y_apellido'] ?? null,
+                'numero_de_carnet'      => $persona['numero_de_carnet'] ?? null,
+                'telefono'              => $persona['telefono'] ?? null,
+                'ciudad'                => $persona['ciudad'] ?? null,
+                'correo_electronico'    => $persona['correo_electronico'] ?? null,
+                'nombres_agrupaciones'  => $persona['agrupacion'] ?? null,
+                'categoria'             => $persona['categoria'] ?? null,
+                'genero'                => $persona['genero'] ?? null,
+                'tipo_de_contacto'      => 'representante',
+                'antecedentes'          => 'Solicitó_2026',
+                'año_de_participacion'  => '2026',
+                'fecha_actualizacion'   => now_iso(),
+            ]);
+        }
+    }
+
+    // 3) Vincular en instituciones SOLO si está vacío (nunca pisar).
+    if ($idEncargado) {
+        $inst = $sb->selectOne('instituciones', 'encargados', ['id_agrupacion' => "eq.$idAgrupacion"]);
+        if ($inst !== null && trim((string)($inst['encargados'] ?? '')) === '') {
+            $sb->update('instituciones', 'id_agrupacion', $idAgrupacion, [
+                'encargados'           => $idEncargado,
+                'encargados_nombres'   => $persona['nombre_y_apellido'] ?? null,
+                'fecha_actualizacion'  => now_iso(),
+            ]);
+        }
+    }
+    return $idEncargado;
+}

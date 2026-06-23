@@ -12,11 +12,11 @@ import { calcularPromedioFinal, fmtScore } from '@/lib/utils/scoring';
 import { useAuth } from '@/hooks/useAuth';
 import type { Nota, YearNotas } from '@/types/domain';
 
-const YEARS = ['2023', '2024', '2025'] as const satisfies readonly YearNotas[];
+const YEARS = ['2023', '2024', '2025', '2026'] as const satisfies readonly YearNotas[];
 
 export function CalificacionesTab() {
   const { user } = useAuth();
-  const [year, setYear] = useState<YearNotas>('2025');
+  const [year, setYear] = useState<YearNotas>('2026');
   const [search, setSearch] = useState('');
 
   const q = useCalificaciones(year, !!user);

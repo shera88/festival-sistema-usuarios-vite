@@ -42,5 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <AuthCtx.Provider value={{ user, loading, login, logout, setUser }}>{children}</AuthCtx.Provider>;
+  // Editan: contactos de festival_contactos_global y participantes kárdex
+  // STAFF/DIRECTOR/COREOGRAFO. validate_login ya resolvió `puede_editar`.
+  // Default true para sesiones legacy (solo contactos existían antes).
+  const puedeEditar = user ? (user.puede_editar ?? true) : false;
+
+  return <AuthCtx.Provider value={{ user, loading, puedeEditar, login, logout, setUser }}>{children}</AuthCtx.Provider>;
 }

@@ -11,7 +11,7 @@ function asString(v: unknown): string {
 }
 
 export function PerfilPage() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, puedeEditar } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({
     nombre_y_apellido: '',
@@ -145,17 +145,19 @@ export function PerfilPage() {
           )}
         </div>
         <div className="flex flex-col items-center gap-2 sm:items-start">
-          <button
-            type="button"
-            disabled={uploadingFoto}
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 rounded-md border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-[11px] font-semibold uppercase text-cyan transition hover:bg-cyan/20 disabled:opacity-50"
-            style={{ letterSpacing: '0.5px' }}
-          >
-            <Camera className="h-3.5 w-3.5" />
-            {uploadingFoto ? 'Subiendo…' : 'Cambiar foto'}
-          </button>
-          <p className="text-[10px] text-text-45">JPG, PNG, WEBP · máx 5 MB</p>
+          {puedeEditar && (
+            <button
+              type="button"
+              disabled={uploadingFoto}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-md border border-cyan/40 bg-cyan/10 px-3 py-1.5 text-[11px] font-semibold uppercase text-cyan transition hover:bg-cyan/20 disabled:opacity-50"
+              style={{ letterSpacing: '0.5px' }}
+            >
+              <Camera className="h-3.5 w-3.5" />
+              {uploadingFoto ? 'Subiendo…' : 'Cambiar foto'}
+            </button>
+          )}
+          {puedeEditar && <p className="text-[10px] text-text-45">JPG, PNG, WEBP · máx 5 MB</p>}
           <input
             ref={fileInputRef}
             type="file"
@@ -236,15 +238,21 @@ export function PerfilPage() {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="flex w-full items-center justify-center gap-1.5 rounded-full bg-cyan px-4 py-2.5 text-[12px] font-semibold uppercase text-[#04020F] transition hover:bg-[#66F0FF] disabled:opacity-50"
-          style={{ letterSpacing: '0.6px' }}
-        >
-          <Save className="h-3.5 w-3.5" />
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        {puedeEditar ? (
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex w-full items-center justify-center gap-1.5 rounded-full bg-cyan px-4 py-2.5 text-[12px] font-semibold uppercase text-[#04020F] transition hover:bg-[#66F0FF] disabled:opacity-50"
+            style={{ letterSpacing: '0.6px' }}
+          >
+            <Save className="h-3.5 w-3.5" />
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        ) : (
+          <p className="rounded-lg border border-glass-border bg-elev px-3 py-2 text-center text-xs text-text-45">
+            Su cuenta es de solo lectura.
+          </p>
+        )}
       </form>
 
       <style>{`

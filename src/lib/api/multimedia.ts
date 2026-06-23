@@ -1,5 +1,4 @@
 import { api } from './client';
-import { apiUrl } from './url';
 import type { MultimediaListaRes } from '@/types/domain';
 
 export interface MultimediaSubirRes {
@@ -24,9 +23,14 @@ export const multimediaApi = {
     api.get<MultimediaListaRes>(`/multimedia-listar.php?id_inscripcion=${encodeURIComponent(id_inscripcion)}`),
 
   /**
-   * Upload con progreso. onProgress recibe estado:
-   *  - { phase: 'uploading', pct: 0-100 } durante envío de bytes
-   *  - { phase: 'processing' } cuando bytes completos, esperando respuesta server
+   * Upload con progreso. Flujo en 3 pasos (R2 directo, no pasa por PHP):
+   *   1) POST /multimedia-presign.php  → URL PUT firmada de R2
+   *   2) PUT del archivo DIRECTO a R2 (con progreso real)
+   *   3) POST /multimedia-registrar.php → guarda metadatos en BD
+   *
+   * onProgress recibe:
+   *  - { phase: 'uploading', pct: 0-100 } durante el PUT a R2
+   *  - { phase: 'processing' } cuando terminan los bytes, registrando en BD
    */
   subir: async (
     id_inscripcion: string,
@@ -34,42 +38,46 @@ export const multimediaApi = {
     file: File,
     onProgress?: (status: { phase: 'uploading' | 'processing'; pct: number }) => void,
   ): Promise<MultimediaSubirRes> => {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const form = new FormData();
-      form.append('id_inscripcion', id_inscripcion);
-      form.append('tipo', tipo);
-      form.append('file', file);
+    const mime = file.type || 'application/octet-stream';
 
+    // 1) Pedir URL firmada (request chico, va por el backend con sesión).
+    const pres = await api.post<{
+      ok: true; url: string; key: string; storage_path: string;
+      url_publica: string; mime: string; ext: string;
+    }>('/multimedia-presign.php', { id_inscripcion, tipo, mime, size: file.size });
+
+    // 2) PUT del archivo DIRECTO a R2 (sin cookies, CORS habilitado en el bucket).
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && onProgress) {
           onProgress({ phase: 'uploading', pct: Math.round((e.loaded / e.total) * 100) });
         }
       };
       xhr.upload.onload = () => {
-        // Bytes terminados de enviar. Server ahora procesa (storage + INSERT).
         if (onProgress) onProgress({ phase: 'processing', pct: 100 });
       };
       xhr.onload = () => {
-        const raw = xhr.responseText || '';
-        let body: Partial<MultimediaSubirRes> & { error?: string; ok?: boolean };
-        try {
-          body = raw ? JSON.parse(raw) : {};
-        } catch {
-          // Response no es JSON (HTML error page de PHP, etc.)
-          reject(new Error(`Respuesta inválida (HTTP ${xhr.status}): ${raw.slice(0, 200)}`));
-          return;
-        }
-        if (xhr.status >= 200 && xhr.status < 300 && body && body.ok === true) {
-          resolve(body as MultimediaSubirRes);
-        } else {
-          reject(new Error(body?.error || `HTTP ${xhr.status}`));
-        }
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`R2 PUT HTTP ${xhr.status}: ${(xhr.responseText || '').slice(0, 200)}`));
       };
-      xhr.onerror = () => reject(new Error('Error de red durante la subida'));
-      xhr.open('POST', apiUrl('multimedia-subir.php'));
-      xhr.withCredentials = true;
-      xhr.send(form);
+      xhr.onerror = () => reject(new Error('Error de red subiendo a R2'));
+      xhr.open('PUT', pres.url);
+      xhr.setRequestHeader('Content-Type', pres.mime || mime);
+      // NO withCredentials: R2 es cross-origin y no usa cookies.
+      xhr.send(file);
+    });
+
+    // 3) Registrar metadatos en BD.
+    return api.post<MultimediaSubirRes>('/multimedia-registrar.php', {
+      id_inscripcion,
+      tipo,
+      key: pres.key,
+      url_publica: pres.url_publica,
+      nombre: file.name,
+      mime: pres.mime || mime,
+      peso_bytes: file.size,
+      extension: pres.ext,
     });
   },
 

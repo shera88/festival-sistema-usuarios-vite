@@ -1,17 +1,20 @@
 import { NavLink } from 'react-router-dom';
-
-const TABS = [
-  { to: '/inscripciones', label: 'Inscripciones', color: 'var(--cyan)' },
-  { to: '/kardex', label: 'Kardex', color: 'var(--fuchsia)' },
-  { to: '/calificaciones', label: 'Calificaciones', color: 'var(--gold)' },
-  { to: '/videos', label: 'Videos', color: 'var(--purple)' },
-  { to: '/pagos', label: 'Pagos', color: 'var(--green)' },
-] as const;
+import { useAuth } from '@/hooks/useAuth';
 
 export function TabsNav() {
+  const { puedeEditar } = useAuth();
+  // Bailarines/participantes (solo lectura) ven etiquetas personales.
+  const TABS = [
+    { to: '/inscripciones', label: puedeEditar ? 'Inscripciones' : 'Mis Participaciones', color: 'var(--cyan)' },
+    { to: '/kardex', label: puedeEditar ? 'Kardex' : 'Mis Agrupaciones', color: 'var(--fuchsia)' },
+    { to: '/calificaciones', label: 'Calificaciones', color: 'var(--gold)' },
+    { to: '/videos', label: 'Videos', color: 'var(--purple)' },
+    { to: '/pagos', label: 'Pagos', color: 'var(--green)' },
+  ] as const;
+
   return (
     <nav
-      className="sticky top-16 z-30 flex overflow-x-auto border-b border-glass-border no-scrollbar"
+      className="sticky top-16 z-30 hidden overflow-x-auto border-b border-glass-border no-scrollbar lg:flex"
       style={{ background: 'var(--bg-base)' }}
     >
       {TABS.map((t) => (
@@ -19,7 +22,7 @@ export function TabsNav() {
           key={t.to}
           to={t.to}
           className={({ isActive }) =>
-            `relative flex-1 min-w-[110px] whitespace-nowrap px-4 py-4 text-center text-[11px] font-semibold uppercase transition-colors ${
+            `relative flex-none whitespace-nowrap px-4 py-4 text-center text-[11px] font-semibold uppercase transition-colors lg:flex-1 lg:min-w-[110px] ${
               isActive ? 'text-text-white' : 'text-text-45 hover:text-text-90'
             }`
           }

@@ -270,47 +270,73 @@ class SupabaseClient
         return rtrim($this->url, '/') . "/storage/v1/object/public/{$this->bucket}/$path";
     }
 
+    /**
+     * Sube archivo (nombre autogenerado). Si es imagen rasterizada, genera
+     * WebP optimizado (redimensionado) y lo sirve; el ORIGINAL se preserva en
+     * `<prefix>/originals/`. Reutiliza uploadPublicFileAt para subir bytes.
+     */
     public function uploadPublicFile(string $tmpPath, string $mime, string $prefix): string
     {
-        $ext = $this->extFromType($mime);
-        $filename = sprintf('%d-%s.%s', (int)(microtime(true) * 1000), uuidv4(), $ext);
-        $path = "$prefix/$filename";
-        $uploadUrl = rtrim($this->url, '/') . "/storage/v1/object/{$this->bucket}/$path";
+        $base = sprintf('%d-%s', (int)(microtime(true) * 1000), uuidv4());
 
-        $fileContents = file_get_contents($tmpPath);
-        if ($fileContents === false) {
-            throw new RuntimeException('No se pudo leer el archivo subido');
+        if (in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+            $webp = $this->toWebp($tmpPath, $mime);
+            if ($webp !== null) {
+                // Preservar original (best-effort).
+                try {
+                    $this->uploadPublicFileAt($tmpPath, $mime, "$prefix/originals/$base." . $this->extFromType($mime), true);
+                } catch (Throwable $e) {
+                    error_log('[supabase] no se pudo guardar original: ' . $e->getMessage());
+                }
+                // Subir webp desde tempfile.
+                $wt = tempnam(sys_get_temp_dir(), 'webp_');
+                file_put_contents($wt, $webp);
+                try {
+                    return $this->uploadPublicFileAt($wt, 'image/webp', "$prefix/$base.webp", true);
+                } finally {
+                    @unlink($wt);
+                }
+            }
+            // GD sin webp -> guardado normal abajo.
         }
 
-        $ch = curl_init($uploadUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $fileContents,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 120,
-            CURLOPT_HTTPHEADER     => [
-                'Authorization: Bearer ' . $this->serviceKey,
-                'apikey: ' . $this->serviceKey,
-                'Content-Type: ' . $mime,
-                'x-upsert: false',
-                'Cache-Control: public, max-age=31536000, immutable',
-            ],
-        ]);
-        $resp = curl_exec($ch);
-        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = curl_error($ch);
-        curl_close($ch);
+        return $this->uploadPublicFileAt($tmpPath, $mime, "$prefix/$base." . $this->extFromType($mime), false);
+    }
 
-        if ($resp === false) {
-            error_log("[supabase] upload cURL: $err");
-            throw new RuntimeException('No se pudo subir el archivo (conexión)');
-        }
-        if ($http < 200 || $http >= 300) {
-            error_log("[supabase] upload HTTP $http: $resp");
-            throw new RuntimeException('No se pudo subir el archivo');
-        }
+    /**
+     * Convierte una imagen a WebP redimensionada (lado mayor <= $maxDim).
+     * Devuelve bytes WebP, o null si GD no soporta webp / falla la lectura.
+     */
+    private function toWebp(string $tmpPath, string $mime, int $maxDim = 512, int $quality = 80): ?string
+    {
+        if (!function_exists('imagewebp')) return null;
+        $src = match ($mime) {
+            'image/jpeg' => @imagecreatefromjpeg($tmpPath),
+            'image/png'  => @imagecreatefrompng($tmpPath),
+            'image/gif'  => @imagecreatefromgif($tmpPath),
+            'image/webp' => @imagecreatefromwebp($tmpPath),
+            default      => null,
+        };
+        if (!$src) return null;
 
-        return rtrim($this->url, '/') . "/storage/v1/object/public/{$this->bucket}/$path";
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $scale = min(1.0, $maxDim / max($w, $h));
+        $nw = max(1, (int)round($w * $scale));
+        $nh = max(1, (int)round($h * $scale));
+
+        $dst = imagecreatetruecolor($nw, $nh);
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+
+        ob_start();
+        $ok = imagewebp($dst, null, $quality);
+        $bytes = ob_get_clean();
+        imagedestroy($src);
+        imagedestroy($dst);
+
+        return ($ok && $bytes !== '') ? $bytes : null;
     }
 
     public function mirrorExternalUrl(string $url, string $prefix): ?string

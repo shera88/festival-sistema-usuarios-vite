@@ -32,7 +32,7 @@ register_shutdown_function(function () {
 handlePreflight();
 requireMethod('POST');
 
-$user = requireAuth();
+$user = requireEditor();
 $userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
 
 $concepto       = trim((string)($_POST['concepto'] ?? ''));

@@ -1,6 +1,9 @@
 const MOBILE_API_BASE = 'https://festivaldanzarte.com/app-portal/php';
 const isMobile = typeof window !== 'undefined' && typeof window.__MOBILE_VERSION__ === 'string';
-const API_BASE = isMobile ? MOBILE_API_BASE : (import.meta.env.VITE_API_URL || '/api');
+// Respeta el base path de Vite: en prod /portal/ -> /portal/api, en dev / -> /api
+const API_BASE = isMobile
+  ? MOBILE_API_BASE
+  : (import.meta.env.VITE_API_URL || `${import.meta.env.BASE_URL.replace(/\/$/, '')}/api`);
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

@@ -12,7 +12,8 @@ $user = requireAuth();
 $filter = buildContextFilter($user);
 if (!$filter) { sendJson(new stdClass()); exit; }
 
-$years = ['2023', '2024', '2025', '2026'];
+// Videos 2026 quedan tras membresía pagada → por ahora solo historial ≤2025.
+$years = ['2023', '2024', '2025'];
 $select = 'id_inscripcion,orden,dia,agrupacion,enlace_del_logo,nombre_de_la_obra,url_video,categoria,division,subdivision,modalidad,coreografo,director,bloque,genero';
 
 $results = [];

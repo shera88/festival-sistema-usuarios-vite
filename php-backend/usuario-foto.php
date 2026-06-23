@@ -16,7 +16,7 @@ require __DIR__ . '/_lib/supabase.php';
 handlePreflight();
 requireMethod('POST');
 
-$user = requireAuth();
+$user = requireEditor();
 
 if (!isset($_FILES['foto']) || !is_uploaded_file($_FILES['foto']['tmp_name'])) {
     sendJson(['error' => 'Falta archivo "foto"'], 400);

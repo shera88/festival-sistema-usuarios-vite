@@ -17,7 +17,7 @@ require __DIR__ . '/_lib/context.php';
 handlePreflight();
 requireMethod('POST');
 
-$user = requireAuth();
+$user = requireEditor();
 $body = jsonBody();
 
 $id_inscripcion = trim((string)($body['id_inscripcion'] ?? ''));

@@ -51,6 +51,25 @@ function requireAuth(): array
     return $_SESSION['user_data'];
 }
 
+/**
+ * Como requireAuth() pero además exige rol con permiso de edición
+ * (representante/director/coreógrafo). Los participantes de kárdex son
+ * solo-lectura → 403. Defensa en profundidad (la UI también lo oculta).
+ */
+function requireEditor(): array
+{
+    $user = requireAuth();
+    // Editan: contactos de festival_contactos_global (puede_editar=true) y
+    // participantes de kárdex con cargo STAFF/DIRECTOR/COREOGRAFO. El RPC
+    // validate_login ya resolvió ese booleano. Default true para sesiones
+    // legacy (contactos) creadas antes de la migración 009.
+    if (array_key_exists('puede_editar', $user) && !$user['puede_editar']) {
+        sendJson(['error' => 'Su cuenta es de solo lectura'], 403);
+        exit;
+    }
+    return $user;
+}
+
 function requireMethod(string $method): void
 {
     if ($_SERVER['REQUEST_METHOD'] !== strtoupper($method)) {

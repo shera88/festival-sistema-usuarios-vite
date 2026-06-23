@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, FileText, Users, FilePlus, X } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const ITEMS = [
   {
@@ -27,6 +28,7 @@ const ITEMS = [
 ] as const;
 
 export function NavMenu() {
+  const { puedeEditar } = useAuth();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
@@ -48,6 +50,9 @@ export function NavMenu() {
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
   }, []);
+
+  // Bailarines/participantes (solo lectura) no crean formularios.
+  if (!puedeEditar) return null;
 
   return (
     <div ref={ref} className="relative">

@@ -13,6 +13,7 @@ require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
 require __DIR__ . '/_lib/context.php';
 require __DIR__ . '/_lib/multimedia.php';
+require __DIR__ . '/_lib/r2.php';
 
 // Capturar fatal errors y devolverlos como JSON (no HTML page).
 register_shutdown_function(function () {
@@ -50,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST) && empty($_FILES)) {
     exit;
 }
 
-$user = requireAuth();
+$user = requireEditor();
 
 $id_inscripcion = trim((string)($_POST['id_inscripcion'] ?? ''));
 $tipo = trim((string)($_POST['tipo'] ?? ''));
@@ -146,16 +147,17 @@ $existing = $sb->selectOne(
 
 // Si existe, borrar objeto anterior (si tiene path distinto al nuevo)
 $newStoragePath = mmStoragePath($tipo, $orden, $agrupacion, $obra, $ext);
+// Borrar objeto anterior en R2 (si cambió el path) para no dejar huérfanos.
 if ($existing && !empty($existing['storage_path'])) {
     $oldPath = (string)$existing['storage_path'];
     if ($oldPath !== $newStoragePath) {
-        $sb->deleteObject($oldPath);
+        r2()->deleteObject($oldPath);
     }
 }
 
-// Subir nuevo objeto (upsert=true por si misma ruta sobrescribe)
+// Subir nuevo objeto a Cloudflare R2 (antes Supabase Storage). Devuelve URL pública r2.dev.
 try {
-    $publicUrl = $sb->uploadPublicFileAt($file['tmp_name'], $mime, $newStoragePath, true);
+    $publicUrl = r2()->putObject($file['tmp_name'], $mime, $newStoragePath);
 } catch (RuntimeException $e) {
     sendJson(['error' => $e->getMessage()], 500);
     exit;

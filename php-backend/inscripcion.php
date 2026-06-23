@@ -267,6 +267,30 @@ try {
     }
     $id_encargado_final = $reprRow['id_encargado'] ?? null;
 
+    // NUEVO (2026-06-10): la persona ya quedó como representante (trigger). Si la
+    // agrupación no tenía representante vinculado en instituciones.encargados,
+    // rellenarlo (cierra el hueco que dejaba agrupaciones huérfanas, p.ej. MONSEÑOR).
+    // Defensivo: nunca debe romper el guardado de la inscripción.
+    try {
+        vincular_representante_agrupacion(
+            $sb, (string)$id_agrupacion, $id_contacto_final ?: null,
+            [
+                'nombre_y_apellido'  => $norm['nombre_y_apellido'],
+                'numero_de_carnet'   => (int)$ci,
+                'telefono'           => (int)$telefono,
+                'ciudad'             => $norm['ciudad'],
+                'correo_electronico' => $norm['correo_electronico'],
+                'agrupacion'         => $norm['agrupacion'],
+                'categoria'          => $categoriaLabel,
+                'genero'             => $generoLabel,
+            ],
+            $id_encargado_final,
+            false   // inscripción → NO insertar representante (ya lo hizo el trigger)
+        );
+    } catch (Throwable $e) {
+        error_log('[inscripcion] vincular_representante_agrupacion: ' . $e->getMessage());
+    }
+
     // 8) Persistir foto en `representantes.imagen` para todas las filas con
     //    este id_contacto. Tres casos:
     //    a) Subió foto nueva → usar esa URL.

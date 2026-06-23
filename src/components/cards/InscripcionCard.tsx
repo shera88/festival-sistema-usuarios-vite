@@ -216,7 +216,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                 {/* Género derivado de la modalidad (correcto aunque el dato en BD venga mal). */}
                 <Field
                   label="Género"
-                  value={(() => { const g = generoDeModalidad(insc.modalidad); return g ? GENERO_LABEL[g] : insc.genero; })()}
+                  value={(() => { const g = generoDeModalidad(insc.modalidad); return g ? GENERO_LABEL[g] : (insc.genero ?? undefined); })()}
                 />
                 <Field label="Bloque" value={insc.bloque} />
                 <Field label="Día" value={insc.dia} />

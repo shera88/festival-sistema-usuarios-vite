@@ -22,4 +22,23 @@ return [
 
     // Debug
     'debug' => true,                                 // false en prod
+
+    // Cloudflare R2 (S3) — almacenamiento de multimedia (audio/video).
+    // Reemplaza Supabase Storage. Bucket con acceso público r2.dev.
+    'r2' => [
+        'endpoint'          => 'https://REPLACE_ACCOUNT_ID.r2.cloudflarestorage.com',
+        'bucket'            => 'festival-danzarte',
+        'access_key_id'     => 'REPLACE_ME',
+        'secret_access_key' => 'REPLACE_ME',
+        'public_url_base'   => 'https://pub-REPLACE.r2.dev',
+        'region'            => 'auto',
+    ],
+
+    // Google Drive OAuth (subida de videos del festival)
+    'drive' => [
+        'client_id'     => 'REPLACE_ME.apps.googleusercontent.com',
+        'client_secret' => 'REPLACE_ME',
+        'refresh_token' => 'REPLACE_ME',
+        'folder_id'     => '',  // ID de la carpeta destino en Drive
+    ],
 ];

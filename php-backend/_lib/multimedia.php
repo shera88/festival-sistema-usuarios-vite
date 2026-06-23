@@ -100,3 +100,25 @@ function mmNewId(): string
 {
     return bin2hex(random_bytes(4));
 }
+
+/**
+ * Nombre legible para Drive: "Agrupación - Obra.ext".
+ * Mantiene mayúsculas y acentos. Solo strip caracteres ilegales
+ * de filesystem y colapsa whitespace.
+ */
+function mmDriveFilename(string $agrupacion, string $obra, string $ext): string
+{
+    $clean = function (string $s): string {
+        $s = trim($s);
+        if ($s === '') return 'sin-nombre';
+        $s = preg_replace('#[\\\\/:*?"<>|\r\n\t]+#u', '', $s) ?? $s;
+        $s = preg_replace('/\s+/u', ' ', $s) ?? $s;
+        return trim($s);
+    };
+    $a = $clean($agrupacion);
+    $o = $clean($obra);
+    $name = $a . ' - ' . $o;
+    // Cap total filename a 180 chars (Drive permite 255, dejamos margen)
+    if (mb_strlen($name) > 180) $name = mb_substr($name, 0, 180);
+    return $name . '.' . $ext;
+}

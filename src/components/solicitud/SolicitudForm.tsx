@@ -2,7 +2,7 @@ import { useForm, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+
 import {
   solicitudSchema,
   type SolicitudData,
@@ -11,6 +11,7 @@ import {
   DIVISIONES,
 } from "@/lib/schemas/solicitud";
 import { apiUrl } from "@/lib/api/url";
+import { fetchWithTimeout } from "@/lib/api/fetch-timeout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -58,6 +59,8 @@ function normalizeCI(v: string | null | undefined): string {
 export function SolicitudForm({ defaultValues }: { defaultValues?: Partial<SolicitudData> } = {}) {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [submittedWaUrl, setSubmittedWaUrl] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   // Teléfono registrado del participante seleccionado. NO se muestra ni se
   // autocompleta — se guarda en memoria solo para comparar contra lo que tipea
   // el usuario y mostrar un aviso si difieren. Privacidad: la PII no aparece
@@ -187,14 +190,7 @@ export function SolicitudForm({ defaultValues }: { defaultValues?: Partial<Solic
   };
 
   const onSubmit = async (data: SolicitudData) => {
-    // Optimización: abrir wa.me DIRECTO con la URL final en el user gesture
-    // del click, en vez de abrir about:blank y esperar al fetch. Esto deja
-    // que la carga de wa.me + redirect a WhatsApp Web/App corra en paralelo
-    // con el POST al backend. Tiempo en blanco baja de ~6s a ~1-2s.
-    // Riesgo: si el backend falla, el tab WA queda abierto. Aceptable: el
-    // usuario igual puede mandarnos el mensaje manualmente.
     const waUrl = `https://wa.me/59162180085?text=${encodeURIComponent(buildWhatsAppMessage(data))}`;
-    window.open(waUrl, "_blank", "noopener");
 
     setSubmitting(true);
     try {
@@ -209,7 +205,7 @@ export function SolicitudForm({ defaultValues }: { defaultValues?: Partial<Solic
         categoria: csv(data.categoria),
         division: csv(data.division),
       };
-      const res = await fetch(apiUrl("solicitud.php"), {
+      const res = await fetchWithTimeout(apiUrl("solicitud.php"), {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -217,19 +213,51 @@ export function SolicitudForm({ defaultValues }: { defaultValues?: Partial<Solic
       });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) {
-        toast.error(json.error || `Error ${res.status}: no se pudo enviar la solicitud`);
+        const msg = json.error || `Error ${res.status}: no se pudo enviar la solicitud`;
+        setSubmitError(msg);
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
-      toast.success("¡Solicitud enviada! Le contactaremos por WhatsApp.");
-      navigate("/solicitud/gracias");
+      window.open(waUrl, "_blank", "noopener");
+      setSubmittedWaUrl(waUrl);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       console.error(e);
-      toast.error("Error de red. Intente nuevamente en unos segundos.");
+      setSubmitError(
+        e instanceof Error && /tardó demasiado/.test(e.message)
+          ? e.message
+          : "Error de red. Verifique su conexión e intente nuevamente.",
+      );
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (submittedWaUrl) {
+    return (
+      <div className="relative z-20 rounded-3xl border border-border bg-card/60 p-6 text-center shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)] backdrop-blur-sm md:p-10">
+        <div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full bg-primary-gradient shadow-[0_0_40px_-8px_rgba(34,211,238,0.6)]">
+          <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="#07080e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-extrabold tracking-tight">¡Solicitud enviada!</h2>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Sus datos fueron registrados. WhatsApp se abrió automáticamente con sus datos prellenados — envíe el mensaje al equipo del festival.
+        </p>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate("/inscripciones")}
+            className="rounded-full bg-primary-gradient px-6 py-3 text-sm font-bold text-white shadow-[0_10px_32px_-10px_rgba(168,85,247,0.55)]"
+          >
+            Ver mis inscripciones →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <form
@@ -237,6 +265,19 @@ export function SolicitudForm({ defaultValues }: { defaultValues?: Partial<Solic
       noValidate
       className="relative z-20 space-y-8 rounded-3xl border border-border bg-card/60 p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)] backdrop-blur-sm md:p-10"
     >
+      {submitError && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 fill-none stroke-current stroke-2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <div className="flex-1">
+            <p className="font-semibold">No se pudo enviar la solicitud</p>
+            <p className="mt-0.5 opacity-80">{submitError}</p>
+            <p className="mt-1 opacity-60">Corrija los datos e intente nuevamente.</p>
+          </div>
+          <button type="button" onClick={() => setSubmitError(null)} className="opacity-50 hover:opacity-100">✕</button>
+        </div>
+      )}
       {/* Nombre y apellido — input con autocomplete inline. Si el texto coincide
           (por clic o match exacto) con alguien de participantes_global, linkeamos
           id_contacto y prefillearmos ciudad/teléfono/correo. Si no coincide, al

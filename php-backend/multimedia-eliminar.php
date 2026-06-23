@@ -9,11 +9,12 @@ declare(strict_types=1);
 require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
 require __DIR__ . '/_lib/context.php';
+require __DIR__ . '/_lib/r2.php';
 
 handlePreflight();
 requireMethod('POST');
 
-$user = requireAuth();
+$user = requireEditor();
 $body = jsonBody();
 $id_multimedia = trim((string)($body['id_multimedia'] ?? ''));
 if ($id_multimedia === '' || !preg_match('/^[a-f0-9]{4,16}$/i', $id_multimedia)) {
@@ -55,9 +56,10 @@ if ($id_inscripcion !== '') {
     }
 }
 
-// Borra objeto + row
+// Borra objeto en R2 + row. (Los multimedia subidos antes de la migración viven en
+// Supabase; ese caso es residual — el borrado en R2 no los toca, no rompe nada.)
 if (!empty($row['storage_path'])) {
-    $sb->deleteObject((string)$row['storage_path']);
+    r2()->deleteObject((string)$row['storage_path']);
 }
 $sb->delete('multimedia', 'id_multimedia', $id_multimedia);
 

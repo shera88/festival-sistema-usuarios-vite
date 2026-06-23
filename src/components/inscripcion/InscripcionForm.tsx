@@ -11,6 +11,7 @@ import {
   SUBDIVISIONES,
 } from "@/lib/schemas/inscripcion";
 import { apiUrl } from "@/lib/api/url";
+import { fetchWithTimeout } from "@/lib/api/fetch-timeout";
 import { Step1Personal } from "./Step1Personal";
 import { Step2Obra } from "./Step2Obra";
 import { cn } from "@/lib/utils";
@@ -88,6 +89,8 @@ export function InscripcionForm({ step1Defaults, lockCarnet }: InscripcionFormPr
   const [step, setStep] = useState<1 | 2>(1);
   const [step1, setStep1] = useState<Step1Data | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submittedWaUrl, setSubmittedWaUrl] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const onStep1Submit = (data: Step1Data) => {
     const parsed = step1Schema.safeParse(data);
@@ -112,12 +115,9 @@ export function InscripcionForm({ step1Defaults, lockCarnet }: InscripcionFormPr
       return;
     }
 
-    // Optimización: abrir wa.me con URL final dentro del user gesture del submit.
-    // Carga del tab WA corre en paralelo con el POST → menos pantalla blanca.
     const waUrl = `https://wa.me/59162180085?text=${encodeURIComponent(
       buildInscripcionWhatsAppMessage(step1, parsed2.data)
     )}`;
-    window.open(waUrl, "_blank", "noopener");
 
     setSubmitting(true);
     try {
@@ -136,25 +136,70 @@ export function InscripcionForm({ step1Defaults, lockCarnet }: InscripcionFormPr
         fd.append("foto_nueva", step1.foto_nueva);
       }
 
-      const res = await fetch(apiUrl("inscripcion.php"), { method: "POST", body: fd });
+      const res = await fetchWithTimeout(apiUrl("inscripcion.php"), { method: "POST", body: fd });
       const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !json.ok) {
-        toast.error(json.error || `Error ${res.status}: no se pudo enviar la inscripción`);
+        const msg = json.error || `Error ${res.status}: no se pudo enviar la inscripción`;
+        setSubmitError(msg);
+        window.scrollTo({ top: 0, behavior: "smooth" });
         return;
       }
 
-      toast.success("¡Inscripción enviada! Le contactaremos por WhatsApp.");
-      navigate("/inscripcion/gracias");
+      window.open(waUrl, "_blank", "noopener");
+      setSubmittedWaUrl(waUrl);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       console.error(e);
-      toast.error("Error de red. Intente nuevamente en unos segundos.");
+      setSubmitError(
+        e instanceof Error && /tardó demasiado/.test(e.message)
+          ? e.message
+          : "Error de red. Verifique su conexión e intente nuevamente.",
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (submittedWaUrl) {
+    return (
+      <div className="relative z-20 rounded-3xl border border-border bg-card/60 p-6 text-center shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)] backdrop-blur-sm md:p-10">
+        <div className="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-full bg-primary-gradient shadow-[0_0_40px_-8px_rgba(34,211,238,0.6)]">
+          <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="#07080e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-extrabold tracking-tight">¡Inscripción enviada!</h2>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Sus datos fueron registrados. WhatsApp se abrió automáticamente con sus datos prellenados — envíe el mensaje al equipo del festival.
+        </p>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate("/inscripciones")}
+            className="rounded-full bg-primary-gradient px-6 py-3 text-sm font-bold text-white shadow-[0_10px_32px_-10px_rgba(168,85,247,0.55)]"
+          >
+            Ver mis inscripciones →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative z-20 rounded-3xl border border-border bg-card/60 p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.7)] backdrop-blur-sm md:p-10">
+      {submitError && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0 fill-none stroke-current stroke-2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <div className="flex-1">
+            <p className="font-semibold">No se pudo enviar la inscripción</p>
+            <p className="mt-0.5 opacity-80">{submitError}</p>
+            <p className="mt-1 opacity-60">Corrija los datos e intente nuevamente.</p>
+          </div>
+          <button type="button" onClick={() => setSubmitError(null)} className="opacity-50 hover:opacity-100">✕</button>
+        </div>
+      )}
       {/* Stepper */}
       <div className="mb-10 flex items-center justify-center gap-4 md:gap-8">
         <StepDot step={1} active={step === 1} done={step > 1} label="Datos personales" />

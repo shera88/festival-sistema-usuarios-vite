@@ -37,6 +37,7 @@ Thumbs.db
 
 # PHP backend secret + logs
 php-backend/config.php
+php-backend/config.prod.php
 php-backend/rate-limit-data
 php-backend/stderr.log
 php-backend/webhook-log.txt

@@ -16,6 +16,10 @@ export interface User {
   id_original_representante: string | null;
   id_original_director: string | null;
   id_original_coreografo: string | null;
+  /** 'contacto' = festival_contactos_global · 'kardex' = solo registro_kardex_2026 */
+  origen?: 'contacto' | 'kardex' | string;
+  /** Permiso de edición resuelto en validate_login (contacto, o kárdex STAFF/DIRECTOR/COREOGRAFO). */
+  puede_editar?: boolean;
 }
 
 export interface SearchResult {
@@ -168,7 +172,7 @@ export interface Bootstrap {
 }
 
 export type Year = '2023' | '2024' | '2025' | '2026';
-export type YearNotas = '2023' | '2024' | '2025';
+export type YearNotas = '2023' | '2024' | '2025' | '2026';
 
 // ============== Pagos 2026 ==============
 

@@ -31,8 +31,8 @@ curl -s -H "Authorization: Bearer github_pat_11AQ55XAQ0hXNwP1XiOAY2_n7qrqdATeMRm
 
 # Supabase service_role
 curl -s "https://supabase.imaginarte.cloud/rest/v1/instituciones?select=id_agrupacion&limit=1" \
-  -H "apikey: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI" \
-  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI"
+  -H "apikey: __SUPABASE_SERVICE_ROLE_KEY__" \
+  -H "Authorization: Bearer __SUPABASE_SERVICE_ROLE_KEY__"
 # Expected: JSON array con 1 elemento (no 401, no 403)
 ```
 
@@ -541,7 +541,7 @@ backups/
 # Pasa al frontend en build (Vite expone solo VITE_*)
 VITE_API_URL=/api
 VITE_SUPABASE_URL=https://supabase.imaginarte.cloud
-VITE_SUPABASE_ANON_KEY=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoiYW5vbiJ9.BZpU3YmE_09rdSNIAvqPrcrDRLifTBBuIaa2ThFVhyo
+VITE_SUPABASE_ANON_KEY=__SUPABASE_ANON_KEY__
 ```
 
 - [ ] **Step 3: `.editorconfig`**
@@ -1283,7 +1283,7 @@ Expected: issue #1 creado.
 
 ```bash
 SUPABASE_URL="https://supabase.imaginarte.cloud"
-SR_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI"
+SR_KEY="__SUPABASE_SERVICE_ROLE_KEY__"
 
 # Via Supabase MCP es más cómodo; alternativa REST con query SQL:
 # Tenés que crear una RPC `exec_sql` previa o usar Studio. Acá usamos Studio.
@@ -1304,7 +1304,7 @@ Anotar si ya existe `search_login_users` o `validate_login`. Si existen → ver 
 - [ ] **Step 2: Verificar acceso anon a tablas privadas (estado pre-migración)**
 
 ```bash
-ANON_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoiYW5vbiJ9.BZpU3YmE_09rdSNIAvqPrcrDRLifTBBuIaa2ThFVhyo"
+ANON_KEY="__SUPABASE_ANON_KEY__"
 
 curl -s "$SUPABASE_URL/rest/v1/festival_contactos_global?select=id_contacto&limit=1" \
   -H "apikey: $ANON_KEY"
@@ -1457,7 +1457,7 @@ Expected: 2 `CREATE FUNCTION` + 2 `GRANT` + 2 `COMMENT` exitosos.
 - [ ] **Step 3: Probar `search_login_users` con anon key**
 
 ```bash
-ANON_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoiYW5vbiJ9.BZpU3YmE_09rdSNIAvqPrcrDRLifTBBuIaa2ThFVhyo"
+ANON_KEY="__SUPABASE_ANON_KEY__"
 
 curl -s -X POST "$SUPABASE_URL/rest/v1/rpc/search_login_users" \
   -H "apikey: $ANON_KEY" \
@@ -1649,7 +1649,7 @@ cp php-backend/config.example.php php-backend/config.php
 
 Editar `php-backend/config.php` y reemplazar `REPLACE_ME_WITH_REAL_JWT` por:
 ```
-eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3NjcyNTcwMCwiZXhwIjo0OTMyMzk5MzAwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.l3QcebgXlSMsZ4krkM9cdGlBXnWxBtptwyH97xmnPuI
+__SUPABASE_SERVICE_ROLE_KEY__
 ```
 
 - [ ] **Step 3: Verificar que `config.php` NO está stageado**

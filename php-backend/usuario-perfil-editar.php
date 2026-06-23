@@ -23,7 +23,7 @@ require __DIR__ . '/_lib/supabase.php';
 handlePreflight();
 requireMethod('POST');
 
-$user = requireAuth();
+$user = requireEditor();
 $body = jsonBody();
 $patchIn = is_array($body['patch'] ?? null) ? $body['patch'] : [];
 

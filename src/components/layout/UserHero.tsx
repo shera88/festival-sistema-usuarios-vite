@@ -15,6 +15,7 @@ export function UserHero({ user }: Props) {
     ? user.rol_primario.charAt(0).toUpperCase() + user.rol_primario.slice(1)
     : 'Contacto';
   const inst = user.nombre_agrupacion || 'Sin institución';
+  const puedeEditar = user.puede_editar ?? true; // kárdex participante = solo lectura
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const navigate = useNavigate();
@@ -81,15 +82,17 @@ export function UserHero({ user }: Props) {
           >
             {user.nombre_y_apellido}
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/perfil')}
-            aria-label="Editar perfil"
-            title="Editar perfil"
-            className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md text-text-45 transition hover:bg-white/5 hover:text-cyan"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
+          {puedeEditar && (
+            <button
+              type="button"
+              onClick={() => navigate('/perfil')}
+              aria-label="Editar perfil"
+              title="Editar perfil"
+              className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md text-text-45 transition hover:bg-white/5 hover:text-cyan"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
         <div
           className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] uppercase text-text-65"

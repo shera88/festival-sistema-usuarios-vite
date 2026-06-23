@@ -192,7 +192,7 @@ def main():
             ("accountId", "string", "Identificador de cuenta (provisto por BNB al alta)"),
             ("authorizationId", "string", "Identificador de autorización (provisto por BNB)"),
         ],
-        '{\n  "accountId": "s9CG8FE7Id75ef2jeX9bUA==",\n  "authorizationId": "713K7PvTlACs1gdmv9jGgA=="\n}',
+        '{\n  "accountId": "__BNB_ACCOUNT_ID__",\n  "authorizationId": "__BNB_AUTH_ID__"\n}',
         [
             ("success", "true si la autenticación fue exitosa"),
             ("message", "Token Bearer (cuando success=true) o mensaje de error"),

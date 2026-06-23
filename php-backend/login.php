@@ -49,6 +49,8 @@ $_SESSION['user_data'] = [
     'id_original_representante'   => $user['id_original_representante'] ?? null,
     'id_original_director'        => $user['id_original_director'] ?? null,
     'id_original_coreografo'      => $user['id_original_coreografo'] ?? null,
+    'origen'                      => $user['origen'] ?? 'contacto',
+    'puede_editar'                => $user['puede_editar'] ?? true,
 ];
 
 sendJson(['user' => $_SESSION['user_data']]);
