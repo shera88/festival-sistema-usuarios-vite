@@ -42,7 +42,13 @@ if ($id_inscripcion !== '') {
     $id_institucion = (string)($insc['id_agrupacion'] ?? '');
 }
 
-if (!in_array($id_institucion, $userAgrups, true)) {
+if ($id_inscripcion !== '') {
+    // Scope igual al listado: agrupación/encargado/director/coreógrafo (o admin).
+    if (!usuarioAutorizadoInscripcion($user, $id_inscripcion)) {
+        sendJson(['error' => 'No autorizado'], 403);
+        exit;
+    }
+} elseif (!usuarioEsAdmin($user) && !in_array($id_institucion, $userAgrups, true)) {
     sendJson(['error' => 'No autorizado'], 403);
     exit;
 }

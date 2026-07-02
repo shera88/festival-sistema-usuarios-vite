@@ -53,8 +53,8 @@ if (!$insc) {
     exit;
 }
 $id_agrupacion = (string)($insc['id_agrupacion'] ?? '');
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
-if (!in_array($id_agrupacion, $userAgrups, true)) {
+// Scope igual al listado: agrupación/encargado/director/coreógrafo (o admin).
+if (!usuarioAutorizadoInscripcion($user, $id_inscripcion)) {
     sendJson(['error' => 'No autorizado para esta inscripción'], 403);
     exit;
 }

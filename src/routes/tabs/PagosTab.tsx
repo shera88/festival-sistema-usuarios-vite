@@ -3,9 +3,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles, Receipt, Loader2 } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
 import { useAuth } from '@/hooks/useAuth';
+import { pagosVisibleParaRol } from '@/lib/roles';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { PagoModal } from '@/components/cards/PagoModal';
+import { PdfPreviewModal } from '@/components/PdfPreviewModal';
 import { webpProxy } from '@/lib/utils/img';
 import {
   descargarArchivo,
@@ -25,20 +27,20 @@ const FONT_DISPLAY = "'Inter Tight', 'Inter', system-ui, sans-serif";
 const FONT_MONO = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
 
 const conceptoLabel: Record<string, string> = {
-  inscripcion: 'Inscripciones',
-  convenio_entradas: 'Pre-Venta de Entradas',
+  por_participante: 'Inscripciones',
+  pre_venta: 'Pre-Venta de Entradas',
   credencial: 'Credenciales',
-  credencial_unit: 'Credenciales Unitarias',
+  credencial_unitaria: 'Credenciales Unitarias',
 };
 
 /** Gradientes por concepto — versión moderna con dirección + 2 stops */
 const conceptoGrad: Record<string, { grad: string; glow: string; accent: string }> = {
-  inscripcion: {
+  por_participante: {
     grad: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
     glow: 'rgba(6,182,212,0.35)',
     accent: '#06B6D4',
   },
-  convenio_entradas: {
+  pre_venta: {
     grad: 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)',
     glow: 'rgba(236,72,153,0.35)',
     accent: '#EC4899',
@@ -48,7 +50,7 @@ const conceptoGrad: Record<string, { grad: string; glow: string; accent: string 
     glow: 'rgba(245,158,11,0.32)',
     accent: '#F59E0B',
   },
-  credencial_unit: {
+  credencial_unitaria: {
     grad: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 100%)',
     glow: 'rgba(245,158,11,0.32)',
     accent: '#F59E0B',
@@ -83,8 +85,6 @@ function useCountUp(value: number, durationMs = 900) {
 }
 
 const ANO_ACTUAL = 2026;
-
-const PAGOS_WHITELIST = ['YACU SERRANO', 'SHERA SERRANO'];
 
 function ProximamentePagos() {
   return (
@@ -132,9 +132,7 @@ function ProximamentePagos() {
 
 export function PagosTab() {
   const { user } = useAuth();
-  const nombre = (user?.nombre_y_apellido ?? '').toUpperCase();
-  const autorizado = PAGOS_WHITELIST.some((w) => nombre.includes(w));
-  if (!autorizado) return <ProximamentePagos />;
+  if (!pagosVisibleParaRol(user)) return <ProximamentePagos />;
   return <PagosTabContent />;
 }
 
@@ -586,7 +584,7 @@ function CompromisoCard({
   const isRevision = !isCompletado && c.saldo <= 0.01 && c.pagado_pendiente > 0.01;
   const isPaid = isCompletado;
   const estadoBadge: EstadoBadge = isCompletado ? 'completado' : isRevision ? 'revision' : 'pendiente';
-  const isCredencial = c.concepto === 'credencial' || c.concepto === 'credencial_unit';
+  const isCredencial = c.concepto === 'credencial' || c.concepto === 'credencial_unitaria';
   const cfg = conceptoGrad[c.concepto] ?? conceptoGrad.inscripcion;
   const pct = c.monto_total > 0 ? Math.min(100, (c.pagado_verificado / c.monto_total) * 100) : 0;
   const initial = (nombreAgrupacion || '?').charAt(0).toUpperCase();
@@ -943,6 +941,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
     recibo: false,
     comprobante: false,
   });
+  const [reciboPreview, setReciboPreview] = useState(false);
 
   function buildFilename(tipo: 'recibo' | 'comprobante'): string {
     const persona = (p.nombre_pagador || 'Pagador').toUpperCase();
@@ -1037,11 +1036,11 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
         <div className="flex w-full">
           {p.estado === 'verificado' && p.recibo_pdf_url ? (
             <ActionButton
-              onClick={() => handleClick('recibo')}
+              onClick={() => setReciboPreview(true)}
               grad={reciboDl ? ABRIR_RECIBO_GRAD : RECIBO_GRAD}
               glow={reciboDl ? ABRIR_RECIBO_GLOW : RECIBO_GLOW}
-              ariaLabel={reciboDl ? 'Abrir recibo descargado' : 'Descargar recibo PDF'}
-              title={reciboDl ? 'Abrir recibo descargado' : 'Descargar recibo PDF'}
+              ariaLabel="Ver vista previa del recibo"
+              title="Ver recibo (vista previa)"
               loading={loading.recibo}
               pulse={!!reciboDl}
             >
@@ -1078,6 +1077,17 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
           )}
         </div>
       </div>
+      {reciboPreview && p.recibo_pdf_url && (
+        <PdfPreviewModal
+          url={p.recibo_pdf_url}
+          title="Recibo de pago"
+          openUrl={pagosApi.reciboUrl(p.id_pago)}
+          actionLabel={reciboDl ? 'Abrir recibo' : 'Descargar recibo'}
+          actionLoading={loading.recibo}
+          onAction={() => { void handleClick('recibo'); }}
+          onClose={() => setReciboPreview(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1256,10 +1266,10 @@ function YearTabs({
 }
 
 const conceptoLabelHist: Record<string, string> = {
-  inscripcion: 'Inscripción',
-  convenio_entradas: 'Pre-venta entradas',
+  por_participante: 'Inscripción',
+  pre_venta: 'Pre-venta entradas',
   credencial: 'Credenciales',
-  credencial_unit: 'Credencial unitaria',
+  credencial_unitaria: 'Credencial unitaria',
   kardex: 'Kardex',
   otro: 'Otro',
 };
@@ -1391,7 +1401,7 @@ function HistorialAgrupadoList({ items }: { items: PagoHistorialAno[] }) {
 }
 
 function HistorialPagoCard({ p }: { p: PagoHistorialAno }) {
-  const isCredencial = p.concepto === 'credencial' || p.concepto === 'credencial_unit';
+  const isCredencial = p.concepto === 'credencial' || p.concepto === 'credencial_unitaria';
   const titulo = isCredencial ? p.agrupacion : (p.nombre_obra || p.agrupacion || '—');
   return (
     <div

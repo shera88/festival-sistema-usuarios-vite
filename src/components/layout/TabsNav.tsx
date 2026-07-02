@@ -1,16 +1,24 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { pagosVisibleParaRol } from '@/lib/roles';
 
 export function TabsNav() {
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
   // Bailarines/participantes (solo lectura) ven etiquetas personales.
   const TABS = [
     { to: '/inscripciones', label: puedeEditar ? 'Inscripciones' : 'Mis Participaciones', color: 'var(--cyan)' },
     { to: '/kardex', label: puedeEditar ? 'Kardex' : 'Mis Agrupaciones', color: 'var(--fuchsia)' },
     { to: '/calificaciones', label: 'Calificaciones', color: 'var(--gold)' },
     { to: '/videos', label: 'Videos', color: 'var(--purple)' },
-    { to: '/pagos', label: 'Pagos', color: 'var(--green)' },
-  ] as const;
+    // Pagos solo para representantes/directores/coreógrafos (staff). NO bailarines.
+    ...(pagosVisibleParaRol(user)
+      ? [{ to: '/pagos', label: 'Pagos', color: 'var(--green)' }]
+      : []),
+    // Solo admins de pagos (Yacu / Shera / Briza) ven el dashboard admin.
+    ...(user?.es_admin
+      ? [{ to: '/admin/pagos', label: 'Admin Pagos', color: 'var(--green)' }]
+      : []),
+  ];
 
   return (
     <nav

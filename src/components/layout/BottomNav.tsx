@@ -1,17 +1,19 @@
 import { NavLink } from 'react-router-dom';
 import { ClipboardList, Users, Award, Video, CreditCard, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { pagosVisibleParaRol } from '@/lib/roles';
 
 // Barra de navegación inferior estilo app móvil (solo teléfono; en desktop se usan los tabs de arriba).
 export function BottomNav() {
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
 
   const items: { to: string; label: string; icon: LucideIcon; color: string }[] = [
     { to: '/inscripciones', label: puedeEditar ? 'Inscrip.' : 'Participo', icon: ClipboardList, color: 'var(--cyan)' },
     { to: '/kardex', label: puedeEditar ? 'Kárdex' : 'Grupos', icon: Users, color: 'var(--fuchsia)' },
     { to: '/calificaciones', label: 'Notas', icon: Award, color: 'var(--gold)' },
     { to: '/videos', label: 'Videos', icon: Video, color: 'var(--purple)' },
-    { to: '/pagos', label: 'Pagos', icon: CreditCard, color: 'var(--green)' },
+    // Pagos solo para representantes/directores/coreógrafos (staff). NO bailarines.
+    ...(pagosVisibleParaRol(user) ? [{ to: '/pagos', label: 'Pagos', icon: CreditCard, color: 'var(--green)' }] : []),
   ];
 
   return (

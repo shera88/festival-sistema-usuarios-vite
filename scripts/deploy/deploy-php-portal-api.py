@@ -21,11 +21,14 @@ REMOTE_BASE = "/festivaldanzarte.com/public_html/portal/api"
 PHP_DIR = ROOT_DIR / "php-backend"
 
 FILES = [
-    "_lib/context.php",
-    "_lib/master-tables.php",
-    "inscripciones.php",
-    "solicitud.php",
-    "inscripcion.php",
+    "_lib/recibo.php",
+    "_assets/logo-recibo-negro.png",
+    "_assets/logo-color-navy.png",
+    "_assets/Inter-Regular.ttf",
+    "_assets/Inter-Bold.ttf",
+    "_assets/Inter-Medium.ttf",
+    "_assets/Inter-Light.ttf",
+    "recibo-generar.php",
 ]
 
 

@@ -70,6 +70,57 @@ function requireEditor(): array
     return $user;
 }
 
+/**
+ * Como requireAuth() pero además exige que el id_contacto de la sesión sea un
+ * administrador de pagos activo (tabla admin_usuarios). Gatea el dashboard admin.
+ *
+ * NO usa rpc('es_admin_pagos') a propósito: SupabaseClient::rpc() aplasta las
+ * respuestas escalares a [] y esa función SQL devuelve un boolean escalar
+ * (siempre daría falso). Se consulta admin_usuarios por SELECT (devuelve filas).
+ */
+function requireAdmin(): array
+{
+    $user = requireAuth();
+    // Fast path: el flag ya viene en la sesión (lo setean login.php / me.php),
+    // evitando una consulta extra a admin_usuarios en cada request admin.
+    if (!empty($user['es_admin'])) {
+        return $user;
+    }
+    // Fallback: sesiones creadas antes de que existiera el flag.
+    require_once __DIR__ . '/context.php'; // parseIdCsv (idempotente)
+    $idContacto = parseIdCsv($user['id_contacto'] ?? '')[0] ?? '';
+    if ($idContacto === '' || !esAdminPagos($idContacto)) {
+        sendJson(['error' => 'Requiere permisos de administrador'], 403);
+        exit;
+    }
+    return $user;
+}
+
+/** ¿El id_contacto está en admin_usuarios y activo? Lo usan requireAdmin() y me.php. */
+function esAdminPagos(string $idContacto): bool
+{
+    if ($idContacto === '') return false;
+    require_once __DIR__ . '/supabase.php'; // supabase() (idempotente)
+    $rows = supabase()->selectRaw(
+        'admin_usuarios',
+        'select=id_contacto&activo=eq.true&id_contacto=eq.' . rawurlencode($idContacto) . '&limit=1'
+    );
+    return is_array($rows) && count($rows) > 0;
+}
+
+/**
+ * ¿El usuario de sesión es administrador? Fast path por el flag de sesión
+ * (lo setean login.php / me.php), con fallback a admin_usuarios para sesiones
+ * legacy. Los admins pueden gestionar multimedia/pagos de CUALQUIER agrupación.
+ */
+function usuarioEsAdmin(array $user): bool
+{
+    if (!empty($user['es_admin'])) return true;
+    require_once __DIR__ . '/context.php'; // parseIdCsv (idempotente)
+    $idContacto = parseIdCsv($user['id_contacto'] ?? '')[0] ?? '';
+    return $idContacto !== '' && esAdminPagos($idContacto);
+}
+
 function requireMethod(string $method): void
 {
     if ($_SERVER['REQUEST_METHOD'] !== strtoupper($method)) {

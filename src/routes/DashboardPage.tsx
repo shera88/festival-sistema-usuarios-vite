@@ -26,6 +26,9 @@ const SolicitudPage = lazy(() =>
 const PerfilPage = lazy(() =>
   import('./PerfilPage').then((m) => ({ default: m.PerfilPage })),
 );
+const AdminPagosTab = lazy(() =>
+  import('./tabs/AdminPagosTab').then((m) => ({ default: m.AdminPagosTab })),
+);
 
 function RouteFallback() {
   return (
@@ -63,6 +66,7 @@ export function DashboardPage() {
             <Route path="calificaciones" element={<CalificacionesTab />} />
             <Route path="videos" element={<VideosTab />} />
             <Route path="pagos" element={<PagosTab />} />
+            <Route path="admin/pagos" element={<AdminPagosTab />} />
             <Route path="inscripcion" element={<InscripcionPage />} />
             <Route path="kardex-form" element={<KardexFormPage />} />
             <Route path="solicitud" element={<SolicitudPage />} />

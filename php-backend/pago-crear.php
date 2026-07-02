@@ -41,7 +41,20 @@ $monto          = (float)($_POST['monto'] ?? 0);
 $id_metodo_pago = trim((string)($_POST['id_metodo_pago'] ?? ''));
 $observacion    = trim((string)($_POST['observacion'] ?? '')) ?: null;
 
-if (!in_array($concepto, ['inscripcion','convenio_entradas','credencial','credencial_unit'], true)) {
+// Normalizar al vocab CANÓNICO de pagos_2026 (la gestión, los pagos guardados
+// y la constraint chk_pagos_concepto_fk usan estos nombres). La app puede mandar
+// nombres viejos durante la transición. TODO se guarda en pagos_2026.
+$CONCEPTO_CANON = [
+    'inscripcion'         => 'por_participante',
+    'por_participante'    => 'por_participante',
+    'convenio_entradas'   => 'pre_venta',
+    'pre_venta'           => 'pre_venta',
+    'credencial'          => 'credencial',
+    'credencial_unit'     => 'credencial_unitaria',
+    'credencial_unitaria' => 'credencial_unitaria',
+];
+$conceptoCanon = $CONCEPTO_CANON[$concepto] ?? null;
+if ($conceptoCanon === null) {
     sendJson(['error' => 'Concepto inválido'], 400);
     exit;
 }
@@ -76,7 +89,7 @@ $id_agrupacion = null;
 $monto_total = null;
 $saldo_actual = null;
 
-if ($concepto === 'inscripcion') {
+if ($conceptoCanon === 'por_participante') {
     $row = $sb->selectOne(
         'registro_de_inscripcion_2026',
         'id_inscripcion,id_agrupacion,subdivision,cantidad',
@@ -84,7 +97,7 @@ if ($concepto === 'inscripcion') {
     );
     if (!$row) { sendJson(['error' => 'Inscripción no encontrada'], 404); exit; }
     $id_agrupacion = (string)$row['id_agrupacion'];
-} elseif ($concepto === 'convenio_entradas') {
+} elseif ($conceptoCanon === 'pre_venta') {
     $row = $sb->selectOne(
         'recepcion_convenio_2026',
         'id_convenio,id_agrupacion,monto_total',
@@ -111,7 +124,7 @@ if (!in_array($id_agrupacion, $userAgrups, true)) {
 $deudas = $sb->rpc('pagos_resumen_agrupacion', ['p_id_agrupacion' => $id_agrupacion]);
 $saldo = 0;
 foreach ($deudas as $d) {
-    if ($d['concepto'] === $concepto && $d['id_referencia'] === $id_referencia) {
+    if ($d['concepto'] === $conceptoCanon && $d['id_referencia'] === $id_referencia) {
         $saldo = (float)($d['saldo'] ?? 0);
         break;
     }
@@ -157,7 +170,8 @@ if (isset($_FILES['comprobante']) && is_uploaded_file($_FILES['comprobante']['tm
 
 // Generar id_pago + numero_recibo
 $id_pago = bin2hex(random_bytes(8));
-$numero_recibo = strtoupper(strtoupper($concepto[0]) . '-' . date('ymd') . '-' . substr($id_pago, 0, 6));
+$PREFIX = ['por_participante'=>'PP','pre_venta'=>'PV','credencial'=>'CR','credencial_unitaria'=>'CU'];
+$numero_recibo = ($PREFIX[$conceptoCanon] ?? 'PG') . '-' . date('ymd') . '-' . strtoupper(substr($id_pago, 0, 6));
 
 // Fecha/hora Bolivia (UTC-4)
 $tz = new DateTimeZone('America/La_Paz');
@@ -166,12 +180,14 @@ $now = new DateTime('now', $tz);
 $row = [
     'id_pago'             => $id_pago,
     'numero_recibo'       => $numero_recibo,
-    'concepto'            => $concepto,
+    'concepto'            => $conceptoCanon,
     'id_referencia'       => $id_referencia,
     'id_agrupacion'       => $id_agrupacion,
-    'id_inscripcion'      => $concepto === 'inscripcion' ? $id_referencia : null,
-    'id_convenio'         => $concepto === 'convenio_entradas' ? $id_referencia : null,
-    'id_pago_credencial'  => in_array($concepto, ['credencial','credencial_unit'], true) ? $id_referencia : null,
+    'id_inscripcion'      => $conceptoCanon === 'por_participante' ? $id_referencia : null,
+    'id_convenio'         => $conceptoCanon === 'pre_venta' ? $id_referencia : null,
+    // Modelo unificado: TODO vive en pagos_2026 (link por id_referencia + id_agrupacion + concepto).
+    // NO usar id_pago_credencial (FK legacy -> pagos_credenciales_2026, tabla deprecada).
+    'id_pago_credencial'  => null,
     'fecha'               => $now->format('Y-m-d'),
     'hora'                => $now->format('H:i:s'),
     'metodo_pago'         => $metodo['metodo'],
@@ -202,16 +218,24 @@ if ($n8nUrl) {
     // Datos contextuales para enriquecer la notificación
     $obra = '';
     $agrupacion = '';
-    if ($concepto === 'inscripcion') {
+    // Nombre de la agrupación desde instituciones (sirve para TODOS los conceptos:
+    // inscripción, pre-venta, credenciales). Antes solo se llenaba para inscripción.
+    $inst = $sb->selectOne('instituciones', 'nombre_agrupacion', ['id_agrupacion' => 'eq.' . $id_agrupacion]);
+    $agrupacion = (string)($inst['nombre_agrupacion'] ?? '');
+    if ($conceptoCanon === 'por_participante') {
         $insRow = $sb->selectOne('registro_de_inscripcion_2026', 'nombre_de_la_obra,agrupacion', ['id_inscripcion' => 'eq.' . $id_referencia]);
         $obra = (string)($insRow['nombre_de_la_obra'] ?? '');
-        $agrupacion = (string)($insRow['agrupacion'] ?? '');
+        if ($agrupacion === '') $agrupacion = (string)($insRow['agrupacion'] ?? '');
     }
+    // PDF de revisión para el admin: hoja 1 con los datos del pago + el comprobante
+    // del usuario anexado (imagen embebida o PDF fusionado). Si falla, usa el comprobante crudo.
+    require_once __DIR__ . '/_lib/revision.php';
+    $revisionPdfUrl = revisionGenerarPdf($row, $agrupacion);
     $payload = [
         'secret'           => $n8nSecret,
         'id_pago'          => $id_pago,
         'numero_recibo'    => $numero_recibo,
-        'concepto'         => $concepto,
+        'concepto'         => $conceptoCanon,
         'id_referencia'    => $id_referencia,
         'monto'            => $monto,
         'fecha'            => $row['fecha'],
@@ -220,6 +244,7 @@ if ($n8nUrl) {
         'nombre_pagador'   => $row['nombre_pagador'],
         'telefono_pagador' => $row['telefono_pagador'],
         'comprobante_url'  => $comprobante_url,
+        'revision_pdf_url' => $revisionPdfUrl ?: $comprobante_url,
         'agrupacion'       => $agrupacion,
         'nombre_obra'      => $obra,
     ];

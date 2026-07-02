@@ -67,8 +67,9 @@ if (!$insc) {
     exit;
 }
 $id_agrupacion = (string)($insc['id_agrupacion'] ?? '');
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
-if (!in_array($id_agrupacion, $userAgrups, true)) {
+// Autoriza con el MISMO scope que el listado: agrupación propia, encargado,
+// director o coreógrafo de la obra (o admin). [[usuarioAutorizadoInscripcion]]
+if (!usuarioAutorizadoInscripcion($user, $id_inscripcion)) {
     sendJson(['error' => 'No autorizado para esta inscripción'], 403);
     exit;
 }

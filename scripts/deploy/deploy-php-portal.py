@@ -14,8 +14,10 @@ with open(ROOT_DIR / ".credentials" / "deploy-credentials.json", encoding="utf-8
 REMOTE_BASE = "/festivaldanzarte.com/public_html/app-portal/php"
 PHP_DIR = ROOT_DIR / "php-backend"
 
-SKIP_NAMES = {".gitkeep", ".gitignore", "README.md", "config.example.php", "stderr.log", "webhook-log.txt"}
-SKIP_DIRS = {"rate-limit-data", "node_modules", ".git", "__pycache__"}
+SKIP_NAMES = {".gitkeep", ".gitignore", "README.md", "config.example.php", "stderr.log", "webhook-log.txt",
+              "config.php", "_test_recibo.php", "_test-recibo.php"}  # config.php dev NO se sube (va config.prod.php)
+SKIP_DIRS = {"rate-limit-data", "node_modules", ".git", "__pycache__", "vendor"}  # vendor ya está en prod
+RENAME = {"config.prod.php": "config.php"}  # prod usa config.prod.php como config.php
 
 
 def connect():
@@ -66,7 +68,8 @@ def upload_tree(ftps, local_dir, remote_dir):
         for fname in files:
             if fname in SKIP_NAMES:
                 continue
-            rel = (rel_root / fname).as_posix()
+            remote_name = RENAME.get(fname, fname)
+            rel = (rel_root / remote_name).as_posix()
             remote = remote_dir.rstrip("/") + "/" + rel
             upload_file(ftps, Path(root) / fname, remote)
             n += 1

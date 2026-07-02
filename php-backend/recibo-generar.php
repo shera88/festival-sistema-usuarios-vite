@@ -70,8 +70,12 @@ if (($pago['estado'] ?? '') !== 'verificado') {
     exit;
 }
 
+// enviar_whatsapp=true (lo manda el handler n8n al aprobar) → envía recibo a cliente + admins.
+// El front (recibo-ver) NO lo manda, así que ver el recibo no dispara envíos.
+$enviarWa = !empty($body['enviar_whatsapp']);
+
 try {
-    $result = reciboGenerarYGuardar($idPago, $user['id_global'] ?? null);
+    $result = reciboGenerarYGuardar($idPago, $user['id_global'] ?? null, $enviarWa);
     sendJson($result, 200);
 } catch (\Throwable $e) {
     error_log('[recibo-generar] ' . $e->getMessage());

@@ -16,10 +16,10 @@ const FONT_DISPLAY = "'Inter Tight', 'Inter', system-ui, sans-serif";
 const FONT_MONO = "'JetBrains Mono', 'SF Mono', Menlo, monospace";
 
 const conceptoAccent: Record<string, { grad: string; accent: string; glow: string }> = {
-  inscripcion:       { grad: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)', accent: '#06B6D4', glow: 'rgba(6,182,212,0.35)' },
-  convenio_entradas: { grad: 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)', accent: '#EC4899', glow: 'rgba(236,72,153,0.35)' },
+  por_participante:  { grad: 'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)', accent: '#06B6D4', glow: 'rgba(6,182,212,0.35)' },
+  pre_venta: { grad: 'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)', accent: '#EC4899', glow: 'rgba(236,72,153,0.35)' },
   credencial:        { grad: 'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)', accent: '#F59E0B', glow: 'rgba(245,158,11,0.32)' },
-  credencial_unit:   { grad: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 100%)', accent: '#F59E0B', glow: 'rgba(245,158,11,0.32)' },
+  credencial_unitaria:   { grad: 'linear-gradient(135deg, #F59E0B 0%, #EC4899 100%)', accent: '#F59E0B', glow: 'rgba(245,158,11,0.32)' },
 };
 
 function bs(n: number): string {
@@ -35,7 +35,11 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrLightbox, setQrLightbox] = useState(false);
-  const QR_URL = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-inscripcion.png';
+  // QR de pago según concepto: credenciales (batch o unitaria) tiene su propio QR;
+  // inscripción / convenio de entradas siguen usando el QR de inscripción.
+  const QR_URL = /credencial/i.test(compromiso?.concepto || '')
+    ? 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-credenciales.png'
+    : 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-inscripcion.png';
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Solo QR habilitado en portal de usuarios
@@ -69,7 +73,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
 
   if (!compromiso) return null;
 
-  const cfg = conceptoAccent[compromiso.concepto] ?? conceptoAccent.inscripcion;
+  const cfg = conceptoAccent[compromiso.concepto] ?? conceptoAccent.por_participante;
 
   const montoNum = (() => {
     const n = Number(monto);
@@ -420,7 +424,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                     <path d="M14 14h3v3M17 17v4M21 14v3M14 21h7" />
                   </svg>
                 </span>
-                <span className="relative">{qrOpen ? 'Ocultar QR' : 'Generar QR de pago'}</span>
+                <span className="relative">{qrOpen ? 'Ocultar QR' : 'Mostrar QR para pagar'}</span>
               </button>
 
               {/* QR placeholder — imagen estática hasta integrar API banco */}

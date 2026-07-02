@@ -53,4 +53,8 @@ $_SESSION['user_data'] = [
     'puede_editar'                => $user['puede_editar'] ?? true,
 ];
 
+// Flag admin (mismo helper que me.php) para que el tab admin esté disponible
+// desde el primer render post-login, sin esperar a la rehidratación de me.php.
+$_SESSION['user_data']['es_admin'] = esAdminPagos((string)($_SESSION['user_data']['id_contacto'] ?? ''));
+
 sendJson(['user' => $_SESSION['user_data']]);

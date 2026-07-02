@@ -35,8 +35,9 @@ PHP_DIR = ROOT_DIR / "php-backend"
 SKIP_NAMES = {
     ".gitkeep", ".gitignore", "README.md", "config.example.php",
     "stderr.log", "webhook-log.txt", "config.php",  # config.php local NO se sube tal cual
+    "_test_recibo.php", "_test-recibo.php",          # archivos de test, no a prod
 }
-SKIP_DIRS = {"rate-limit-data", "node_modules", ".git", "__pycache__"}
+SKIP_DIRS = {"rate-limit-data", "node_modules", ".git", "__pycache__", "vendor"}  # vendor ya está en prod
 
 
 def connect() -> ftplib.FTP_TLS:

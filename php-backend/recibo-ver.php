@@ -43,9 +43,12 @@ if (!$pago) {
     exit;
 }
 
-// Autorización: solo el representante de la agrupación o admin
+// Autorización: el representante dueño de la agrupación, o un admin de pagos
+// (que puede ver el recibo de cualquier agrupación desde el dashboard).
 $idAgrupPago = (string)($pago['id_agrupacion'] ?? '');
-if (!in_array($idAgrupPago, $userAgrups, true) && ($user['rol'] ?? '') !== 'admin') {
+$esAdmin = ($user['rol'] ?? '') === 'admin'
+    || esAdminPagos(parseIdCsv($user['id_contacto'] ?? '')[0] ?? '');
+if (!in_array($idAgrupPago, $userAgrups, true) && !$esAdmin) {
     sendJson(['error' => 'No autorizado'], 403);
     exit;
 }

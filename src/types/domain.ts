@@ -20,6 +20,8 @@ export interface User {
   origen?: 'contacto' | 'kardex' | string;
   /** Permiso de edición resuelto en validate_login (contacto, o kárdex STAFF/DIRECTOR/COREOGRAFO). */
   puede_editar?: boolean;
+  /** True si el id_contacto está en admin_usuarios.activo (resuelto on-demand en me.php). */
+  es_admin?: boolean;
 }
 
 export interface SearchResult {
@@ -176,7 +178,7 @@ export type YearNotas = '2023' | '2024' | '2025' | '2026';
 
 // ============== Pagos 2026 ==============
 
-export type PagoConcepto = 'inscripcion' | 'convenio_entradas' | 'credencial' | 'credencial_unit';
+export type PagoConcepto = 'por_participante' | 'pre_venta' | 'credencial' | 'credencial_unitaria';
 export type PagoEstado = 'pendiente' | 'enviado' | 'verificado' | 'rechazado' | 'anulado';
 
 export interface MetodoPago {
@@ -281,4 +283,64 @@ export interface PagoCrearRes {
   estado: PagoEstado;
   comprobante_url: string | null;
   monto: number;
+}
+
+// ============== Admin Pagos (dashboard) ==============
+
+export interface AdminRecaudadoConcepto {
+  concepto: PagoConcepto;
+  n_pagos: number;
+  total_verificado: number;
+  total_pendiente: number;
+  total_rechazado: number;
+}
+
+export interface AdminPagoReciente {
+  id_pago: string;
+  numero_recibo: string | null;
+  concepto: PagoConcepto;
+  id_referencia: string | null;
+  id_agrupacion: string | null;
+  nombre_agrupacion: string | null;
+  enlace_del_logo: string | null;
+  fecha: string | null;
+  hora: string | null;
+  monto: number;
+  estado: PagoEstado;
+  metodo_pago: string | null;
+  nombre_pagador: string | null;
+  telefono_pagador: string | null;
+  comprobante_url: string | null;
+  recibo_pdf_url: string | null;
+  created_at: string | null;
+}
+
+export interface AdminAgrupacionPagos {
+  id_agrupacion: string;
+  nombre_agrupacion: string | null;
+  enlace_del_logo: string | null;
+  total_deuda: number;
+  pagado_verificado: number;
+  pagado_pendiente: number;
+  saldo: number;
+  n_pagos: number;
+}
+
+export interface AdminResumenRes {
+  resumen: AdminRecaudadoConcepto[];
+}
+export interface AdminPagosRecientesRes {
+  pagos: AdminPagoReciente[];
+}
+export interface AdminAgrupacionesRes {
+  agrupaciones: AdminAgrupacionPagos[];
+}
+export interface AdminAgrupacionDetalleRes {
+  agrupacion: {
+    id_agrupacion: string;
+    nombre_agrupacion: string | null;
+    enlace_del_logo: string | null;
+  } | null;
+  compromisos: CompromisoDeuda[];
+  historial: PagoHistorial[];
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, FileText, Users, FilePlus, X } from 'lucide-react';
+import { Menu, FileText, Users, FilePlus, X, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 const ITEMS = [
@@ -27,8 +27,21 @@ const ITEMS = [
   },
 ] as const;
 
+const ADMIN_ITEMS = [
+  {
+    to: '/admin/pagos',
+    label: 'Admin Pagos',
+    desc: 'Dashboard de pagos del festival',
+    icon: ShieldCheck,
+    color: 'var(--green)',
+  },
+] as const;
+
+type MenuItem = { to: string; label: string; desc: string; icon: typeof FilePlus; color: string };
+
 export function NavMenu() {
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
+  const esAdmin = !!user?.es_admin;
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
   const ref = useRef<HTMLDivElement>(null);
@@ -51,15 +64,55 @@ export function NavMenu() {
     return () => window.removeEventListener('keydown', onEsc);
   }, []);
 
-  // Bailarines/participantes (solo lectura) no crean formularios.
-  if (!puedeEditar) return null;
+  // Bailarines/participantes (solo lectura, sin admin) no tienen menú.
+  if (!puedeEditar && !esAdmin) return null;
+
+  function renderItem(item: MenuItem) {
+    const Icon = item.icon;
+    return (
+      <button
+        key={item.to}
+        type="button"
+        onClick={() => {
+          navigate(item.to);
+          setOpen(false);
+        }}
+        className="flex w-full items-start gap-3 border-b border-glass-border px-4 py-3 text-left transition last:border-b-0 hover:bg-white/[0.04]"
+      >
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
+          style={{
+            borderColor: `${item.color}33`,
+            background: `${item.color}1a`,
+            color: item.color,
+          }}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold text-text-white">{item.label}</div>
+          <div className="mt-0.5 text-[11px] text-text-45">{item.desc}</div>
+        </div>
+      </button>
+    );
+  }
+
+  function sectionHeader(title: string) {
+    return (
+      <div className="border-b border-glass-border px-4 py-3">
+        <div className="text-[10px] font-semibold uppercase text-text-45" style={{ letterSpacing: '1px' }}>
+          {title}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Menú de formularios"
+        aria-label="Menú"
         className="flex h-10 w-10 items-center justify-center rounded-full border border-glass-border text-text-65 transition hover:border-cyan hover:text-cyan"
         style={{ background: 'var(--bg-elevated)' }}
       >
@@ -74,47 +127,18 @@ export function NavMenu() {
             backdropFilter: 'blur(16px)',
           }}
         >
-          <div className="border-b border-glass-border px-4 py-3">
-            <div
-              className="text-[10px] font-semibold uppercase text-text-45"
-              style={{ letterSpacing: '1px' }}
-            >
-              Formularios
-            </div>
-          </div>
-          <div>
-            {ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.to}
-                  type="button"
-                  onClick={() => {
-                    navigate(item.to);
-                    setOpen(false);
-                  }}
-                  className="flex w-full items-start gap-3 border-b border-glass-border px-4 py-3 text-left transition last:border-b-0 hover:bg-white/[0.04]"
-                >
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
-                    style={{
-                      borderColor: `${item.color}33`,
-                      background: `${item.color}1a`,
-                      color: item.color,
-                    }}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold text-text-white">
-                      {item.label}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-text-45">{item.desc}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          {puedeEditar && (
+            <>
+              {sectionHeader('Formularios')}
+              <div>{ITEMS.map(renderItem)}</div>
+            </>
+          )}
+          {esAdmin && (
+            <>
+              {sectionHeader('Administración')}
+              <div>{ADMIN_ITEMS.map(renderItem)}</div>
+            </>
+          )}
         </div>
       )}
     </div>

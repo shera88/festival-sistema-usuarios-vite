@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
-import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, Video, CreditCard, type LucideIcon } from 'lucide-react';
+import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, Video, CreditCard, ShieldCheck, type LucideIcon } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 import { useAuth } from '@/hooks/useAuth';
+import { pagosVisibleParaRol } from '@/lib/roles';
 
 interface Props {
   open: boolean;
@@ -25,7 +26,7 @@ const FORM_ITEMS = [
 type NavSection = { label: string; items: { to: string; label: string; icon: LucideIcon }[] };
 
 export function AppSidebar({ open, onClose }: Props) {
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
 
   // Secciones (los mismos tabs) + Formularios solo para quien puede editar.
   const sections: NavSection[] = [
@@ -36,7 +37,10 @@ export function AppSidebar({ open, onClose }: Props) {
         { to: '/kardex', label: puedeEditar ? 'Kardex' : 'Mis Agrupaciones', icon: Users },
         { to: '/calificaciones', label: 'Calificaciones', icon: Award },
         { to: '/videos', label: 'Videos', icon: Video },
-        { to: '/pagos', label: 'Pagos', icon: CreditCard },
+        // Pagos solo para representantes/directores/coreógrafos (staff). NO bailarines.
+        ...(pagosVisibleParaRol(user) ? [{ to: '/pagos', label: 'Pagos', icon: CreditCard }] : []),
+        // Solo admins de pagos (Yacu / Shera / Briza).
+        ...(user?.es_admin ? [{ to: '/admin/pagos', label: 'Admin Pagos', icon: ShieldCheck }] : []),
       ],
     },
     ...(puedeEditar ? [{ label: 'Formularios', items: FORM_ITEMS }] : []),

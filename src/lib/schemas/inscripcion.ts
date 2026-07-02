@@ -47,7 +47,7 @@ export const DIVISIONES = [
 export const SUBDIVISIONES = [
   { value: "solo", label: "Solo", hint: "1 integrante", min: 1, max: 1 },
   { value: "duo", label: "Dúo", hint: "2 integrantes", min: 2, max: 2 },
-  { value: "grupo_pequeno", label: "Grupo Chico", hint: "3 a 14", min: 3, max: 14 },
+  { value: "grupo_pequeno", label: "Grupo Pequeño", hint: "5 a 14", min: 5, max: 14 },
   { value: "grupo_grande", label: "Grupo Grande", hint: "15 a 60", min: 15, max: 60 },
 ] as const;
 
