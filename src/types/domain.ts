@@ -196,6 +196,14 @@ export interface CompromisoDeuda {
   pagado_verificado: number;
   pagado_pendiente: number;
   saldo: number;
+  // Obra asociada (por_participante = obra; pre_venta = obra del convenio;
+  // credencial = null, es a nivel agrupación). Para el header del modal de pago.
+  obra?: string | null;
+  // Agrupación a la que pertenece el compromiso. Una persona (representante)
+  // puede tener varias agrupaciones → cada card se muestra con la suya.
+  id_agrupacion?: string;
+  nombre_agrupacion?: string;
+  enlace_del_logo?: string | null;
 }
 
 export interface PagoHistorial {
@@ -213,12 +221,16 @@ export interface PagoHistorial {
   comprobante_url: string | null;
   recibo_pdf_url: string | null;
   observacion: string | null;
+  id_agrupacion?: string;
+  nombre_agrupacion?: string;
 }
 
 export interface PagosResumen {
   id_agrupacion: string;
   nombre_agrupacion: string;
   enlace_del_logo: string | null;
+  /** Todas las agrupaciones que la persona representa (para header/selector). */
+  agrupaciones?: { id_agrupacion: string; nombre_agrupacion: string; enlace_del_logo: string | null }[];
   compromisos: CompromisoDeuda[];
   historial: PagoHistorial[];
   totales: {
@@ -274,6 +286,8 @@ export interface PagoCrearReq {
   id_metodo_pago: string;
   observacion?: string;
   comprobante?: File;
+  /** Solo credencial: cantidad de credenciales a comprar (fija el compromiso). */
+  cantidad?: number;
 }
 
 export interface PagoCrearRes {

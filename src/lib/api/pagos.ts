@@ -21,6 +21,7 @@ export const pagosApi = {
     fd.append('monto', String(req.monto));
     fd.append('id_metodo_pago', req.id_metodo_pago);
     if (req.observacion) fd.append('observacion', req.observacion);
+    if (req.cantidad != null) fd.append('cantidad', String(req.cantidad));
     if (req.comprobante) fd.append('comprobante', req.comprobante);
 
     const res = await fetch(apiUrl('pago-crear.php'), {

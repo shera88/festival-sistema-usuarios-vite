@@ -27,10 +27,17 @@ function ensurePdfJs(): Promise<any> {
   return _pdfjsPromise;
 }
 
+/** Detecta si la URL apunta a una imagen (por extensión). El resto → PDF. */
+function urlEsImagen(u: string): boolean {
+  return /\.(jpe?g|png|webp|gif|avif|bmp|heic)(\?|#|$)/i.test(u);
+}
+
 interface Props {
-  /** URL del PDF a previsualizar (público, p.ej. recibo_pdf_url). */
+  /** URL del archivo a previsualizar (recibo PDF, o comprobante imagen/PDF). */
   url: string;
   title?: string;
+  /** 'pdf' | 'image'. Si se omite, se detecta por la extensión de la URL. */
+  kind?: 'pdf' | 'image';
   /** Acción del botón inferior (descargar/abrir). Si se omite, no se muestra. */
   onAction?: () => void;
   actionLabel?: string;
@@ -43,6 +50,7 @@ interface Props {
 export function PdfPreviewModal({
   url,
   title = 'Vista previa',
+  kind,
   onAction,
   actionLabel = 'Descargar / Abrir',
   actionLoading = false,
@@ -53,12 +61,22 @@ export function PdfPreviewModal({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(false);
 
+  const isImage = kind === 'image' || (kind == null && urlEsImagen(url));
+  // Cache-buster por apertura: el PDF/imagen se sube a Storage con
+  // Cache-Control max-age=3600. Al regenerar un recibo la URL es la MISMA, así que
+  // el navegador serviría el archivo viejo hasta 1h. Un query único por apertura
+  // fuerza traer siempre la versión fresca.
+  const [cb] = useState(() => Date.now());
+  const previewUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + cb;
+
   useEffect(() => {
+    // Imágenes: el render lo maneja <img> (onLoad/onError). Solo PDF usa pdf.js.
+    if (isImage) return;
     let cancelled = false;
     (async () => {
       try {
         const pdfjs = await ensurePdfJs();
-        const pdf = await pdfjs.getDocument(url).promise;
+        const pdf = await pdfjs.getDocument(previewUrl).promise;
         const page = await pdf.getPage(1);
         const base = page.getViewport({ scale: 1 });
         const canvas = canvasRef.current;
@@ -75,15 +93,16 @@ export function PdfPreviewModal({
         }
       }
     })();
+    return () => { cancelled = true; };
+  }, [previewUrl, isImage]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     window.addEventListener('keydown', onKey);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [url, onClose]);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   return createPortal(
     <div
@@ -110,14 +129,26 @@ export function PdfPreviewModal({
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-sm text-cyan-400 underline"
             >
-              <ExternalLink className="h-4 w-4" /> Abrir PDF
+              <ExternalLink className="h-4 w-4" /> {isImage ? 'Abrir imagen' : 'Abrir PDF'}
             </a>
           )}
-          <canvas
-            ref={canvasRef}
-            className={`max-w-full rounded-lg ${loading || err ? 'hidden' : ''}`}
-            style={{ background: '#fff' }}
-          />
+          {isImage ? (
+            <img
+              src={previewUrl}
+              alt={title}
+              onLoad={() => setLoading(false)}
+              onError={() => { setErr(true); setLoading(false); }}
+              className={`max-h-[72vh] max-w-full rounded-lg object-contain ${loading || err ? 'hidden' : ''}`}
+              style={{ background: '#fff' }}
+              decoding="async"
+            />
+          ) : (
+            <canvas
+              ref={canvasRef}
+              className={`max-w-full rounded-lg ${loading || err ? 'hidden' : ''}`}
+              style={{ background: '#fff' }}
+            />
+          )}
         </div>
         {onAction && (
           <div className="border-t border-white/8 px-4 py-3">

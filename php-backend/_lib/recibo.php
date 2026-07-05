@@ -55,11 +55,20 @@ function reciboCargarDatos(string $idPago): array
         ? $s->selectOne('instituciones', '*', ['id_agrupacion' => 'eq.' . $idAgrupacion])
         : null;
 
-    // Deuda (monto_total, descripcion, bailarines)
+    // Deuda (monto_total, descripcion, bailarines). OJO: deudas_2026 usa el vocab
+    // CANÓNICO (por_participante/pre_venta/credencial); el resto de esta función
+    // usa el vocab viejo (inscripcion/convenio_entradas/credencial). Sin este mapeo
+    // el lookup no matcheaba → monto_total=0 → el recibo no mostraba el desglose de
+    // Saldo/Saldo actual (bug observado en inscripción y pre-venta).
+    $conceptoCanon = [
+        'inscripcion'       => 'por_participante',
+        'convenio_entradas' => 'pre_venta',
+        'credencial'        => 'credencial',
+    ][$conceptoDeuda] ?? $conceptoDeuda;
     $deuda = null;
     if ($idRef !== '') {
         $rows = $s->select('deudas_2026', '*', [
-            'concepto'      => 'eq.' . $conceptoDeuda,
+            'concepto'      => 'eq.' . $conceptoCanon,
             'id_referencia' => 'eq.' . $idRef,
         ]);
         $deuda = $rows[0] ?? null;
@@ -158,19 +167,18 @@ function reciboEstimarAltura(array $data): float
         $nFields += (int)floor(mb_strlen((string)$det['obra']) / 38); // wrap aprox a ~72mm
     }
     $nFields++; // Método
+    // Solo credencial agrega la fila "Credenciales" (inscripción/pre-venta ya no
+    // muestran subdivisión/bailarines/entradas — igual que gestión).
     if ($esCred && !empty($det['cantidad'])) {
-        $nFields++;
-    } elseif ($concepto === 'inscripcion') {
-        if (($det['subdivision'] ?? '') !== '') $nFields++;
-        if (($det['cantidad'] ?? 0) > 0)        $nFields++;
-    } elseif ($concepto === 'convenio_entradas' && ($det['cantidad'] ?? 0) > 0) {
         $nFields++;
     }
 
-    $hasSaldo = (float)($data['monto_total'] ?? 0) > 0.5;
+    // Credencial: "Bs 15 x N" + Monto abonado (sin saldo). Inscripción/pre-venta:
+    // Saldo + Monto abonado + Saldo actual.
+    $hasSaldo = !$esCred && (float)($data['monto_total'] ?? 0) > 0.5;
     $nMoney = 1; // Monto abonado
-    if ($hasSaldo) $nMoney += 2;
-    if (!empty($det['precio_unitario']) && !empty($det['cantidad'])) $nMoney++;
+    if ($hasSaldo) $nMoney += 2;                              // Saldo + Saldo actual
+    if ($esCred && (int)($det['cantidad'] ?? 0) > 0) $nMoney++; // "Bs 15 x N credenciales"
 
     // base: título + Nº + logo(~8.5mm) + accent ; + campos + solid + dinero + solid + footer + buffer
     $h = 34 + $nFields * 4.6 + 7 + $nMoney * 5.8 + 7 + 24 + 12;
@@ -214,7 +222,8 @@ function reciboRenderHtml(array $data): string
     $montoTotal = (float)($data['monto_total'] ?? 0);
     $saldoAnt   = (float)($data['saldo_anterior'] ?? 0);
     $saldoAct   = (float)($data['saldo_nuevo'] ?? 0);
-    $hasSaldo   = $montoTotal > 0.5;
+    // Credencial NO muestra Saldo/Saldo actual (igual que gestión): solo subtotal + abonado.
+    $hasSaldo   = !$esCred && $montoTotal > 0.5;
 
     $titulo = $esCred ? 'RECIBO DE CREDENCIALES' : 'RECIBO DE INSCRIPCIÓN';
     $unidad = $esCred ? 'credenciales' : 'entradas';
@@ -225,13 +234,10 @@ function reciboRenderHtml(array $data): string
     $campos .= $kv('Agrupación', $agNombre);
     if ($obra !== '') $campos .= $kv('Obra', $obra);
     $campos .= $kv('Método', $metodo);
+    // Igual que el recibo de gestión: solo las credenciales muestran una fila extra
+    // (cantidad). Inscripción / pre-venta NO muestran subdivisión, bailarines ni entradas.
     if ($esCred && $cantidad > 0) {
         $campos .= $kv('Credenciales', (string)$cantidad);
-    } elseif ($concepto === 'inscripcion') {
-        if ($subdiv !== '')  $campos .= $kv('Subdivisión', $subdiv);
-        if ($cantidad > 0)   $campos .= $kv('Bailarines', (string)$cantidad);
-    } elseif ($concepto === 'convenio_entradas' && $cantidad > 0) {
-        $campos .= $kv('Entradas', (string)$cantidad);
     }
 
     // ── Filas de dinero (3 columnas: etiqueta | operador | monto) ──
@@ -246,12 +252,20 @@ function reciboRenderHtml(array $data): string
             . '<td class="' . $acls . '">' . htmlspecialchars($amount, ENT_QUOTES) . '</td>'
             . '</tr></table>';
     };
+    // Sección de dinero — idéntica al recibo de gestión:
+    //  · Credencial: "Bs 15 x N credenciales" (subtotal) + "Monto abonado" (bold). SIN saldo.
+    //  · Inscripción / pre-venta: "Saldo" − "Monto abonado" = "Saldo actual".
     $money = '';
-    if ($hasSaldo) $money .= $moneyRow('Saldo', $bs($saldoAnt));
-    if ($pu > 0 && $cantidad > 0)
-        $money .= $moneyRow('Bs ' . $fmt($pu) . ' x ' . $cantidad . ' ' . $unidad, $bs($pu * $cantidad), ['bold' => true]);
-    $money .= $moneyRow('Monto abonado', $bs($monto), ['op' => $hasSaldo ? '−' : '', 'bold' => $esCred || !$hasSaldo]);
-    if ($hasSaldo) $money .= $moneyRow('Saldo actual', $bs($saldoAct), ['op' => '=', 'bold' => true, 'top' => true]);
+    if ($esCred) {
+        $puCred = $pu > 0 ? $pu : 15.0; // credencial: 15 Bs c/u si faltara el dato
+        if ($cantidad > 0)
+            $money .= $moneyRow('Bs ' . $fmt($puCred) . ' x ' . $cantidad . ' credenciales', $bs($puCred * $cantidad));
+        $money .= $moneyRow('Monto abonado', $bs($monto), ['bold' => true]);
+    } else {
+        if ($hasSaldo) $money .= $moneyRow('Saldo', $bs($saldoAnt));
+        $money .= $moneyRow('Monto abonado', $bs($monto), ['op' => $hasSaldo ? '−' : '']);
+        if ($hasSaldo) $money .= $moneyRow('Saldo actual', $bs($saldoAct), ['op' => '=', 'bold' => true, 'top' => true]);
+    }
 
     $titulo = $h($titulo);
 

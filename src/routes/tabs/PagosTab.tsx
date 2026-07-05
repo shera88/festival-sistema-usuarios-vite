@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles, Receipt, Loader2 } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles, Receipt, Loader2, Pencil } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
+import { inscripcionesApi, type InscripcionEditable } from '@/lib/api/inscripciones';
+import { EditarInscripcionModal } from '@/components/cards/EditarInscripcionModal';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol } from '@/lib/roles';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -17,7 +19,7 @@ import {
   extFromUrl,
   type DescargaResult,
 } from '@/lib/utils/descargarArchivo';
-import type { CompromisoDeuda, PagoHistorial, PagoEstado, PagoHistorialAno, AnoConPagos } from '@/types/domain';
+import type { CompromisoDeuda, PagoHistorial, PagoEstado, PagoHistorialAno, AnoConPagos, Inscripcion } from '@/types/domain';
 
 function bs(n: number): string {
   return new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(Math.round(n)) + ' Bs';
@@ -205,6 +207,11 @@ function PagosTabContent() {
 
   const logoUrl = enlace_del_logo ? webpProxy(enlace_del_logo, 96) : null;
 
+  // Un representante puede tener varias agrupaciones. Si hay más de una entre los
+  // compromisos, cada card muestra a qué agrupación pertenece (nombre + logo).
+  const agrupIds = new Set(compromisos.map((c) => c.id_agrupacion).filter(Boolean));
+  const showAgrupacionPorCard = agrupIds.size > 1;
+
   return (
     <>
       <style>{ANIM_CSS}</style>
@@ -289,18 +296,28 @@ function PagosTabContent() {
                   }}
                 >
                   <div className="space-y-3">
-                    {items.map((c, idx) => (
-                      <CompromisoCard
-                        key={c.id_referencia}
-                        c={c}
-                        logoUrl={logoUrl}
-                        nombreAgrupacion={nombre_agrupacion}
-                        pagosParciales={pagosByCompromiso[`${c.concepto}::${c.id_referencia}`] ?? []}
-                        onPagar={() => setPagoTarget(c)}
-                        canPay={puedeEditar}
-                        delayMs={sectionIdx * 80 + idx * 50}
-                      />
-                    ))}
+                    {items.map((c, idx) => {
+                      const cardNombre = c.nombre_agrupacion || nombre_agrupacion;
+                      // Logo propio de la agrupación del compromiso. En multi-agrupación,
+                      // si no tiene logo NO caemos al de la primaria (sería el equivocado):
+                      // dejamos null → la card muestra la inicial de su agrupación.
+                      const cardLogo = c.enlace_del_logo
+                        ? webpProxy(c.enlace_del_logo, 96)
+                        : (showAgrupacionPorCard ? null : logoUrl);
+                      return (
+                        <CompromisoCard
+                          key={`${c.id_agrupacion ?? ''}::${c.id_referencia}`}
+                          c={c}
+                          logoUrl={cardLogo}
+                          nombreAgrupacion={cardNombre}
+                          showAgrupacion={showAgrupacionPorCard}
+                          pagosParciales={pagosByCompromiso[`${c.concepto}::${c.id_referencia}`] ?? []}
+                          onPagar={() => setPagoTarget(c)}
+                          canPay={puedeEditar}
+                          delayMs={sectionIdx * 80 + idx * 50}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </section>
@@ -318,6 +335,92 @@ function PagosTabContent() {
         )}
       </div>
 
+      <PagoModal
+        compromiso={pagoTarget}
+        metodos={metodos_pago}
+        onClose={() => setPagoTarget(null)}
+        onSaved={() => {
+          setPagoTarget(null);
+          qc.invalidateQueries({ queryKey: ['pagos-resumen'] });
+        }}
+      />
+    </>
+  );
+}
+
+/**
+ * Panel de pagos de UNA inscripción — embebido en la pestaña "Pagos" de la card
+ * de Inscripción. Reusa el mismo resumen de pagos (2026) pero filtra los
+ * compromisos que corresponden a ESTA obra:
+ *   - por_participante: id_referencia === id_inscripcion (exacto)
+ *   - pre_venta: misma obra + misma agrupación (el convenio es por obra)
+ * Credencial se excluye: es a nivel agrupación (varias obras), se paga en la
+ * pestaña Pagos general. Muestra deuda + historial + botón pagar (PagoModal).
+ */
+export function InscripcionPagosPanel({ insc }: { insc: Inscripcion }) {
+  const qc = useQueryClient();
+  const { puedeEditar } = useAuth();
+  const [pagoTarget, setPagoTarget] = useState<CompromisoDeuda | null>(null);
+
+  const q = useQuery({
+    queryKey: ['pagos-resumen'],
+    queryFn: () => pagosApi.resumen(),
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+  });
+
+  if (q.isLoading) return <div className="py-3"><LoadingSkeleton rows={2} /></div>;
+  if (q.error) {
+    return <p className="py-8 text-center text-[12.5px] text-text-45" style={{ fontFamily: FONT_DISPLAY }}>Error al cargar pagos. {(q.error as Error).message}</p>;
+  }
+  if (!q.data) return null;
+
+  const { compromisos, historial, metodos_pago, enlace_del_logo, nombre_agrupacion } = q.data;
+  const obraNorm = (insc.nombre_de_la_obra ?? '').trim().toUpperCase();
+  const agrupNorm = (insc.agrupacion ?? '').trim().toUpperCase();
+
+  const mine = compromisos.filter((c) => {
+    if (c.concepto === 'por_participante') return c.id_referencia === insc.id_inscripcion;
+    if (c.concepto === 'pre_venta') {
+      const co = (c.obra ?? '').trim().toUpperCase();
+      const ca = (c.nombre_agrupacion ?? '').trim().toUpperCase();
+      return co === obraNorm && (agrupNorm ? ca === agrupNorm : true);
+    }
+    return false; // credencial = nivel agrupación → pestaña Pagos general
+  });
+
+  const pagosByCompromiso: Record<string, PagoHistorial[]> = {};
+  for (const p of historial) {
+    const k = `${p.concepto}::${p.id_referencia}`;
+    (pagosByCompromiso[k] ??= []).push(p);
+  }
+
+  if (mine.length === 0) {
+    return (
+      <p className="py-10 text-center text-[13px] italic text-text-45" style={{ fontFamily: FONT_DISPLAY }}>
+        Sin deudas ni pagos registrados para esta obra.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <style>{ANIM_CSS}</style>
+      <div className="space-y-3 py-1">
+        {mine.map((c) => (
+          <CompromisoCard
+            key={`${c.concepto}::${c.id_referencia}`}
+            c={c}
+            logoUrl={c.enlace_del_logo ? webpProxy(c.enlace_del_logo, 96) : (enlace_del_logo ? webpProxy(enlace_del_logo, 96) : null)}
+            nombreAgrupacion={c.nombre_agrupacion || nombre_agrupacion}
+            showAgrupacion={false}
+            hideEdit
+            pagosParciales={pagosByCompromiso[`${c.concepto}::${c.id_referencia}`] ?? []}
+            onPagar={() => setPagoTarget(c)}
+            canPay={puedeEditar}
+          />
+        ))}
+      </div>
       <PagoModal
         compromiso={pagoTarget}
         metodos={metodos_pago}
@@ -565,20 +668,45 @@ function CompromisoCard({
   c,
   logoUrl,
   nombreAgrupacion,
+  showAgrupacion = false,
   pagosParciales,
   onPagar,
   canPay = true,
+  hideEdit = false,
   delayMs = 0,
 }: {
   c: CompromisoDeuda;
   logoUrl: string | null;
   nombreAgrupacion: string;
+  showAgrupacion?: boolean;
   pagosParciales: PagoHistorial[];
   onPagar: () => void;
   canPay?: boolean;
+  /** Oculta el lápiz de editar (ej. embebido en la card de Inscripción, que ya tiene su propio lápiz). */
+  hideEdit?: boolean;
   delayMs?: number;
 }) {
+  const qcCard = useQueryClient();
   const [expanded, setExpanded] = useState(false);
+  const [editingInsc, setEditingInsc] = useState<InscripcionEditable | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+  // El lápiz edita la inscripción detrás del compromiso. Credencial es a nivel
+  // agrupación (varias obras) → no tiene una inscripción única, sin lápiz.
+  const canEdit = canPay && c.concepto !== 'credencial' && !hideEdit;
+
+  async function handleEdit() {
+    if (loadingEdit) return;
+    setLoadingEdit(true);
+    try {
+      const params = c.concepto === 'pre_venta'
+        ? { id_convenio: c.id_referencia }
+        : { id_inscripcion: c.id_referencia };
+      const insc = await inscripcionesApi.obtener(params);
+      setEditingInsc(insc);
+    } catch { /* el modal no abre si falla; el usuario reintenta */ }
+    finally { setLoadingEdit(false); }
+  }
+
   const saldoVerificado = Math.max(0, c.monto_total - c.pagado_verificado);
   const isCompletado = saldoVerificado <= 0.01;
   const isRevision = !isCompletado && c.saldo <= 0.01 && c.pagado_pendiente > 0.01;
@@ -657,11 +785,27 @@ function CompromisoCard({
                   color: cfg.accent,
                 }}
               >
-                {isCredencial ? nombreAgrupacion : c.descripcion}
+                {showAgrupacion || isCredencial ? nombreAgrupacion : c.descripcion}
               </h4>
-              <StatusBadge estado={estadoBadge} />
+              <div className="flex shrink-0 items-center gap-1.5">
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={handleEdit}
+                    disabled={loadingEdit}
+                    aria-label="Editar inscripción"
+                    title="Editar obra, participantes y modalidad"
+                    className="grid h-6 w-6 place-items-center rounded-md border border-white/10 text-text-45 transition hover:border-cyan/40 hover:text-cyan disabled:opacity-50"
+                  >
+                    {loadingEdit
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <Pencil className="h-3 w-3" strokeWidth={2.2} />}
+                  </button>
+                )}
+                <StatusBadge estado={estadoBadge} />
+              </div>
             </div>
-            {isCredencial && (
+            {(showAgrupacion || isCredencial) && (
               <div
                 className="mt-0.5 text-[10px] font-medium text-text-65"
                 style={{ fontFamily: FONT_DISPLAY }}
@@ -859,6 +1003,16 @@ function CompromisoCard({
           ))}
         </div>
       </div>
+
+      <EditarInscripcionModal
+        inscripcion={editingInsc}
+        onClose={() => setEditingInsc(null)}
+        onSaved={() => {
+          setEditingInsc(null);
+          void qcCard.invalidateQueries({ queryKey: ['pagos-resumen'] });
+          void qcCard.invalidateQueries({ queryKey: ['inscripciones'] });
+        }}
+      />
     </div>
   );
 }
@@ -942,6 +1096,7 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
     comprobante: false,
   });
   const [reciboPreview, setReciboPreview] = useState(false);
+  const [comprobantePreview, setComprobantePreview] = useState(false);
 
   function buildFilename(tipo: 'recibo' | 'comprobante'): string {
     const persona = (p.nombre_pagador || 'Pagador').toUpperCase();
@@ -1062,11 +1217,11 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
         <div className="flex w-full">
           {p.comprobante_url ? (
             <ActionButton
-              onClick={() => handleClick('comprobante')}
+              onClick={() => setComprobantePreview(true)}
               grad={comprobanteDl ? ABRIR_COMPROBANTE_GRAD : COMPROBANTE_GRAD}
               glow={comprobanteDl ? ABRIR_COMPROBANTE_GLOW : COMPROBANTE_GLOW}
-              ariaLabel={comprobanteDl ? 'Abrir comprobante descargado' : 'Descargar comprobante'}
-              title={comprobanteDl ? 'Abrir comprobante descargado' : 'Descargar comprobante subido'}
+              ariaLabel="Ver comprobante"
+              title="Ver comprobante (vista previa)"
               loading={loading.comprobante}
               pulse={!!comprobanteDl}
             >
@@ -1086,6 +1241,17 @@ function PagoParcialRow({ p, nombreAgrupacion }: { p: PagoHistorial; nombreAgrup
           actionLoading={loading.recibo}
           onAction={() => { void handleClick('recibo'); }}
           onClose={() => setReciboPreview(false)}
+        />
+      )}
+      {comprobantePreview && p.comprobante_url && (
+        <PdfPreviewModal
+          url={p.comprobante_url}
+          title="Comprobante de pago"
+          openUrl={p.comprobante_url}
+          actionLabel={comprobanteDl ? 'Abrir comprobante' : 'Descargar comprobante'}
+          actionLoading={loading.comprobante}
+          onAction={() => { void handleClick('comprobante'); }}
+          onClose={() => setComprobantePreview(false)}
         />
       )}
     </div>

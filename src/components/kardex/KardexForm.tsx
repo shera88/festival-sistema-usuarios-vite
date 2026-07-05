@@ -21,6 +21,7 @@ import {
   type ParticipanteDetalle,
 } from "@/components/solicitud/NameAutocomplete";
 import { AgrupacionInscritasDropdown } from "@/components/kardex/AgrupacionInscritasDropdown";
+import { BailesMultiselect } from "@/components/kardex/BailesMultiselect";
 import { scrollToFirstError } from "@/lib/form-scroll";
 
 const FIELD_ORDER = [
@@ -135,6 +136,8 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
   const handleAgrupacionSelect = (nombre_agr: string, id_ag: string) => {
     setValue("agrupacion", nombre_agr, { shouldValidate: true });
     setValue("id_agrupacion", id_ag, { shouldValidate: true });
+    // Los bailes dependen de la agrupación → al cambiarla, limpiar la selección previa.
+    setValue("bailes", []);
   };
 
   const onInvalid = (errs: FieldErrors<z.input<typeof kardexSchema>>) => {
@@ -149,6 +152,10 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
         if (v == null) continue;
         if (k === "foto" && v instanceof File) {
           fd.append("foto", v);
+        } else if (k === "bailes") {
+          fd.append("bailes", JSON.stringify(v ?? []));
+        } else if (typeof v === "boolean") {
+          fd.append(k, v ? "1" : "0");
         } else {
           fd.append(k, String(v));
         }
@@ -198,6 +205,24 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
             {errors.agrupacion?.message ?? errors.id_agrupacion?.message}
           </p>
         )}
+      </div>
+
+      {/* 1b. Bailes de la agrupación en los que participa la persona */}
+      <div data-field-anchor="bailes">
+        <Label>Participo en:</Label>
+        <div className="mt-1.5">
+          <Controller
+          control={control}
+          name="bailes"
+          render={({ field }) => (
+            <BailesMultiselect
+              idAgrupacion={watch("id_agrupacion") ?? ""}
+              value={(field.value as { id_inscripcion: string; nombre_de_la_obra: string }[]) ?? []}
+              onChange={field.onChange}
+            />
+          )}
+          />
+        </div>
       </div>
 
       {/* 2. Nombre y apellido — autocomplete inline: si coincide con
@@ -348,6 +373,48 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
             </p>
           )}
         </div>
+      </div>
+
+      {/* 8b. Membresía de Videos — casilla opcional, +15 Bs al credencial */}
+      <div data-field-anchor="membresia">
+        <Controller
+          control={control}
+          name="membresia"
+          render={({ field }) => (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={!!field.value}
+              onClick={() => field.onChange(!field.value)}
+              className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors ${
+                field.value
+                  ? "border-[rgba(34,211,238,0.6)] bg-[rgba(34,211,238,0.08)]"
+                  : "border-border bg-card/60 hover:border-[rgba(34,211,238,0.4)]"
+              }`}
+            >
+              <span
+                className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${
+                  field.value ? "border-[rgba(34,211,238,0.9)] bg-[rgba(34,211,238,0.95)]" : "border-border"
+                }`}
+              >
+                {field.value && (
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-black" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">Añadir Membresía de Videos</span>
+                <span className="mt-0.5 block text-xs text-foreground/60">
+                  Acceso a los videos del festival 2026. Suma 15 Bs al costo de la credencial.
+                </span>
+              </span>
+              <span className="shrink-0 rounded-full bg-primary-gradient px-3 py-1 text-xs font-bold text-white">
+                +15 Bs
+              </span>
+            </button>
+          )}
+        />
       </div>
 
       {/* 9. Foto — obligatoria para credencial */}

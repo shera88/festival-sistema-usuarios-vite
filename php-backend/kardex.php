@@ -56,6 +56,11 @@ $ciudad       = clean_str($_POST['ciudad']             ?? null, 80);
 $edadStr      = clean_str($_POST['edad']               ?? null, 5);
 $ci           = clean_str($_POST['ci']                 ?? null, 15);
 
+// Membresía de Videos (checkbox "1"/"0") + bailes seleccionados (JSON del multiselect).
+$membresia    = (($_POST['membresia'] ?? '0') === '1' || strtolower((string)($_POST['membresia'] ?? '')) === 'true');
+$bailesArr    = json_decode((string)($_POST['bailes'] ?? '[]'), true);
+if (!is_array($bailesArr)) $bailesArr = [];
+
 if (mb_strlen($nombre) < 2) jerror(400, 'Nombre y apellido obligatorio');
 if (mb_strlen($agrupacion) < 2) jerror(400, 'Agrupación obligatoria');
 $CARGOS_VALIDOS = ['BAILARIN', 'COREOGRAFO', 'DIRECTOR', 'ENCARGADO', 'STAFF', 'AUSPICIADOR', 'JURADO', 'ORGANIZACION'];
@@ -125,6 +130,8 @@ try {
         'foto'                => $foto_url,
         'estado'              => 'PENDIENTE',
         'id_contacto'         => $idContactoUuid,
+        'membresia'           => $membresia,
+        'bailes'              => $bailesArr,
     ]);
 
     // Lookup id_contacto resuelto.
@@ -179,6 +186,8 @@ try {
             'ci'                 => (int)$ci,
             'foto_url'           => $foto_url,
             'estado'             => 'PENDIENTE',
+            'membresia'          => $membresia,
+            'bailes'             => $bailesArr,
         ],
         'relacion'        => $relacion_pre,
         // imagen_persona: foto recién subida tiene prioridad. Kardex siempre tiene foto.

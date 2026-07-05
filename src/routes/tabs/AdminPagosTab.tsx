@@ -241,7 +241,7 @@ function AdminPagosContent() {
               <PagoRow
                 key={p.id_pago}
                 p={p}
-                onOpen={() => setDetalle({ id: p.id_agrupacion, nombre: p.nombre_agrupacion ?? p.id_agrupacion })}
+                onOpen={() => setDetalle({ id: p.id_agrupacion ?? '', nombre: p.nombre_agrupacion ?? p.id_agrupacion ?? '' })}
                 onDelete={() => handleDelete(p.id_pago)}
                 deleting={eliminando === p.id_pago}
               />

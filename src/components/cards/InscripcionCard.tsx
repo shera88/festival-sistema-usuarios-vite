@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Play, Upload, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video } from 'lucide-react';
+import { InscripcionPagosPanel } from '@/routes/tabs/PagosTab';
 import type { Inscripcion, Nota } from '@/types/domain';
+import { useAuth } from '@/hooks/useAuth';
+import { EditarInscripcionModal } from './EditarInscripcionModal';
 import { appsheetAudio } from '@/lib/utils/appsheet';
 import { calcularPromedioFinal, fmtScore } from '@/lib/utils/scoring';
 import { extractVimeoId } from '@/lib/utils/vimeo';
@@ -20,7 +23,7 @@ interface Props {
   year: string;
 }
 
-type SubTab = 'detalles' | 'video' | 'calificacion';
+type SubTab = 'detalles' | 'video' | 'calificacion' | 'pagos';
 
 const CHIP_STYLE: Record<string, string> = {
   cat: 'text-cyan border-cyan/25',
@@ -60,6 +63,8 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMsg, setInfoMsg] = useState<{ title: string; body: string } | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const { puedeEditar } = useAuth();
   const qc = useQueryClient();
   const mmConfirmado = !!insc.multimedia_confirmado;
 
@@ -109,11 +114,12 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           : 'linear-gradient(180deg, var(--bg-card) 0%, var(--bg-elevated) 100%)',
       }}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-3 p-4 text-left"
-      >
+      <div className="flex w-full items-center gap-3 p-4">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
         <div
           className={`h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 transition ${
             open ? 'border-cyan shadow-[0_0_18px_rgba(0,229,255,0.25)]' : 'border-cyan/25 shadow-[0_0_12px_rgba(0,229,255,0.12)]'
@@ -166,12 +172,33 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           )}
         </div>
 
-        <ChevronDown
-          className={`h-5 w-5 shrink-0 transition-transform duration-300 ${
-            open ? 'rotate-180 text-cyan' : 'text-text-45'
-          }`}
-        />
-      </button>
+        </button>
+
+        {puedeEditar && (
+          <button
+            type="button"
+            onClick={() => setEditOpen(true)}
+            aria-label="Editar datos de la obra"
+            title="Editar datos de la obra"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan/30 bg-cyan/10 text-cyan transition hover:bg-cyan/20"
+          >
+            <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? 'Contraer' : 'Expandir'}
+          className="shrink-0"
+        >
+          <ChevronDown
+            className={`h-5 w-5 transition-transform duration-300 ${
+              open ? 'rotate-180 text-cyan' : 'text-text-45'
+            }`}
+          />
+        </button>
+      </div>
 
       {open && (
         <div
@@ -181,7 +208,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           }}
         >
           <div className="mb-3 flex gap-1 overflow-x-auto border-b border-glass-border no-scrollbar">
-            {(['detalles', 'video', 'calificacion'] as SubTab[]).map((t) => (
+            {([...(['detalles', 'video', 'calificacion'] as SubTab[]), ...(mmEnabled ? (['pagos'] as SubTab[]) : [])]).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -191,7 +218,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                 }`}
                 style={{ letterSpacing: '0.6px' }}
               >
-                {t === 'detalles' ? 'Detalles' : t === 'calificacion' ? 'Calificación' : 'Video'}
+                {t === 'detalles' ? 'Detalles' : t === 'calificacion' ? 'Calificación' : t === 'pagos' ? 'Pagos' : 'Video'}
                 {t === 'calificacion' && promedio !== null && (
                   <span className="ml-1.5 inline-flex items-center rounded-md bg-cyan-faint px-1.5 py-px text-[10px] font-bold text-cyan">
                     {fmtScore(promedio)}
@@ -227,6 +254,25 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                 <Field label="Estado" value={insc.estado} />
                 <Field label="Formato" value={insc.formato_de_inscripcion} />
               </div>
+              {insc.video_led_url_multimedia && (
+                <div className="mt-3 rounded-xl border border-fuchsia/25 p-3">
+                  <div
+                    className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase text-fuchsia"
+                    style={{ letterSpacing: '0.5px' }}
+                  >
+                    <Video className="h-3.5 w-3.5" />
+                    Video de la obra
+                  </div>
+                  <video
+                    src={insc.video_led_url_multimedia}
+                    controls
+                    preload="metadata"
+                    playsInline
+                    className="w-full rounded-md border border-glass-border bg-black"
+                    style={{ maxHeight: 280 }}
+                  />
+                </div>
+              )}
               {audioUrl && (
                 <div className="mt-3">
                   <AudioPlayer src={audioUrl} />
@@ -381,6 +427,8 @@ export function InscripcionCard({ insc, notas, year }: Props) {
               )}
             </>
           )}
+
+          {sub === 'pagos' && <InscripcionPagosPanel insc={insc} />}
         </div>
       )}
       {vimeoId && (
@@ -392,6 +440,16 @@ export function InscripcionCard({ insc, notas, year }: Props) {
         />
       )}
       <MultimediaDialog open={mmOpen} inscripcion={insc} onClose={() => setMmOpen(false)} />
+
+      <EditarInscripcionModal
+        inscripcion={editOpen ? insc : null}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => {
+          setEditOpen(false);
+          void qc.invalidateQueries({ queryKey: ['inscripciones'] });
+          void qc.invalidateQueries({ queryKey: ['pagos-resumen'] });
+        }}
+      />
 
       <ConfirmDialog
         open={confirmOpen}

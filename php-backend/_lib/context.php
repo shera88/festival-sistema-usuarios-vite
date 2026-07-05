@@ -58,6 +58,39 @@ function parseIdCsv($value): array
     return array_values(array_filter(array_map('trim', explode(',', (string)$value))));
 }
 
+/**
+ * Conjunto REAL de agrupaciones que la persona representa. Igual criterio que el
+ * tab Inscripciones (buildContextFilter): la agrupación de su contacto + las de
+ * todas sus inscripciones (por id_contacto / encargado / director / coreógrafo).
+ *
+ * `festival_contactos_global.id_agrupacion` es un ÚNICO valor (la "primaria"),
+ * pero un representante puede firmar convenios / tener inscripciones para VARIAS
+ * agrupaciones. Todo endpoint scopeado por agrupación (pagos-resumen, pago-crear)
+ * DEBE usar este set, no el CSV del contacto — si no, da 403 / oculta datos de las
+ * agrupaciones no-primarias. Requiere supabase() ya cargado.
+ */
+function resolveUserAgrupaciones(array $user): array
+{
+    require_once __DIR__ . '/supabase.php';
+    $sb = supabase();
+    $set = [];
+    foreach (parseIdCsv($user['id_agrupacion'] ?? '') as $id) {
+        if ($id !== '') $set[$id] = true;
+    }
+    $filter = buildContextFilter($user, true); // includeContacto
+    if ($filter !== null) {
+        $rows = $sb->selectRaw(
+            'registro_de_inscripcion_2026',
+            'select=id_agrupacion&limit=1000&' . $filter
+        );
+        foreach ($rows as $r) {
+            $aid = $r['id_agrupacion'] ?? '';
+            if ($aid !== '' && $aid !== null) $set[$aid] = true;
+        }
+    }
+    return array_keys($set);
+}
+
 function quoteIfNeeded(string $value): string
 {
     // PostgREST: comillas dobles si el valor tiene caracteres especiales

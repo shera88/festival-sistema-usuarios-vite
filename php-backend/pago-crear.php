@@ -33,13 +33,20 @@ handlePreflight();
 requireMethod('POST');
 
 $user = requireEditor();
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
+// Set REAL de agrupaciones (un representante puede tener varias; ver context.php).
+// Antes esto usaba solo el id_agrupacion único del contacto → daba 403 al pagar
+// compromisos de agrupaciones no-primarias.
+$userAgrups = resolveUserAgrupaciones($user);
 
 $concepto       = trim((string)($_POST['concepto'] ?? ''));
 $id_referencia  = trim((string)($_POST['id_referencia'] ?? ''));
 $monto          = (float)($_POST['monto'] ?? 0);
 $id_metodo_pago = trim((string)($_POST['id_metodo_pago'] ?? ''));
 $observacion    = trim((string)($_POST['observacion'] ?? '')) ?: null;
+// Cantidad de credenciales a comprar (solo credencial). La inscripción da un valor
+// inicial pero el usuario puede ajustarlo → fija el compromiso (override) y el monto.
+$cantidadCred   = isset($_POST['cantidad']) ? (int)$_POST['cantidad'] : null;
+const PRECIO_CREDENCIAL = 15;
 
 // Normalizar al vocab CANÓNICO de pagos_2026 (la gestión, los pagos guardados
 // y la constraint chk_pagos_concepto_fk usan estos nombres). La app puede mandar
@@ -105,19 +112,43 @@ if ($conceptoCanon === 'por_participante') {
     );
     if (!$row) { sendJson(['error' => 'Convenio no encontrado'], 404); exit; }
     $id_agrupacion = (string)$row['id_agrupacion'];
-} else { // credencial / credencial_unit
-    $row = $sb->selectOne(
-        'compromisos_credenciales_2026',
-        'id_compromiso,id_agrupacion,monto_total',
-        ['id_compromiso' => "eq.$id_referencia"]
-    );
-    if (!$row) { sendJson(['error' => 'Compromiso credenciales no encontrado'], 404); exit; }
-    $id_agrupacion = (string)$row['id_agrupacion'];
+} else { // credencial / credencial_unitaria
+    // id_referencia canónico = 'cred-<id_agrupacion>' (el compromiso se deriva de
+    // los bailarines; ya no depende de que exista fila en compromisos_credenciales).
+    if (!str_starts_with($id_referencia, 'cred-')) {
+        sendJson(['error' => 'Referencia de credencial inválida'], 400);
+        exit;
+    }
+    $id_agrupacion = substr($id_referencia, 5);
+    if ($id_agrupacion === '') { sendJson(['error' => 'Agrupación de credencial inválida'], 400); exit; }
 }
 
 if (!in_array($id_agrupacion, $userAgrups, true)) {
     sendJson(['error' => 'No autorizado para esta agrupación'], 403);
     exit;
+}
+
+// Credencial con cantidad ajustada: el usuario define cuántas comprar. Se fija el
+// override (compromisos_credenciales_2026) → el compromiso pasa a valer
+// cantidad × 15 Bs, y el monto del pago se calcula desde ahí (autoridad server).
+if ($conceptoCanon === 'credencial' && $cantidadCred !== null) {
+    if ($cantidadCred < 1) { sendJson(['error' => 'Cantidad de credenciales inválida'], 400); exit; }
+    try {
+        $sb->upsert('compromisos_credenciales_2026', [
+            'id_compromiso'   => $id_referencia,
+            'id_agrupacion'   => $id_agrupacion,
+            'cantidad'        => $cantidadCred,
+            'precio_unitario' => PRECIO_CREDENCIAL,
+            'origen'          => 'manual',
+            'updated_at'      => date('c'),
+        ], 'id_agrupacion');
+    } catch (RuntimeException $e) {
+        sendJson(['error' => 'No se pudo fijar la cantidad de credenciales: ' . $e->getMessage()], 500);
+        exit;
+    }
+    // El monto lo manda el frontend (cantidad × 15) pero el server lo recomputa
+    // para no confiar en el cliente.
+    $monto = $cantidadCred * PRECIO_CREDENCIAL;
 }
 
 // Validar saldo (no permitir pagar de más)

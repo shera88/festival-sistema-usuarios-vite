@@ -66,3 +66,28 @@ export function useAgrupacion(id: string | null | undefined) {
     staleTime: 60_000,
   });
 }
+
+export interface ObraAgrupacion {
+  id_inscripcion: string;
+  nombre_de_la_obra: string;
+}
+
+/**
+ * Obras (inscripciones 2026) de una agrupación — alimenta el multiselect
+ * "en qué bailes del grupo baila" del formulario de kárdex.
+ */
+export function useObrasAgrupacion(idAgrupacion: string | null | undefined) {
+  return useQuery({
+    queryKey: ["agrupaciones", "obras", idAgrupacion],
+    queryFn: async (): Promise<ObraAgrupacion[]> => {
+      if (!idAgrupacion) return [];
+      const { data, error } = await supabase.rpc("listar_obras_agrupacion", {
+        p_id_agrupacion: idAgrupacion,
+      });
+      if (error) throw error;
+      return (data as ObraAgrupacion[] | null) ?? [];
+    },
+    enabled: !!idAgrupacion && idAgrupacion.trim().length >= 1,
+    staleTime: 60_000,
+  });
+}

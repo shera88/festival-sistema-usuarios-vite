@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import { X, Loader2, Pencil } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { X, Loader2, Pencil, FilePlus, UserPlus } from 'lucide-react';
 import type { User } from '@/types/domain';
 import { webpProxy } from '@/lib/utils/img';
 
@@ -19,6 +19,16 @@ export function UserHero({ user }: Props) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  // CTA contextual del header: solo en Inscripciones (→ Nueva Inscripción) y
+  // Kardex (→ Nuevo Kardex). En las demás vistas NO aparece ningún botón arriba.
+  const cta =
+    pathname.startsWith('/inscripciones')
+      ? { to: '/inscripcion', long: 'Nueva Inscripción', short: 'Inscribir', aria: 'Nueva inscripción', Icon: FilePlus }
+      : pathname.startsWith('/kardex')
+        ? { to: '/kardex-form', long: 'Nuevo Kardex', short: 'Kardex', aria: 'Nuevo kardex', Icon: UserPlus }
+        : null;
 
   return (
     <div
@@ -108,6 +118,19 @@ export function UserHero({ user }: Props) {
           <span className="truncate">{inst}</span>
         </div>
       </div>
+
+      {cta && (
+        <button
+          type="button"
+          onClick={() => navigate(cta.to)}
+          aria-label={cta.aria}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary-gradient px-4 py-2.5 text-[13px] font-bold text-white shadow-[0_10px_32px_-10px_rgba(168,85,247,0.55)] transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97] sm:px-6 sm:py-3 sm:text-sm"
+        >
+          <cta.Icon className="h-4 w-4 shrink-0" />
+          <span className="sm:hidden">{cta.short}</span>
+          <span className="hidden sm:inline">{cta.long}</span>
+        </button>
+      )}
 
       {previewOpen && user.imagen_contacto &&
         createPortal(

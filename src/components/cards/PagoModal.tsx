@@ -28,6 +28,9 @@ function bs(n: number): string {
 
 export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   const [monto, setMonto] = useState<string>('');
+  // Credencial: el usuario elige CUÁNTAS credenciales comprar (valor inicial =
+  // bailarines de la agrupación). El monto se deriva: cantidad × precio unitario.
+  const [cantidadCred, setCantidadCred] = useState<string>('');
   const [idMetodo, setIdMetodo] = useState<string>('');
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
@@ -48,12 +51,15 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   useEffect(() => {
     if (!compromiso) {
       setMonto('');
+      setCantidadCred('');
       setComprobante(null);
       setComprobanteUrl(null);
       setErr(null);
       return;
     }
     setMonto('');
+    // Cantidad inicial de credenciales = bailarines (valor de arranque, editable).
+    setCantidadCred(compromiso.concepto === 'credencial' ? String(compromiso.bailarines ?? '') : '');
     setIdMetodo(metodosQR[0]?.id_metodo ?? '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compromiso, metodos]);
@@ -74,8 +80,18 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   if (!compromiso) return null;
 
   const cfg = conceptoAccent[compromiso.concepto] ?? conceptoAccent.por_participante;
+  const logoModalUrl = compromiso.enlace_del_logo ? webpProxy(compromiso.enlace_del_logo, 96) : null;
+
+  // Credencial: modo "comprar N credenciales". Precio unitario derivado del
+  // compromiso (monto_total / bailarines), fallback 15 Bs.
+  const isCredencial = compromiso.concepto === 'credencial';
+  const precioUnit = isCredencial && compromiso.bailarines && compromiso.bailarines > 0
+    ? Math.round(compromiso.monto_total / compromiso.bailarines)
+    : 15;
+  const cantidadNum = Math.max(0, Math.floor(Number(cantidadCred) || 0));
 
   const montoNum = (() => {
+    if (isCredencial) return cantidadNum * precioUnit;
     const n = Number(monto);
     if (!isFinite(n) || n <= 0) return 0;
     return Math.min(n, compromiso.saldo);
@@ -118,14 +134,25 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
     const c = compromiso;
     if (!c) return;
 
-    const m = Number(monto);
-    if (!isFinite(m) || m <= 0) {
-      setErr('Monto inválido');
-      return;
-    }
-    if (m > c.saldo + 0.01) {
-      setErr(`Monto excede el saldo (${bs(c.saldo)})`);
-      return;
+    let m: number;
+    let cantidad: number | undefined;
+    if (isCredencial) {
+      if (cantidadNum < 1) {
+        setErr('Indique cuántas credenciales desea comprar');
+        return;
+      }
+      cantidad = cantidadNum;
+      m = cantidadNum * precioUnit;
+    } else {
+      m = Number(monto);
+      if (!isFinite(m) || m <= 0) {
+        setErr('Monto inválido');
+        return;
+      }
+      if (m > c.saldo + 0.01) {
+        setErr(`Monto excede el saldo (${bs(c.saldo)})`);
+        return;
+      }
     }
     if (!idMetodo) {
       setErr('Seleccione método de pago');
@@ -143,6 +170,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
         id_referencia: c.id_referencia,
         monto: m,
         id_metodo_pago: idMetodo,
+        cantidad,
         comprobante,
       });
       onSaved();
@@ -174,6 +202,19 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
         >
 
           <header className="relative flex items-center gap-3 border-b border-white/[0.05] px-5 py-4">
+            {/* Logo de la agrupación (o inicial) */}
+            <div className="relative h-11 w-11 shrink-0">
+              <div className="absolute inset-0 rounded-full opacity-40" style={{ background: cfg.grad, filter: 'blur(6px)' }} />
+              <div className="relative h-full w-full overflow-hidden rounded-full border border-white/[0.10]" style={{ background: '#171429' }}>
+                {logoModalUrl ? (
+                  <img src={logoModalUrl} alt={compromiso.nombre_agrupacion ?? ''} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="grid h-full w-full place-items-center text-[13px] font-semibold" style={{ color: cfg.accent, fontFamily: FONT_DISPLAY }}>
+                    {(compromiso.nombre_agrupacion ?? '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="min-w-0 flex-1">
               <div
                 className="text-[9.5px] font-bold uppercase"
@@ -181,11 +222,18 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
               >
                 Registrar pago
               </div>
+              {/* Agrupación (título) + obra/descripción (subtítulo) */}
               <div
                 className="mt-1 truncate text-[14px] font-semibold text-text-white"
                 style={{ fontFamily: FONT_DISPLAY, letterSpacing: '-0.015em' }}
               >
-                {compromiso.descripcion}
+                {compromiso.nombre_agrupacion || compromiso.descripcion}
+              </div>
+              <div
+                className="mt-0.5 truncate text-[10.5px] font-medium text-text-65"
+                style={{ fontFamily: FONT_DISPLAY }}
+              >
+                {[compromiso.obra, compromiso.descripcion].filter(Boolean).join(' · ')}
               </div>
             </div>
             <button
@@ -213,56 +261,110 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
               className="grid grid-cols-3 divide-x divide-white/[0.06] rounded-2xl border border-white/[0.06] py-3"
               style={{ background: 'rgba(255,255,255,0.02)' }}
             >
-              <StatBox label="Total" value={bs(compromiso.monto_total)} />
-              <StatBox label="Pagado" value={bs(compromiso.pagado_verificado + montoNum)} color="#10B981" />
-              <StatBox
-                label={montoNum > 0 ? 'Quedará' : 'Saldo'}
-                value={bs(saldoRestante)}
-                color={cubreTotal ? '#10B981' : cfg.accent}
-                bold
-                hint={montoNum > 0 ? `de ${bs(compromiso.saldo)}` : undefined}
-              />
+              {isCredencial ? (
+                <>
+                  {/* Credencial: Total = cantidad × 15 (vivo), no hay saldo parcial */}
+                  <StatBox label="Total" value={bs(montoNum)} color={cfg.accent} bold />
+                  <StatBox label="Precio c/u" value={bs(precioUnit)} />
+                  <StatBox label="Credenciales" value={String(cantidadNum)} />
+                </>
+              ) : (
+                <>
+                  <StatBox label="Total" value={bs(compromiso.monto_total)} />
+                  <StatBox label="Pagado" value={bs(compromiso.pagado_verificado + montoNum)} color="#10B981" />
+                  <StatBox
+                    label={montoNum > 0 ? 'Quedará' : 'Saldo'}
+                    value={bs(saldoRestante)}
+                    color={cubreTotal ? '#10B981' : cfg.accent}
+                    bold
+                    hint={montoNum > 0 ? `de ${bs(compromiso.saldo)}` : undefined}
+                  />
+                </>
+              )}
             </div>
 
-            {/* Monto a pagar — hero input */}
+            {/* Monto a pagar (o cantidad de credenciales) — hero input */}
             <div>
               <label className="block">
                 <span
                   className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
                   style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
                 >
-                  Monto a pagar
+                  {isCredencial ? 'Cantidad de credenciales a comprar' : 'Monto a pagar'}
                 </span>
                 <div className="relative">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    step="1"
-                    min="0"
-                    max={compromiso.saldo}
-                    value={monto}
-                    onChange={(e) => handleMontoChange(e.target.value)}
-                    required
-                    placeholder="0"
-                    className="pago-input-hero w-full"
-                    style={{
-                      fontFamily: FONT_MONO,
-                      fontSize: '28px',
-                      fontWeight: 600,
-                      letterSpacing: '-0.025em',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  />
+                  {isCredencial ? (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      step="1"
+                      min="1"
+                      value={cantidadCred}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === '') { setCantidadCred(''); return; }
+                        const n = Math.floor(Number(v));
+                        if (!isFinite(n) || n < 0) return;
+                        setCantidadCred(String(n));
+                      }}
+                      required
+                      placeholder="0"
+                      className="pago-input-hero w-full"
+                      style={{
+                        fontFamily: FONT_MONO,
+                        fontSize: '28px',
+                        fontWeight: 600,
+                        letterSpacing: '-0.025em',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      step="1"
+                      min="0"
+                      max={compromiso.saldo}
+                      value={monto}
+                      onChange={(e) => handleMontoChange(e.target.value)}
+                      required
+                      placeholder="0"
+                      className="pago-input-hero w-full"
+                      style={{
+                        fontFamily: FONT_MONO,
+                        fontSize: '28px',
+                        fontWeight: 600,
+                        letterSpacing: '-0.025em',
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
+                    />
+                  )}
                   <span
                     className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-text-45"
                     style={{ fontFamily: FONT_DISPLAY }}
                   >
-                    Bs
+                    {isCredencial ? 'cred.' : 'Bs'}
                   </span>
                 </div>
               </label>
 
-              {/* Quick chips: 25/50/75/100% */}
+              {/* Credencial: monto derivado (cantidad × precio unitario) */}
+              {isCredencial && (
+                <div
+                  className="mt-2 flex items-center justify-between rounded-xl border px-3.5 py-2.5"
+                  style={{ borderColor: `${cfg.accent}30`, background: `${cfg.accent}08`, fontFamily: FONT_DISPLAY }}
+                >
+                  <span className="text-[10.5px] font-semibold uppercase text-text-45" style={{ letterSpacing: '0.8px' }}>
+                    {cantidadNum} × {bs(precioUnit)}
+                  </span>
+                  <span className="text-[15px] font-bold tabular-nums text-text-white" style={{ fontFamily: FONT_MONO }}>
+                    {bs(montoNum)}
+                  </span>
+                </div>
+              )}
+
+              {/* Quick chips: 25/50/75/100% (solo pagos con saldo fijo, no credencial) */}
+              {!isCredencial && (
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {[0.25, 0.5, 0.75, 1].map((frac) => {
                   const amount = Math.round(compromiso.saldo * frac);
@@ -295,8 +397,10 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                   Máx <span style={{ fontFamily: FONT_MONO, color: 'var(--text-65)' }}>{bs(compromiso.saldo)}</span>
                 </span>
               </div>
+              )}
 
-              {/* Preview en vivo: barra progreso + delta */}
+              {/* Preview en vivo: barra progreso + delta (solo pagos con saldo fijo) */}
+              {!isCredencial && (
               <div
                 className="mt-3 rounded-2xl border px-3.5 py-3"
                 style={{
@@ -373,6 +477,7 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                   )}
                 </div>
               </div>
+              )}
             </div>
 
             {/* Método de pago — texto fijo (solo QR habilitado) */}

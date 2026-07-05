@@ -82,6 +82,14 @@ export const kardexSchema = z.object({
       (f) => /^image\/(jpeg|png|webp)$/.test(f.type),
       "Solo JPG, PNG o WebP"
     ),
+
+  // Membresía de Videos — casilla opcional; suma +15 Bs al credencial de la agrupación.
+  membresia: z.boolean().default(false),
+
+  // Bailes de la agrupación en los que participa la persona (multiselect).
+  bailes: z
+    .array(z.object({ id_inscripcion: z.string(), nombre_de_la_obra: z.string() }))
+    .default([]),
 });
 
 export type KardexData = z.infer<typeof kardexSchema>;
