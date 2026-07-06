@@ -1,18 +1,22 @@
-import { Play } from 'lucide-react';
+import { Play, Lock } from 'lucide-react';
 import type { VideoItem } from '@/types/domain';
-import { extractVimeoId, vimeoThumbUrl } from '@/lib/utils/vimeo';
+import { extractVimeoId, vimeoThumbUrl, isDirectVideoUrl } from '@/lib/utils/vimeo';
 
 interface Props {
   video: VideoItem;
   onClick: () => void;
+  /** Video 2026 sin membresía pagada: miniatura difuminada + candado + "Vista previa". */
+  locked?: boolean;
 }
 
-export function VideoCard({ video, onClick }: Props) {
+export function VideoCard({ video, onClick, locked = false }: Props) {
   const id = extractVimeoId(video.url_video);
+  const directUrl = !id && isDirectVideoUrl(video.url_video) ? String(video.url_video) : null;
   const thumb = id ? vimeoThumbUrl(id) : null;
   const inst = video.agrupacion || 'Sin institución';
   const obra = video.nombre_de_la_obra || 'Sin obra';
   const dia = (video.dia || '').toUpperCase();
+  const dim = locked ? 'scale-105 blur-[3px] brightness-[0.5]' : 'group-hover:scale-105';
 
   return (
     <button
@@ -23,10 +27,16 @@ export function VideoCard({ video, onClick }: Props) {
     >
       <div className="relative aspect-video w-full overflow-hidden bg-base">
         {thumb ? (
-          <img
-            src={thumb}
-            alt={obra}
-            className="h-full w-full object-cover transition group-hover:scale-105"
+          <img src={thumb} alt={obra} className={`h-full w-full object-cover transition ${dim}`} />
+        ) : directUrl ? (
+          // Miniatura = un frame del mp4 (poster). #t=3 → muestra el segundo 3.
+          <video
+            src={`${directUrl}#t=3`}
+            preload="metadata"
+            muted
+            playsInline
+            tabIndex={-1}
+            className={`pointer-events-none h-full w-full object-cover transition ${dim}`}
           />
         ) : (
           <div
@@ -49,9 +59,19 @@ export function VideoCard({ video, onClick }: Props) {
             {dia}
           </span>
         )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
-          <Play className="h-14 w-14 text-white drop-shadow-lg" fill="white" />
-        </div>
+
+        {locked ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40 px-3 text-center">
+            <Lock className="h-7 w-7 text-white drop-shadow" />
+            <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white backdrop-blur">
+              Vista previa · 20s
+            </span>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+            <Play className="h-14 w-14 text-white drop-shadow-lg" fill="white" />
+          </div>
+        )}
       </div>
       <div className="p-3">
         <div

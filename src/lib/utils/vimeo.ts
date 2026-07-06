@@ -18,3 +18,9 @@ export function vimeoEmbedUrl(id: string, opts: { autoplay?: boolean } = {}): st
 export function vimeoThumbUrl(id: string): string {
   return `https://vumbnail.com/${id}.jpg`;
 }
+
+/** URL de video reproducible directo (mp4/webm/… hospedado, ej. Cloudflare R2), no Vimeo. */
+export function isDirectVideoUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /\.(mp4|webm|ogg|ogv|mov|m4v)(\?.*)?$/i.test(String(url).trim());
+}

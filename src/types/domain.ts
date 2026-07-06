@@ -155,6 +155,24 @@ export interface VideoItem {
   director: string | null;
   bloque: string | null;
   genero: string | null;
+  /** Videos 2026: true si la membresía aún no está pagada (bloqueado). */
+  bloqueado?: boolean;
+}
+
+/** Estado de la Membresía de Videos de la persona logueada (para gating de 2026). */
+export interface MembresiaEstado {
+  id_kardex: string | null;
+  /** Reservó la membresía en el kárdex (marcó el check) → precio 20. */
+  reservo: boolean;
+  /** Ya pagó → sus videos 2026 quedan desbloqueados. */
+  pagada: boolean;
+  /** La persona tiene al menos una fila de kárdex. */
+  tiene_kardex: boolean;
+}
+
+export interface VideosResponse {
+  videos: Record<string, VideoItem[]>;
+  membresia: MembresiaEstado;
 }
 
 export interface Institucion {

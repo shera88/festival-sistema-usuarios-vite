@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { Bootstrap, Inscripcion, KardexRow, Nota, VideoItem, Year, YearNotas } from '@/types/domain';
+import type { Bootstrap, Inscripcion, KardexRow, Nota, Year, YearNotas, VideosResponse } from '@/types/domain';
 
 export const dataApi = {
   bootstrap: () => api.get<Bootstrap>('/bootstrap.php'),
@@ -14,7 +14,11 @@ export const dataApi = {
     api.get<Record<string, Nota[]>>(`/calificaciones.php?year=${year}`),
 
   videos: () =>
-    api.get<Record<string, VideoItem[]>>('/videos.php'),
+    api.get<VideosResponse>('/videos.php'),
+
+  /** Inicia el checkout de la Membresía de Videos → devuelve la URL de pago de WooCommerce. */
+  membresiaCheckout: () =>
+    api.post<{ pay_url: string; order_id: number; precio: number }>('/membresia-checkout.php', {}),
 
   pagos: (year: Year) =>
     api.get<Record<string, unknown[]>>(`/pagos.php?year=${year}`),

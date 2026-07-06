@@ -9,6 +9,9 @@ import { VideoModal } from '@/components/media/VideoModal';
 import { useVideos } from '@/hooks/queries';
 import { dayOrderIndex } from '@/lib/utils/days';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { dataApi } from '@/lib/api/data';
+import { MEMBRESIA_VIDEOS } from '@/lib/membresia';
 import type { VideoItem } from '@/types/domain';
 
 function norm(s: string | null | undefined): string {
@@ -20,8 +23,25 @@ export function VideosTab() {
   const q = useVideos(!!user);
   const [active, setActive] = useState<VideoItem | null>(null);
   const [query, setQuery] = useState('');
+  const [unlocking, setUnlocking] = useState(false);
 
-  const data = useMemo(() => (q.data ?? {}) as Record<string, VideoItem[]>, [q.data]);
+  const data = useMemo(() => q.data?.videos ?? {}, [q.data]);
+  const membresia = q.data?.membresia;
+  const unlockPrice = membresia?.reservo
+    ? MEMBRESIA_VIDEOS.precioReserva
+    : MEMBRESIA_VIDEOS.precioRegular;
+
+  async function handleUnlock() {
+    if (unlocking) return;
+    setUnlocking(true);
+    try {
+      const { pay_url } = await dataApi.membresiaCheckout();
+      window.location.href = pay_url;
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo iniciar el pago.');
+      setUnlocking(false);
+    }
+  }
 
   const byYearAll = useMemo(() => {
     const years = Object.keys(data).sort((a, b) => Number(b) - Number(a));
@@ -88,6 +108,32 @@ export function VideosTab() {
     <div className="space-y-4 p-4 sm:p-6">
       <StatsCards stats={stats} />
 
+      {membresia && membresia.tiene_kardex && !membresia.pagada && (
+        <div className="flex flex-col gap-3 rounded-xl border border-[rgba(124,58,237,0.35)] bg-[rgba(124,58,237,0.1)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-text-white">Membresía de Videos 2026</p>
+            <p className="mt-0.5 text-xs text-text-65">
+              Accedé a todos tus videos del Festival Danzarte 2026.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleUnlock}
+            disabled={unlocking}
+            className="shrink-0 rounded-full bg-primary-gradient px-5 py-2 text-sm font-bold text-white shadow-[0_4px_16px_rgba(124,58,237,0.45)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
+          >
+            {unlocking ? 'Abriendo pago…' : `Comprar membresía · ${unlockPrice} Bs`}
+          </button>
+        </div>
+      )}
+
+      {membresia?.pagada && (
+        <div className="flex items-center gap-2 rounded-xl border border-[rgba(34,211,238,0.3)] bg-[rgba(34,211,238,0.08)] px-4 py-2.5 text-sm font-medium text-cyan">
+          <span aria-hidden>✓</span>
+          <span>Membresía de Videos activa — tus videos 2026 están desbloqueados.</span>
+        </div>
+      )}
+
       <div
         className="sticky top-[112px] z-20 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6"
         style={{ background: 'var(--bg-base)' }}
@@ -136,14 +182,26 @@ export function VideosTab() {
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {items.map((v) => (
-                <VideoCard key={v.id_inscripcion} video={v} onClick={() => setActive(v)} />
+                <VideoCard
+                  key={v.id_inscripcion}
+                  video={v}
+                  locked={v.bloqueado}
+                  onClick={() => setActive(v)}
+                />
               ))}
             </div>
           </DayGroup>
         ))}
       </div>
 
-      <VideoModal video={active} onClose={() => setActive(null)} />
+      <VideoModal
+        video={active}
+        onClose={() => setActive(null)}
+        preview={active?.bloqueado ?? false}
+        unlockPrice={unlockPrice}
+        onUnlock={handleUnlock}
+        unlocking={unlocking}
+      />
     </div>
   );
 }

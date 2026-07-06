@@ -12,7 +12,13 @@ function buildContextFilter(array $user, bool $includeContacto = false): ?string
     // (registro_de_inscripcion_2026+); las históricas no, por eso es opt-in.
     if ($includeContacto) {
         foreach (parseIdCsv($user['id_contacto'] ?? '') as $id) {
-            $conditions[] = 'id_contacto.eq.' . quoteIfNeeded($id);
+            // id_contacto en las tablas de inscripción es UUID. Los logins de
+            // kárdex traen un id_kardex (hex8) que NO es UUID → si lo metemos en
+            // el filtro, PostgREST responde 22P02 y rompe todo el query. Lo
+            // omitimos; para esos usuarios el scope real es por id_agrupacion.
+            if (preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $id)) {
+                $conditions[] = 'id_contacto.eq.' . quoteIfNeeded($id);
+            }
         }
     }
 

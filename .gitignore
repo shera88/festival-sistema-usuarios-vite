@@ -69,3 +69,6 @@ screenshots/
 
 # credentials (NEVER commit)
 .credentials/
+
+# Videos de prueba — nunca commitear (se hostean en R2)
+*.mp4

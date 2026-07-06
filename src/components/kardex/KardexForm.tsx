@@ -23,6 +23,7 @@ import {
 import { AgrupacionInscritasDropdown } from "@/components/kardex/AgrupacionInscritasDropdown";
 import { BailesMultiselect } from "@/components/kardex/BailesMultiselect";
 import { scrollToFirstError } from "@/lib/form-scroll";
+import { MEMBRESIA_VIDEOS } from "@/lib/membresia";
 
 const FIELD_ORDER = [
   "agrupacion",
@@ -375,7 +376,7 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
         </div>
       </div>
 
-      {/* 8b. Membresía de Videos — casilla opcional, +15 Bs al credencial */}
+      {/* 8b. Membresía de Videos — OFERTA: reserva a precio promo antes del festival */}
       <div data-field-anchor="membresia">
         <Controller
           control={control}
@@ -404,13 +405,23 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
                 )}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-foreground">Añadir Membresía de Videos</span>
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">Añadir Membresía de Videos</span>
+                  <span className="rounded-full border border-[rgba(251,191,36,0.4)] bg-[rgba(251,191,36,0.12)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--amber-accent)]">
+                    Oferta
+                  </span>
+                </span>
                 <span className="mt-0.5 block text-xs text-foreground/60">
-                  Acceso a los videos del festival 2026. Suma 15 Bs al costo de la credencial.
+                  Acceso a todos sus videos del festival 2026. Aproveche y reserve su cupo especial antes del festival.
                 </span>
               </span>
-              <span className="shrink-0 rounded-full bg-primary-gradient px-3 py-1 text-xs font-bold text-white">
-                +15 Bs
+              <span className="flex shrink-0 flex-col items-end gap-0.5 leading-none">
+                <span className="text-xs font-medium text-foreground/40 line-through">
+                  {MEMBRESIA_VIDEOS.precioRegular} Bs
+                </span>
+                <span className="rounded-full bg-primary-gradient px-3 py-1 text-sm font-bold text-white">
+                  {MEMBRESIA_VIDEOS.precioReserva} Bs
+                </span>
               </span>
             </button>
           )}
