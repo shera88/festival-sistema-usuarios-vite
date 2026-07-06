@@ -62,6 +62,24 @@ foreach ($ALLOWED as $field) {
     }
 }
 
+// Bailes (jsonb array de {id_inscripcion, nombre_de_la_obra}) + bailes_ids (jsonb
+// array de id_inscripcion, derivado). Se manejan aparte del whitelist de strings.
+if (array_key_exists('bailes', $patchIn)) {
+    $raw = is_array($patchIn['bailes']) ? $patchIn['bailes'] : [];
+    $bailes = [];
+    $ids = [];
+    foreach ($raw as $item) {
+        if (!is_array($item) || empty($item['id_inscripcion'])) continue;
+        $bailes[] = [
+            'id_inscripcion'    => (string)$item['id_inscripcion'],
+            'nombre_de_la_obra' => (string)($item['nombre_de_la_obra'] ?? ''),
+        ];
+        $ids[] = (string)$item['id_inscripcion'];
+    }
+    $patch['bailes']     = $bailes;
+    $patch['bailes_ids'] = $ids;
+}
+
 if (count($patch) === 0) {
     sendJson(['error' => 'Nada para actualizar'], 400);
     exit;

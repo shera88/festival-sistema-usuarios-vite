@@ -56,10 +56,14 @@ $ciudad       = clean_str($_POST['ciudad']             ?? null, 80);
 $edadStr      = clean_str($_POST['edad']               ?? null, 5);
 $ci           = clean_str($_POST['ci']                 ?? null, 15);
 
-// Membresía de Videos (checkbox "1"/"0") + bailes seleccionados (JSON del multiselect).
-$membresia    = (($_POST['membresia'] ?? '0') === '1' || strtolower((string)($_POST['membresia'] ?? '')) === 'true');
+// Membresías (checkboxes "1"/"0") + bailes seleccionados (JSON del multiselect).
+$membresia        = (($_POST['membresia'] ?? '0') === '1' || strtolower((string)($_POST['membresia'] ?? '')) === 'true');
+$membresiaPaquete = (($_POST['membresia_paquete'] ?? '0') === '1' || strtolower((string)($_POST['membresia_paquete'] ?? '')) === 'true');
 $bailesArr    = json_decode((string)($_POST['bailes'] ?? '[]'), true);
 if (!is_array($bailesArr)) $bailesArr = [];
+// Lista de id_inscripcion (columna bailes_ids) derivada del multiselect de bailes.
+$bailesIds = [];
+foreach ($bailesArr as $b) { if (is_array($b) && !empty($b['id_inscripcion'])) $bailesIds[] = (string)$b['id_inscripcion']; }
 
 if (mb_strlen($nombre) < 2) jerror(400, 'Nombre y apellido obligatorio');
 if (mb_strlen($agrupacion) < 2) jerror(400, 'Agrupación obligatoria');
@@ -97,6 +101,50 @@ $sb = new SupabaseClient(
     $CFG['storage_bucket']
 );
 
+// ---- Regla de exclusividad: máx 1 agrupación ESCOLAR (colegio/universidad) +
+//      máx 1 BALLET (agrupación/independiente) por bailarín (CI). ----
+// El bucket de una agrupación sale de registro_de_inscripcion_2026.categoria
+// (COLEGIOS/UNIVERSIDADES → ESCOLAR; AGRUPACION → BALLET). Registrarse otra vez
+// en la MISMA agrupación (u otro baile de ella) SÍ se permite; lo que se bloquea
+// es un SEGUNDO colegio/universidad, o un SEGUNDO ballet. Falla-abierto si la
+// agrupación destino no tiene inscripciones 2026 (bucket desconocido).
+if ($idAgrupacion && ctype_digit($ci)) {
+    $bucketOf = static function (?string $cat): ?string {
+        if ($cat === 'COLEGIOS' || $cat === 'UNIVERSIDADES') return 'ESCOLAR';
+        if ($cat === 'AGRUPACION') return 'BALLET';
+        return null;
+    };
+    $insTarget = $sb->selectRaw('registro_de_inscripcion_2026',
+        'select=categoria&id_agrupacion=eq.' . rawurlencode($idAgrupacion) . '&limit=50');
+    $targetBucket = null;
+    if (is_array($insTarget)) {
+        foreach ($insTarget as $r) { $b = $bucketOf($r['categoria'] ?? null); if ($b) { $targetBucket = $b; break; } }
+    }
+    if ($targetBucket !== null) {
+        $mineRows = $sb->selectRaw('registro_kardex_2026',
+            'select=id_agrupacion&ci=eq.' . (int)$ci . '&id_agrupacion=not.is.null&limit=1000');
+        $mine = [];
+        if (is_array($mineRows)) {
+            foreach ($mineRows as $r) { $a = $r['id_agrupacion'] ?? null; if ($a) $mine[$a] = true; }
+        }
+        // Ya figura en la agrupación destino (misma agrupación / otro baile) → permitido.
+        if (!isset($mine[$idAgrupacion]) && $mine) {
+            $inList = implode(',', array_map(fn($a) => '"' . rawurlencode($a) . '"', array_keys($mine)));
+            $insOthers = $sb->selectRaw('registro_de_inscripcion_2026',
+                'select=id_agrupacion,categoria&id_agrupacion=in.(' . $inList . ')&limit=1000');
+            if (is_array($insOthers)) {
+                foreach ($insOthers as $r) {
+                    if ($bucketOf($r['categoria'] ?? null) === $targetBucket) {
+                        jerror(409, $targetBucket === 'ESCOLAR'
+                            ? 'Este bailarín ya está registrado en otro colegio o universidad. Un bailarín solo puede estar en uno.'
+                            : 'Este bailarín ya está registrado en otro ballet o agrupación. Un bailarín solo puede estar en uno.');
+                    }
+                }
+            }
+        }
+    }
+}
+
 try {
     // Snapshot PRE-INSERT de "todo lo relacionado a la persona/agrupación".
     // Se hace ANTES del INSERT para que el flag es_nuevo refleje el estado
@@ -131,7 +179,9 @@ try {
         'estado'              => 'PENDIENTE',
         'id_contacto'         => $idContactoUuid,
         'membresia'           => $membresia,
+        'membresia_paquete'   => $membresiaPaquete,
         'bailes'              => $bailesArr,
+        'bailes_ids'          => $bailesIds,
     ]);
 
     // Lookup id_contacto resuelto.
@@ -187,7 +237,9 @@ try {
             'foto_url'           => $foto_url,
             'estado'             => 'PENDIENTE',
             'membresia'          => $membresia,
+            'membresia_paquete'  => $membresiaPaquete,
             'bailes'             => $bailesArr,
+            'bailes_ids'         => $bailesIds,
         ],
         'relacion'        => $relacion_pre,
         // imagen_persona: foto recién subida tiene prioridad. Kardex siempre tiene foto.

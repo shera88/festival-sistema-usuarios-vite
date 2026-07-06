@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video } from 'lucide-react';
+import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video, Download } from 'lucide-react';
 import { InscripcionPagosPanel } from '@/routes/tabs/PagosTab';
 import type { Inscripcion, Nota } from '@/types/domain';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,8 @@ import { MultimediaDialog } from './MultimediaDialog';
 import { multimediaApi } from '@/lib/api/multimedia';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { generoDeModalidad, GENERO_LABEL } from '@/lib/schemas/inscripcion';
+import { mediaBaseName, mediaDownloadUrl } from '@/lib/utils/mediaName';
+import { extFromUrl, sanitizeFilename } from '@/lib/utils/descargarArchivo';
 
 interface Props {
   insc: Inscripcion;
@@ -94,6 +96,12 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   // Audio: prefiere el de tabla multimedia (nuevo) sobre el legacy musica.
   const audioUrl = insc.audio_url_multimedia || appsheetAudio(insc.musica);
   const vimeoId = extractVimeoId(insc.url_video);
+
+  // Nombre dinámico para descargar audio/video: "01.- Danzarte - The Black Panter - Martes"
+  // (Orden - Agrupación - Obra - Día). Omite orden/día si faltan.
+  const mediaBase = mediaBaseName(insc);
+  const videoUrl = insc.video_led_url_multimedia;
+  const videoFileName = videoUrl ? sanitizeFilename(mediaBase + extFromUrl(videoUrl, '.mp4')) : null;
 
   const chips: { variant: keyof typeof CHIP_STYLE; text: string }[] = [];
   if (insc.categoria) chips.push({ variant: 'cat', text: insc.categoria });
@@ -254,17 +262,35 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                 <Field label="Estado" value={insc.estado} />
                 <Field label="Formato" value={insc.formato_de_inscripcion} />
               </div>
-              {insc.video_led_url_multimedia && (
+              {videoUrl && (
                 <div className="mt-3 rounded-xl border border-fuchsia/25 p-3">
-                  <div
-                    className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase text-fuchsia"
-                    style={{ letterSpacing: '0.5px' }}
-                  >
-                    <Video className="h-3.5 w-3.5" />
-                    Video de la obra
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div
+                      className="flex items-center gap-2 text-[10px] font-medium uppercase text-fuchsia"
+                      style={{ letterSpacing: '0.5px' }}
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      Video Para Pantallas
+                    </div>
+                    {videoUrl && videoFileName && (
+                      <a
+                        href={mediaDownloadUrl(videoUrl, videoFileName)}
+                        download={videoFileName}
+                        className="flex shrink-0 items-center gap-1 rounded-md border border-fuchsia/40 bg-fuchsia/10 px-2 py-1 text-[10px] font-semibold uppercase text-fuchsia transition hover:bg-fuchsia/20"
+                        style={{ letterSpacing: '0.4px' }}
+                      >
+                        <Download className="h-3 w-3" />
+                        Descargar
+                      </a>
+                    )}
                   </div>
+                  {videoFileName && (
+                    <div className="mb-2 truncate text-[11px] text-text-90" title={videoFileName}>
+                      {videoFileName}
+                    </div>
+                  )}
                   <video
-                    src={insc.video_led_url_multimedia}
+                    src={videoUrl}
                     controls
                     preload="metadata"
                     playsInline
@@ -275,7 +301,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
               )}
               {audioUrl && (
                 <div className="mt-3">
-                  <AudioPlayer src={audioUrl} />
+                  <AudioPlayer src={audioUrl} downloadName={mediaBase} />
                 </div>
               )}
               {mmEnabled && (

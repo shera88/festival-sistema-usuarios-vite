@@ -5,6 +5,7 @@ import { X, Save, AlertCircle, Camera } from 'lucide-react';
 import type { KardexRow as KRow } from '@/types/domain';
 import { kardexApi, type KardexEditablePatch } from '@/lib/api/kardex';
 import { webpProxy } from '@/lib/utils/img';
+import { BailesMultiselect, type BaileSel } from '@/components/kardex/BailesMultiselect';
 
 interface Props {
   open: boolean;
@@ -30,6 +31,7 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
     ciudad: '',
     edad: '',
   });
+  const [bailes, setBailes] = useState<BaileSel[]>([]);
   const [saving, setSaving] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [fotoUrl, setFotoUrl] = useState<string | null>(null);
@@ -50,6 +52,16 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
       ciudad: asString(row.ciudad),
       edad: asString(row.edad),
     });
+    setBailes(
+      Array.isArray(row.bailes)
+        ? row.bailes
+            .filter((b) => b && b.id_inscripcion)
+            .map((b) => ({
+              id_inscripcion: String(b.id_inscripcion),
+              nombre_de_la_obra: String(b.nombre_de_la_obra ?? ''),
+            }))
+        : [],
+    );
     setFotoUrl(row.foto ?? null);
     setFotoFailed(false);
     setPendingFile(null);
@@ -122,6 +134,7 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
         ci: form.ci.trim() || null,
         ciudad: form.ciudad.trim() || null,
         edad: form.edad.trim() === '' ? null : Number(form.edad.trim()),
+        bailes,
       };
       await kardexApi.editar(row.id_kardex, patch);
       await qc.invalidateQueries({ queryKey: ['kardex'] });
@@ -301,6 +314,16 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
               className="w-full rounded-md border border-glass-border bg-[rgba(8,5,30,0.6)] px-3 py-2 text-[13px] text-text-white outline-none transition focus:border-cyan focus:bg-[rgba(8,5,30,0.85)]"
             />
           </Field>
+
+          {row.id_agrupacion && (
+            <Field label="Baila en (obras de su agrupación)">
+              <BailesMultiselect
+                idAgrupacion={row.id_agrupacion}
+                value={bailes}
+                onChange={setBailes}
+              />
+            </Field>
+          )}
 
           {errMsg && (
             <div className="flex items-start gap-2 rounded-md border border-red-400/40 bg-red-400/5 px-3 py-2 text-[12px] text-red-400">

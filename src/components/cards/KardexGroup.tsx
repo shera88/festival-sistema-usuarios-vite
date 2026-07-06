@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Lock } from 'lucide-react';
 import type { KardexRow as KRow, Year } from '@/types/domain';
-import { KardexRow } from './KardexRow';
+import { KardexObraGroups } from './KardexObraGroups';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { kardexApi } from '@/lib/api/kardex';
 import { webpProxy } from '@/lib/utils/img';
@@ -212,17 +212,12 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
 
       {open && (
         <div className="border-t border-glass-border anim-fade-in">
-          {sortedRows.map((r, i) => (
-            <KardexRow
-              key={r.id_kardex ?? i}
-              row={r}
-              canDelete={canEdit}
-              canEdit={canEdit}
-              isCurrentYear={isCurrentYear}
-              locked={cerrada}
-            />
-          ))}
-
+          <KardexObraGroups
+            rows={sortedRows}
+            canEdit={canEdit}
+            isCurrentYear={isCurrentYear}
+            locked={cerrada}
+          />
         </div>
       )}
 

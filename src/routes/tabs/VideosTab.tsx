@@ -11,7 +11,7 @@ import { dayOrderIndex } from '@/lib/utils/days';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { dataApi } from '@/lib/api/data';
-import { MEMBRESIA_VIDEOS } from '@/lib/membresia';
+import { MEMBRESIA_VIDEOS, MEMBRESIA_PAQUETE } from '@/lib/membresia';
 import type { VideoItem } from '@/types/domain';
 
 function norm(s: string | null | undefined): string {
@@ -30,12 +30,15 @@ export function VideosTab() {
   const unlockPrice = membresia?.reservo
     ? MEMBRESIA_VIDEOS.precioReserva
     : MEMBRESIA_VIDEOS.precioRegular;
+  const paquetePrice = membresia?.paquete_reservo
+    ? MEMBRESIA_PAQUETE.precioReserva
+    : MEMBRESIA_PAQUETE.precioRegular;
 
-  async function handleUnlock() {
+  async function handleUnlock(tipo: 'videos' | 'paquete' = 'videos') {
     if (unlocking) return;
     setUnlocking(true);
     try {
-      const { pay_url } = await dataApi.membresiaCheckout();
+      const { pay_url } = await dataApi.membresiaCheckout(tipo);
       window.location.href = pay_url;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo iniciar el pago.');
@@ -108,31 +111,62 @@ export function VideosTab() {
     <div className="space-y-4 p-4 sm:p-6">
       <StatsCards stats={stats} />
 
-      {membresia && membresia.tiene_kardex && !membresia.pagada && (
-        <div className="flex flex-col gap-3 rounded-xl border border-[rgba(124,58,237,0.35)] bg-[rgba(124,58,237,0.1)] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-text-white">Membresía de Videos 2026</p>
-            <p className="mt-0.5 text-xs text-text-65">
-              Accedé a todos tus videos del Festival Danzarte 2026.
-            </p>
+      {membresia && membresia.tiene_kardex && !membresia.paquete_pagada && (
+        <>
+          {!membresia.pagada && (
+            <div className="flex flex-col gap-3 rounded-xl border border-[rgba(34,211,238,0.35)] bg-[rgba(34,211,238,0.08)] p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-text-white">Membresía de Videos 2026</p>
+                <p className="mt-0.5 text-xs text-text-65">
+                  Accedé a los videos de tus bailes del Festival Danzarte 2026.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleUnlock('videos')}
+                disabled={unlocking}
+                className="shrink-0 rounded-full bg-primary-gradient px-5 py-2 text-sm font-bold text-white shadow-[0_4px_16px_rgba(124,58,237,0.45)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
+              >
+                {unlocking ? 'Abriendo pago…' : `Comprar · ${unlockPrice} Bs`}
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-3 rounded-xl border border-[rgba(168,85,247,0.4)] bg-[rgba(168,85,247,0.12)] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-text-white">
+                Paquete Completo 2026
+                <span className="rounded-full border border-[rgba(251,191,36,0.4)] bg-[rgba(251,191,36,0.12)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--amber-accent)]">
+                  Oferta
+                </span>
+              </p>
+              <p className="mt-0.5 text-xs text-text-65">
+                Accedé a TODOS los videos del festival, no solo los tuyos.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleUnlock('paquete')}
+              disabled={unlocking}
+              className="shrink-0 rounded-full bg-primary-gradient px-5 py-2 text-sm font-bold text-white shadow-[0_4px_16px_rgba(168,85,247,0.45)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
+            >
+              {unlocking ? 'Abriendo pago…' : `Comprar · ${paquetePrice} Bs`}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleUnlock}
-            disabled={unlocking}
-            className="shrink-0 rounded-full bg-primary-gradient px-5 py-2 text-sm font-bold text-white shadow-[0_4px_16px_rgba(124,58,237,0.45)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
-          >
-            {unlocking ? 'Abriendo pago…' : `Comprar membresía · ${unlockPrice} Bs`}
-          </button>
-        </div>
+        </>
       )}
 
-      {membresia?.pagada && (
+      {membresia?.paquete_pagada ? (
+        <div className="flex items-center gap-2 rounded-xl border border-[rgba(168,85,247,0.4)] bg-[rgba(168,85,247,0.12)] px-4 py-2.5 text-sm font-medium text-[rgb(196,181,253)]">
+          <span aria-hidden>✓</span>
+          <span>Paquete Completo activo — TODOS los videos del festival 2026 desbloqueados.</span>
+        </div>
+      ) : membresia?.pagada ? (
         <div className="flex items-center gap-2 rounded-xl border border-[rgba(34,211,238,0.3)] bg-[rgba(34,211,238,0.08)] px-4 py-2.5 text-sm font-medium text-cyan">
           <span aria-hidden>✓</span>
           <span>Membresía de Videos activa — tus videos 2026 están desbloqueados.</span>
         </div>
-      )}
+      ) : null}
 
       <div
         className="sticky top-[112px] z-20 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6"

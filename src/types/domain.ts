@@ -115,6 +115,15 @@ export interface KardexRow {
   enlace_del_credencial: string | null;
   enlace_del_certificado: string | null;
   verificado?: boolean | null;
+  /** Bailes/obras de la agrupación en los que participa (jsonb `bailes`). */
+  bailes?: { id_inscripcion: string; nombre_de_la_obra: string }[] | null;
+  /** Lista de id_inscripcion de esos bailes (jsonb `bailes_ids`). */
+  bailes_ids?: string[] | null;
+  /** Membresías (para etiqueta junto al nombre). reserva = marcó en el kárdex; pagada = ya pagó. */
+  membresia?: boolean | null;
+  membresia_pagada?: boolean | null;
+  membresia_paquete?: boolean | null;
+  membresia_paquete_pagada?: boolean | null;
 }
 
 export interface Nota {
@@ -159,13 +168,17 @@ export interface VideoItem {
   bloqueado?: boolean;
 }
 
-/** Estado de la Membresía de Videos de la persona logueada (para gating de 2026). */
+/** Estado de las membresías de la persona logueada (para gating de videos 2026). */
 export interface MembresiaEstado {
   id_kardex: string | null;
-  /** Reservó la membresía en el kárdex (marcó el check) → precio 20. */
+  /** Reservó la membresía de Videos en el kárdex → precio 20. */
   reservo: boolean;
-  /** Ya pagó → sus videos 2026 quedan desbloqueados. */
+  /** Pagó la membresía de Videos → SUS videos 2026 desbloqueados. */
   pagada: boolean;
+  /** Reservó el Paquete Completo en el kárdex → precio 40. */
+  paquete_reservo: boolean;
+  /** Pagó el Paquete Completo → TODOS los videos 2026 desbloqueados. */
+  paquete_pagada: boolean;
   /** La persona tiene al menos una fila de kárdex. */
   tiene_kardex: boolean;
 }

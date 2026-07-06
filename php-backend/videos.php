@@ -27,18 +27,29 @@ if ($filter) {
 // Estado de la Membresía de Videos de la persona logueada (resuelto por su carnet).
 $membresia = estadoMembresia($user);
 
-// Videos 2026: se listan (scope de agrupación, incluye id_contacto en 2026+) pero
-// quedan BLOQUEADOS hasta que la membresía esté pagada. La membresía desbloquea
-// TODOS los videos 2026 de su agrupación.
-$filter2026 = buildContextFilter($user, true);
-if ($filter2026) {
-    $qs = $filter2026 . "&url_video=not.is.null&select=$select&limit=300";
+// Videos 2026:
+//  - Paquete Completo pagado → TODOS los videos del festival, desbloqueados.
+//  - Membresía de Videos pagada → los videos de SU agrupación, desbloqueados.
+//  - Ninguna → los de su agrupación, bloqueados (upsell).
+if (!empty($membresia['paquete_pagada'])) {
+    $qs = "url_video=not.is.null&select=$select&order=dia.asc,orden.asc&limit=3000";
     $rows = supabase()->selectRaw('registro_de_inscripcion_2026', $qs);
     if (count($rows) > 0) {
-        $bloqueado = !$membresia['pagada'];
-        foreach ($rows as &$r) { $r['bloqueado'] = $bloqueado; }
+        foreach ($rows as &$r) { $r['bloqueado'] = false; }
         unset($r);
         $videos['2026'] = $rows;
+    }
+} else {
+    $filter2026 = buildContextFilter($user, true);
+    if ($filter2026) {
+        $qs = $filter2026 . "&url_video=not.is.null&select=$select&limit=300";
+        $rows = supabase()->selectRaw('registro_de_inscripcion_2026', $qs);
+        if (count($rows) > 0) {
+            $bloqueado = !$membresia['pagada'];
+            foreach ($rows as &$r) { $r['bloqueado'] = $bloqueado; }
+            unset($r);
+            $videos['2026'] = $rows;
+        }
     }
 }
 
@@ -66,28 +77,35 @@ function estadoMembresia(array $user): array
     try {
         $rows = supabase()->selectRaw(
             'registro_kardex_2026',
-            'select=id_kardex,membresia,membresia_pagada&' . $idFilter . '&limit=50'
+            'select=id_kardex,membresia,membresia_pagada,membresia_paquete,membresia_paquete_pagada&' . $idFilter . '&limit=50'
         );
     } catch (\Throwable $e) {
         return membresiaVacia();
     }
     if (!is_array($rows) || count($rows) === 0) return membresiaVacia();
 
-    $pagada = false; $reservo = false; $idKardex = null;
+    $pagada = false; $reservo = false; $paquetePagada = false; $paqueteReservo = false; $idKardex = null;
     foreach ($rows as $r) {
-        if (!empty($r['membresia_pagada'])) $pagada = true;
-        if (!empty($r['membresia']))        $reservo = true;
+        if (!empty($r['membresia_pagada']))         $pagada = true;
+        if (!empty($r['membresia']))                $reservo = true;
+        if (!empty($r['membresia_paquete_pagada'])) $paquetePagada = true;
+        if (!empty($r['membresia_paquete']))        $paqueteReservo = true;
         if ($idKardex === null && !empty($r['id_kardex'])) $idKardex = (string)$r['id_kardex'];
     }
     return [
-        'id_kardex'    => $idKardex,
-        'reservo'      => $reservo,
-        'pagada'       => $pagada,
-        'tiene_kardex' => true,
+        'id_kardex'       => $idKardex,
+        'reservo'         => $reservo,
+        'pagada'          => $pagada,
+        'paquete_reservo' => $paqueteReservo,
+        'paquete_pagada'  => $paquetePagada,
+        'tiene_kardex'    => true,
     ];
 }
 
 function membresiaVacia(): array
 {
-    return ['id_kardex' => null, 'reservo' => false, 'pagada' => false, 'tiene_kardex' => false];
+    return [
+        'id_kardex' => null, 'reservo' => false, 'pagada' => false,
+        'paquete_reservo' => false, 'paquete_pagada' => false, 'tiene_kardex' => false,
+    ];
 }

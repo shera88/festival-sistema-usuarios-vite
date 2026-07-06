@@ -33,6 +33,8 @@ export type KardexEditablePatch = Partial<{
   ciudad: string | null;
   edad: number | string | null;
   cargo: string | null;
+  /** Bailes en los que participa — el backend deriva bailes_ids de acá. */
+  bailes: { id_inscripcion: string; nombre_de_la_obra: string }[];
 }>;
 
 export interface KardexEditarRes {

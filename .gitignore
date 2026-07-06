@@ -72,3 +72,6 @@ screenshots/
 
 # Videos de prueba — nunca commitear (se hostean en R2)
 *.mp4
+
+# Backups de reconciliación (artefactos, no fuente)
+migrations/backup_*.csv

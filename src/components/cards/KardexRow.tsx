@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, MessageCircle, Trash2, Pencil, BadgeCheck, X, Loader2 } from 'lucide-react';
+import { ChevronDown, MessageCircle, Trash2, Pencil, BadgeCheck, X, Loader2, Music2, Video, Crown } from 'lucide-react';
 import type { KardexRow as KRow } from '@/types/domain';
 import { whatsappLink } from '@/lib/utils/whatsapp';
 import { webpProxy } from '@/lib/utils/img';
@@ -9,6 +9,14 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { EditKardexDialog } from './EditKardexDialog';
 import { LazyImage } from '@/components/shared/LazyImage';
 import { kardexApi } from '@/lib/api/kardex';
+import { PdfPreviewModal } from '@/components/PdfPreviewModal';
+import { descargarArchivo } from '@/lib/utils/descargarArchivo';
+
+/** URL determinística del PDF de credencial 2026 en Storage (uploads-2026/kardex-pdf). */
+function credencialUrl2026(idKardex: string): string {
+  const base = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  return `${base}/storage/v1/object/public/uploads-2026/kardex-pdf/credencial-${idKardex}.pdf`;
+}
 
 interface Props {
   row: KRow;
@@ -37,6 +45,7 @@ export function KardexRow({
   const [infoMsg, setInfoMsg] = useState<{ title: string; body: string } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHiResLoaded, setPreviewHiResLoaded] = useState(false);
+  const [credPreviewOpen, setCredPreviewOpen] = useState(false);
   const debounceRef = useRef<{
     timer: number | null;
     serverValue: boolean;
@@ -294,7 +303,10 @@ export function KardexRow({
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium text-text-white">{nombre}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[13px] font-medium text-text-white">{nombre}</span>
+            <MembresiaBadge row={row} />
+          </div>
           <div
             className="mt-0.5 truncate text-[10px] uppercase text-text-45"
             style={{ letterSpacing: '0.4px' }}
@@ -401,7 +413,61 @@ export function KardexRow({
             <Detail label="Ciudad" value={row.ciudad} />
             <Detail label="Edad" value={row.edad} />
             <Detail label="Estado" value={row.estado} />
-            {(row.enlace_del_credencial || row.enlace_del_certificado) && (
+
+            {/* Bailes en los que participa (obras de su agrupación) */}
+            {Array.isArray(row.bailes) && row.bailes.length > 0 && (
+              <div className="pt-1.5">
+                <span
+                  className="text-[9px] uppercase text-text-45"
+                  style={{ letterSpacing: '0.5px' }}
+                >
+                  Baila en
+                </span>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {row.bailes.map((b) => (
+                    <span
+                      key={b.id_inscripcion}
+                      className="inline-flex items-center gap-1 rounded-full border border-fuchsia/40 bg-fuchsia/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia"
+                    >
+                      <Music2 className="h-2.5 w-2.5" />
+                      {b.nombre_de_la_obra}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isCurrentYear && hasIdKardex ? (
+              // Año actual (2026): credencial real desde Storage (preview + descarga);
+              // certificado aún no disponible → mensaje.
+              <div className="mt-2 flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCredPreviewOpen(true);
+                  }}
+                  className="rounded-md border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[11px] font-medium text-cyan transition hover:bg-cyan/20"
+                >
+                  Credencial
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInfoMsg({
+                      title: 'Certificado',
+                      body: 'Los certificados se entregarán al finalizar el festival.',
+                    });
+                    setInfoOpen(true);
+                  }}
+                  className="rounded-md border border-fuchsia/40 bg-fuchsia/10 px-2.5 py-1 text-[11px] font-medium text-fuchsia transition hover:bg-fuchsia/20"
+                >
+                  Certificado
+                </button>
+              </div>
+            ) : (row.enlace_del_credencial || row.enlace_del_certificado) ? (
+              // Años pasados: enlaces históricos (Google Doc / PDF) tal cual.
               <div className="mt-2 flex flex-wrap gap-2 pt-1">
                 {row.enlace_del_credencial && (
                   <a
@@ -424,7 +490,7 @@ export function KardexRow({
                   </a>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}
@@ -455,6 +521,19 @@ export function KardexRow({
       />
 
       <EditKardexDialog open={editOpen} row={row} onClose={() => setEditOpen(false)} />
+
+      {credPreviewOpen && row.id_kardex && (
+        <PdfPreviewModal
+          url={credencialUrl2026(row.id_kardex)}
+          title={`Credencial — ${nombre}`}
+          openUrl={credencialUrl2026(row.id_kardex)}
+          actionLabel="Descargar credencial"
+          onAction={() => {
+            void descargarArchivo(credencialUrl2026(row.id_kardex!), `Credencial - ${nombre}.pdf`, 'Credencial');
+          }}
+          onClose={() => setCredPreviewOpen(false)}
+        />
+      )}
 
       {previewOpen && row.foto &&
         createPortal(
@@ -526,6 +605,42 @@ export function KardexRow({
         onClose={() => setInfoOpen(false)}
       />
     </div>
+  );
+}
+
+/**
+ * Etiqueta de membresía junto al nombre. Distingue Paquete Completo (superset)
+ * de la de Videos, y pagada (sólida) de sólo reservada (contorno + "reserva").
+ * El Paquete tiene prioridad si por algún motivo tuviera ambas.
+ */
+function MembresiaBadge({ row }: { row: KRow }) {
+  const paquetePago = !!row.membresia_paquete_pagada;
+  const videosPago = !!row.membresia_pagada;
+  const paqueteRes = !!row.membresia_paquete && !paquetePago;
+  const videosRes = !!row.membresia && !videosPago && !paquetePago && !paqueteRes;
+
+  let cfg: { text: string; cls: string; Icon: typeof Video } | null = null;
+  if (paquetePago) {
+    cfg = { text: 'Paquete', Icon: Crown, cls: 'border-[rgba(168,85,247,0.7)] bg-[rgba(168,85,247,0.18)] text-[rgb(216,180,254)]' };
+  } else if (videosPago) {
+    cfg = { text: 'Videos', Icon: Video, cls: 'border-cyan/60 bg-cyan/15 text-cyan' };
+  } else if (paqueteRes) {
+    cfg = { text: 'Paquete · reserva', Icon: Crown, cls: 'border-[rgba(168,85,247,0.4)] bg-transparent text-[rgba(216,180,254,0.75)]' };
+  } else if (videosRes) {
+    cfg = { text: 'Videos · reserva', Icon: Video, cls: 'border-cyan/35 bg-transparent text-cyan/70' };
+  }
+  if (!cfg) return null;
+
+  const { text, cls, Icon } = cfg;
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[9px] font-semibold uppercase leading-tight ${cls}`}
+      style={{ letterSpacing: '0.3px' }}
+      title={`Membresía: ${text}`}
+    >
+      <Icon className="h-2.5 w-2.5" />
+      {text}
+    </span>
   );
 }
 
