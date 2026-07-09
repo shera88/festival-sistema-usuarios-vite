@@ -16,4 +16,15 @@ $esAdmin = esAdminPagos(parseIdCsv($user['id_contacto'] ?? '')[0] ?? '');
 $_SESSION['user_data']['es_admin'] = $esAdmin;
 $user['es_admin'] = $esAdmin;
 
+// Super admin (supervisión): puede impersonar. Si YA está impersonando, el flag
+// se evalúa sobre el usuario REAL (guardado al iniciar la supervisión), y se
+// expone quién es el real para el banner "Viendo como…" del frontend.
+$impersonando = !empty($_SESSION['real_user']);
+$idReal = $impersonando
+    ? (parseIdCsv($_SESSION['real_user']['id_contacto'] ?? '')[0] ?? '')
+    : (parseIdCsv($user['id_contacto'] ?? '')[0] ?? '');
+$user['es_super_admin'] = esSuperAdmin($idReal);
+$user['impersonando'] = $impersonando;
+$user['real_user_nombre'] = $impersonando ? ($_SESSION['real_user']['nombre_y_apellido'] ?? null) : null;
+
 sendJson(['user' => $user]);

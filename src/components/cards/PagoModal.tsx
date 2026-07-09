@@ -40,9 +40,13 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   const [qrLightbox, setQrLightbox] = useState(false);
   // QR de pago según concepto: credenciales (batch o unitaria) tiene su propio QR;
   // inscripción / convenio de entradas siguen usando el QR de inscripción.
+  // ?v= = cache-buster: los objetos viejos en Storage traían cache-control 1h,
+  // así que sin versión el navegador/CDN sigue sirviendo el QR anterior. Subir el
+  // número al reemplazar el PNG en Storage.
+  const QR_V = '20260708';
   const QR_URL = /credencial/i.test(compromiso?.concepto || '')
-    ? 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-credenciales.png'
-    : 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-inscripcion.png';
+    ? `https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-credenciales.png?v=${QR_V}`
+    : `https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/qr-inscripcion.png?v=${QR_V}`;
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Solo QR habilitado en portal de usuarios

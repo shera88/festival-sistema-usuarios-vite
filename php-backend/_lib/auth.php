@@ -109,6 +109,22 @@ function esAdminPagos(string $idContacto): bool
 }
 
 /**
+ * ¿El id_contacto es SUPER admin (admin_usuarios.super_admin = true, activo)?
+ * Gatea la impersonación de supervisión (impersonar.php): un super admin puede
+ * entrar al panel de cualquier persona para ver lo que esa persona ve.
+ */
+function esSuperAdmin(string $idContacto): bool
+{
+    if ($idContacto === '') return false;
+    require_once __DIR__ . '/supabase.php'; // supabase() (idempotente)
+    $rows = supabase()->selectRaw(
+        'admin_usuarios',
+        'select=id_contacto&activo=eq.true&super_admin=eq.true&id_contacto=eq.' . rawurlencode($idContacto) . '&limit=1'
+    );
+    return is_array($rows) && count($rows) > 0;
+}
+
+/**
  * ¿El usuario de sesión es administrador? Fast path por el flag de sesión
  * (lo setean login.php / me.php), con fallback a admin_usuarios para sesiones
  * legacy. Los admins pueden gestionar multimedia/pagos de CUALQUIER agrupación.
@@ -119,6 +135,33 @@ function usuarioEsAdmin(array $user): bool
     require_once __DIR__ . '/context.php'; // parseIdCsv (idempotente)
     $idContacto = parseIdCsv($user['id_contacto'] ?? '')[0] ?? '';
     return $idContacto !== '' && esAdminPagos($idContacto);
+}
+
+/**
+ * ¿La sesión tiene permisos de admin EFECTIVOS?
+ *
+ * Igual que usuarioEsAdmin() pero además contempla la SUPERVISIÓN: cuando un
+ * super admin está impersonando a otra persona, la sesión activa es la del
+ * destino (que puede NO ser admin), pero quien opera sigue siendo el super
+ * admin → conserva el bypass. Sin esto, el frontend mostraría los controles
+ * (usa es_super_admin del usuario real) pero el backend los rechazaría con 403.
+ */
+function sesionEsAdmin(): bool
+{
+    startSecureSession();
+    $u = $_SESSION['user_data'] ?? [];
+    if (is_array($u) && usuarioEsAdmin($u)) return true;
+
+    // Supervisando: el usuario REAL (guardado al iniciar la supervisión).
+    $real = $_SESSION['real_user'] ?? null;
+    if (is_array($real)) {
+        require_once __DIR__ . '/context.php'; // parseIdCsv (idempotente)
+        $idReal = parseIdCsv($real['id_contacto'] ?? '')[0] ?? '';
+        if ($idReal !== '' && (esAdminPagos($idReal) || esSuperAdmin($idReal))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function requireMethod(string $method): void

@@ -22,6 +22,12 @@ export interface User {
   puede_editar?: boolean;
   /** True si el id_contacto está en admin_usuarios.activo (resuelto on-demand en me.php). */
   es_admin?: boolean;
+  /** True si el usuario REAL es super admin (admin_usuarios.super_admin) → puede supervisar. */
+  es_super_admin?: boolean;
+  /** True si la sesión está supervisando a otra persona (impersonar.php). */
+  impersonando?: boolean;
+  /** Nombre del usuario real mientras supervisa (banner "Supervisando como…"). */
+  real_user_nombre?: string | null;
 }
 
 export interface SearchResult {

@@ -194,6 +194,57 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           </button>
         )}
 
+        {mmEnabled && puedeEditar && (
+          <button
+            type="button"
+            onClick={() => setMmOpen(true)}
+            aria-label="Subir multimedia (audio / video)"
+            title={mmConfirmado ? 'Multimedia confirmada' : 'Subir audio / video'}
+            className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-fuchsia/30 bg-fuchsia/10 text-fuchsia transition hover:bg-fuchsia/20"
+          >
+            <Upload className="h-3.5 w-3.5" strokeWidth={2.2} />
+            {!mmConfirmado && !audioUrl && (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 bg-gold"
+                style={{ borderColor: 'var(--bg-card)' }}
+                aria-hidden
+              />
+            )}
+          </button>
+        )}
+
+        {mmEnabled && puedeEditar && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={mmConfirmado}
+            aria-label={mmConfirmado ? 'Multimedia confirmada (bloqueado)' : 'Marcar audio/video como listos'}
+            title={mmConfirmado ? 'Audio/video confirmados' : 'Marcar audio/video como listos'}
+            disabled={confirming}
+            onClick={() => {
+              if (mmConfirmado) {
+                setInfoMsg({
+                  title: 'Multimedia confirmada',
+                  body: 'Esta multimedia ya está confirmada. Contacte al administrador para revertir.',
+                });
+                setInfoOpen(true);
+                return;
+              }
+              setConfirmOpen(true);
+            }}
+            className="relative h-[20px] w-9 shrink-0 cursor-pointer rounded-full border transition disabled:opacity-60"
+            style={{
+              background: mmConfirmado ? 'var(--cyan)' : 'rgba(255,255,255,0.08)',
+              borderColor: mmConfirmado ? 'var(--cyan)' : 'var(--glass-border)',
+            }}
+          >
+            <span
+              className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow transition-all"
+              style={{ left: mmConfirmado ? 'calc(100% - 16px)' : '2px' }}
+            />
+          </button>
+        )}
+
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}

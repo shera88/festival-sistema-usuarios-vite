@@ -62,6 +62,10 @@ export const kardexApi = {
   editar: (id_kardex: string, patch: KardexEditablePatch) =>
     api.post<KardexEditarRes>('/kardex-editar.php', { id_kardex, patch }),
 
+  /** Rota FÍSICAMENTE la foto (giro horario 90/180/270) y devuelve la nueva URL. */
+  rotarFoto: (id_kardex: string, grados: 90 | 180 | 270) =>
+    api.post<KardexFotoRes>('/kardex-rotar-foto.php', { id_kardex, grados }),
+
   subirFoto: async (id_kardex: string, file: File): Promise<KardexFotoRes> => {
     const form = new FormData();
     form.append('id_kardex', id_kardex);

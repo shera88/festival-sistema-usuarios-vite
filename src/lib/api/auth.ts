@@ -15,4 +15,11 @@ export const authApi = {
   logout: () => api.post<{ ok: true }>('/logout.php', {}),
 
   me: () => api.get<LoginResponse>('/me.php'),
+
+  /** Supervisión (solo super admin): entra al panel de otra persona. */
+  impersonar: (idContacto: string) =>
+    api.post<{ ok: true; user: User }>('/impersonar.php', { id_contacto: idContacto }),
+
+  /** Vuelve a la cuenta real del super admin. */
+  stopImpersonar: () => api.post<{ ok: true; user: User }>('/impersonar.php', { stop: true }),
 };

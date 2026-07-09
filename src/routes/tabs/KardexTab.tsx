@@ -62,7 +62,10 @@ export function KardexTab() {
     > = {};
     for (const r of filtered) {
       const rawName = r.agrupacion || 'Sin institución';
-      const key = r.id_agrupacion ? `id:${r.id_agrupacion}` : `name:${norm(rawName)}`;
+      // Agrupar SIEMPRE por nombre normalizado: una misma agrupación cuyos rows
+      // vienen unos con id_agrupacion y otros en null (data mixta) se partía en
+      // dos cards. Keyear por nombre las une en una sola.
+      const key = `name:${norm(rawName)}`;
       if (!m[key]) m[key] = { displayName: rawName, logo: r.enlace_del_logo, rows: [] };
       if (!m[key].logo && r.enlace_del_logo) m[key].logo = r.enlace_del_logo;
       m[key].rows.push(r);

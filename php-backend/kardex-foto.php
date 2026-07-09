@@ -65,11 +65,13 @@ if (!$row) {
 }
 $id_agrupacion = (string)($row['id_agrupacion'] ?? '');
 $userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
-if (!in_array($id_agrupacion, $userAgrups, true)) {
+// Admins / super-admin operan sobre CUALQUIER agrupación (igual que multimedia-*).
+$esAdmin = sesionEsAdmin();
+if (!$esAdmin && !in_array($id_agrupacion, $userAgrups, true)) {
     sendJson(['error' => 'No autorizado'], 403);
     exit;
 }
-if (credCerrada($sb, $id_agrupacion, 2026)) {
+if (!$esAdmin && credCerrada($sb, $id_agrupacion, 2026)) {
     sendJson(['error' => 'Agrupación cerrada. Solicite habilitar.'], 423);
     exit;
 }

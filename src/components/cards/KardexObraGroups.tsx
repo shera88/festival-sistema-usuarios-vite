@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Music2, Users } from 'lucide-react';
+import { ChevronDown, Music2, Users, AlertCircle } from 'lucide-react';
 import type { KardexRow as KRow } from '@/types/domain';
 import { KardexRow } from './KardexRow';
 
@@ -128,11 +128,15 @@ function ObraSection({
   const isNone = obra.id === NONE;
   const cargoGroups = useMemo(() => groupByCargo(obra.rows), [obra.rows]);
 
+  const n = obra.rows.length;
   return (
     <div>
+      {/* ── NIVEL 2 · OBRA ── barra de acento + ícono lleno + label fuerte.
+          "Sin baile asignado" en ámbar (bucket que requiere acción). */}
       <div
         role="button"
         tabIndex={0}
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -140,67 +144,78 @@ function ObraSection({
             setOpen((v) => !v);
           }
         }}
-        className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-2.5 text-left transition select-none hover:bg-fuchsia/3 sm:px-4"
-        style={{ background: 'rgba(124,58,237,0.05)' }}
+        className="group flex w-full cursor-pointer items-stretch text-left transition select-none"
       >
         <span
-          className={`grid h-7 w-7 shrink-0 place-items-center rounded-md border ${
-            isNone
-              ? 'border-glass-border text-text-45'
-              : 'border-fuchsia/40 bg-fuchsia/10 text-fuchsia'
-          }`}
-        >
-          <Music2 className="h-3.5 w-3.5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div
-            className="truncate text-[12px] font-semibold uppercase text-text-white"
-            style={{ letterSpacing: '0.4px' }}
-          >
-            {obra.label}
-          </div>
-        </div>
-        <span
-          className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan/40 bg-cyan/10 px-2 py-0.5 text-[10px] font-semibold text-cyan"
-          style={{ letterSpacing: '0.3px' }}
-        >
-          <Users className="h-3 w-3" />
-          {obra.rows.length}
-        </span>
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 transition-transform duration-300 ${
-            open ? 'rotate-180 text-fuchsia' : 'text-text-45'
-          }`}
+          className="w-1 shrink-0 transition-colors"
+          style={{ background: isNone ? 'rgba(232,208,152,0.75)' : 'rgba(217,70,239,0.75)' }}
         />
+        <div
+          className="flex flex-1 items-center gap-3 px-3 py-3 transition group-hover:brightness-125 sm:px-4"
+          style={{ background: isNone ? 'rgba(232,208,152,0.06)' : 'rgba(217,70,239,0.06)' }}
+        >
+          <span
+            className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+              isNone ? 'bg-gold/15 text-gold' : 'bg-fuchsia/15 text-fuchsia'
+            }`}
+          >
+            {isNone ? <AlertCircle className="h-[18px] w-[18px]" /> : <Music2 className="h-[18px] w-[18px]" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div
+              className="truncate text-[13px] font-bold uppercase text-text-white"
+              style={{ letterSpacing: '0.5px' }}
+            >
+              {obra.label}
+            </div>
+            <div className="mt-0.5 truncate text-[10px] text-text-45">
+              {isNone ? 'Falta asignar baile' : 'Obra'} · {n} {n === 1 ? 'integrante' : 'integrantes'}
+            </div>
+          </div>
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              isNone ? 'bg-gold/15 text-gold' : 'bg-cyan/12 text-cyan'
+            }`}
+          >
+            <Users className="h-3 w-3" />
+            {n}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 transition-transform duration-300 ${open ? 'rotate-180' : ''} ${
+              isNone ? 'text-gold/80' : 'text-fuchsia/80'
+            }`}
+          />
+        </div>
       </div>
 
       {open && (
         <div className="anim-fade-in">
           {cargoGroups.map((cg) => (
             <div key={cg.key}>
-              <div
-                className="flex items-center justify-between gap-2 border-y border-glass-border bg-black/20 px-4 py-1.5"
-              >
+              {/* ── NIVEL 3 · CARGO ── pill chico indentado + línea divisoria (subordinado). */}
+              <div className="flex items-center gap-2.5 py-2 pl-7 pr-4 sm:pl-8">
                 <span
-                  className="text-[9px] font-semibold uppercase text-text-65"
-                  style={{ letterSpacing: '0.8px' }}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.06] px-2 py-0.5 text-[9px] font-semibold uppercase text-text-65"
+                  style={{ letterSpacing: '0.7px' }}
                 >
                   {cg.label}
+                  <span className="text-text-45">{cg.rows.length}</span>
                 </span>
-                <span className="text-[9px] font-medium text-text-45">
-                  {cg.rows.length}
-                </span>
+                <span className="h-px flex-1 bg-glass-border" />
               </div>
-              {cg.rows.map((r, i) => (
-                <KardexRow
-                  key={`${obra.id}:${r.id_kardex ?? i}`}
-                  row={r}
-                  canDelete={canEdit}
-                  canEdit={canEdit}
-                  isCurrentYear={isCurrentYear}
-                  locked={locked}
-                />
-              ))}
+              {/* ── NIVEL 4 · PERSONAS ── rail izquierdo + indentación (hijos del cargo). */}
+              <div className="ml-7 border-l border-glass-border sm:ml-8">
+                {cg.rows.map((r, i) => (
+                  <KardexRow
+                    key={`${obra.id}:${r.id_kardex ?? i}`}
+                    row={r}
+                    canDelete={canEdit}
+                    canEdit={canEdit}
+                    isCurrentYear={isCurrentYear}
+                    locked={locked}
+                  />
+                ))}
+              </div>
             </div>
           ))}
         </div>

@@ -50,10 +50,13 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
   const initials = initialsOf(agrupacion);
   const showImg = !!logo && !logoFailed;
 
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
+  // El super admin hace todo: edita/rota/verifica/elimina en cualquier
+  // agrupación, incluso si está cerrada (el backend aplica el mismo bypass).
+  const isSuperAdmin = !!user?.es_super_admin;
   const cerrada = (meta?.estado_credenciales ?? '').toLowerCase() === 'completo';
   const isCurrentYear = year === '2026';
-  const canEdit = puedeEditar && isCurrentYear && !cerrada;
+  const canEdit = isCurrentYear && ((puedeEditar && !cerrada) || isSuperAdmin);
   const canClose = puedeEditar && isCurrentYear && !cerrada && !!meta?.id_agrupacion;
 
   const sortedRows = useMemo(
@@ -216,7 +219,7 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
             rows={sortedRows}
             canEdit={canEdit}
             isCurrentYear={isCurrentYear}
-            locked={cerrada}
+            locked={cerrada && !isSuperAdmin}
           />
         </div>
       )}

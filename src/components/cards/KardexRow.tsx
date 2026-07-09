@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, MessageCircle, Trash2, Pencil, BadgeCheck, X, Loader2, Music2, Video, Crown } from 'lucide-react';
+import { ChevronDown, MessageCircle, Trash2, Pencil, BadgeCheck, X, Loader2, Music2, Video, Crown, RotateCcw, RotateCw } from 'lucide-react';
 import type { KardexRow as KRow } from '@/types/domain';
 import { whatsappLink } from '@/lib/utils/whatsapp';
 import { webpProxy } from '@/lib/utils/img';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { EditKardexDialog } from './EditKardexDialog';
+import { BailesMultiselect, type BaileSel } from '@/components/kardex/BailesMultiselect';
 import { LazyImage } from '@/components/shared/LazyImage';
 import { kardexApi } from '@/lib/api/kardex';
 import { PdfPreviewModal } from '@/components/PdfPreviewModal';
@@ -46,6 +47,9 @@ export function KardexRow({
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHiResLoaded, setPreviewHiResLoaded] = useState(false);
   const [credPreviewOpen, setCredPreviewOpen] = useState(false);
+  // Rotación de foto (giro efímero previsualizado por CSS; se persiste al Guardar).
+  const [rot, setRot] = useState(0);
+  const [savingRot, setSavingRot] = useState(false);
   const debounceRef = useRef<{
     timer: number | null;
     serverValue: boolean;
@@ -84,6 +88,40 @@ export function KardexRow({
   const wa = whatsappLink(row.telefono);
   const fotoOpt = webpProxy(row.foto, 96);
   const hasIdKardex = !!row.id_kardex;
+  const canRotar = canEdit && !locked && hasIdKardex && !!row.foto;
+
+  // El giro pendiente se descarta al cerrar el preview o al llegar una foto nueva.
+  useEffect(() => {
+    if (!previewOpen) setRot(0);
+  }, [previewOpen]);
+  useEffect(() => {
+    setRot(0);
+  }, [row.foto]);
+
+  async function handleRotarSave() {
+    if (!row.id_kardex) return;
+    const g = (((rot % 360) + 360) % 360) as 0 | 90 | 180 | 270;
+    if (g !== 90 && g !== 180 && g !== 270) {
+      setRot(0);
+      return;
+    }
+    setSavingRot(true);
+    try {
+      await kardexApi.rotarFoto(row.id_kardex, g);
+      // Nueva URL (objeto nuevo) → refetch pinta la foto ya rotada; reseteamos giro.
+      await qc.invalidateQueries({ queryKey: ['kardex'] });
+      setRot(0);
+      setPreviewHiResLoaded(false);
+    } catch (e) {
+      setInfoMsg({
+        title: 'No se pudo rotar',
+        body: e instanceof Error ? e.message : 'Error al rotar la foto',
+      });
+      setInfoOpen(true);
+    } finally {
+      setSavingRot(false);
+    }
+  }
 
   async function handleDelete() {
     if (!row.id_kardex) return;
@@ -215,6 +253,31 @@ export function KardexRow({
 
   const verified = !!row.verificado;
 
+  // Bailes editables inline (en el desplegable). Al togglear se guarda y el
+  // trigger 012 recalcula `verificado` (sin baile → off; con baile → on).
+  const mapBailes = (bs: KRow['bailes']): BaileSel[] =>
+    Array.isArray(bs) ? bs.map((b) => ({ id_inscripcion: b.id_inscripcion, nombre_de_la_obra: b.nombre_de_la_obra })) : [];
+  const [bailesLocal, setBailesLocal] = useState<BaileSel[]>(() => mapBailes(row.bailes));
+  const [savingBailes, setSavingBailes] = useState(false);
+  useEffect(() => { setBailesLocal(mapBailes(row.bailes)); }, [row.bailes]);
+
+  async function handleBailesChange(next: BaileSel[]) {
+    if (!row.id_kardex) return;
+    const prev = bailesLocal;
+    setBailesLocal(next);            // optimista
+    setSavingBailes(true);
+    try {
+      await kardexApi.editar(row.id_kardex, { bailes: next });
+      await qc.invalidateQueries({ queryKey: ['kardex'] });
+    } catch (e: unknown) {
+      setBailesLocal(prev);          // revertir
+      setInfoMsg({ title: 'No se pudo guardar los bailes', body: e instanceof Error ? e.message : 'Error' });
+      setInfoOpen(true);
+    } finally {
+      setSavingBailes(false);
+    }
+  }
+
   return (
     <div
       className={`border-b border-glass-border transition last:border-b-0 ${
@@ -303,8 +366,8 @@ export function KardexRow({
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-[13px] font-medium text-text-white">{nombre}</span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-[13px] font-medium text-text-white">{nombre}</span>
             <MembresiaBadge row={row} />
           </div>
           <div
@@ -326,6 +389,21 @@ export function KardexRow({
           >
             <MessageCircle className="h-3.5 w-3.5" />
           </a>
+        )}
+
+        {canEdit && hasIdKardex && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditOpen(true);
+            }}
+            aria-label="Editar integrante"
+            title="Editar integrante"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-glass-border text-text-65 transition hover:border-cyan/60 hover:text-cyan"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
         )}
 
         {isCurrentYear && hasIdKardex && (
@@ -371,23 +449,9 @@ export function KardexRow({
 
       {open && (
         <div className="border-t border-glass-border bg-black/20 anim-fade-in">
-          {/* Acciones secundarias */}
-          {(canEdit || canDelete) && (
+          {/* Acciones secundarias (Editar ya está en el header de la fila) */}
+          {canDelete && hasIdKardex && (
             <div className="flex flex-wrap items-center gap-1.5 border-b border-glass-border px-3 py-2.5 sm:px-4">
-              {canEdit && hasIdKardex && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 rounded-md border border-glass-border bg-glass-bg px-2 py-1.5 text-[10px] font-semibold uppercase text-text-65 transition hover:border-cyan/60 hover:text-cyan"
-                  style={{ letterSpacing: '0.5px' }}
-                >
-                  <Pencil className="h-3 w-3" />
-                  Editar
-                </button>
-              )}
               {canDelete && hasIdKardex && (
                 <button
                   type="button"
@@ -414,20 +478,37 @@ export function KardexRow({
             <Detail label="Edad" value={row.edad} />
             <Detail label="Estado" value={row.estado} />
 
-            {/* Bailes en los que participa (obras de su agrupación) */}
-            {Array.isArray(row.bailes) && row.bailes.length > 0 && (
+            {/* Bailes en los que participa (obras de su agrupación).
+                Editable inline si el usuario puede editar; si no, chips de solo
+                lectura con buen contraste. */}
+            {canEdit && hasIdKardex && row.id_agrupacion ? (
               <div className="pt-1.5">
-                <span
-                  className="text-[9px] uppercase text-text-45"
-                  style={{ letterSpacing: '0.5px' }}
-                >
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="text-[9px] uppercase text-text-45" style={{ letterSpacing: '0.5px' }}>
+                    Baila en (obras de su agrupación)
+                  </span>
+                  {savingBailes && (
+                    <span className="inline-flex items-center gap-1 text-[9px] text-cyan">
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" /> Guardando…
+                    </span>
+                  )}
+                </div>
+                <BailesMultiselect
+                  idAgrupacion={row.id_agrupacion}
+                  value={bailesLocal}
+                  onChange={handleBailesChange}
+                />
+              </div>
+            ) : Array.isArray(row.bailes) && row.bailes.length > 0 ? (
+              <div className="pt-1.5">
+                <span className="text-[9px] uppercase text-text-45" style={{ letterSpacing: '0.5px' }}>
                   Baila en
                 </span>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {row.bailes.map((b) => (
                     <span
                       key={b.id_inscripcion}
-                      className="inline-flex items-center gap-1 rounded-full border border-fuchsia/40 bg-fuchsia/10 px-2 py-0.5 text-[10px] font-medium text-fuchsia"
+                      className="inline-flex items-center gap-1 rounded-full border border-cyan/45 bg-cyan/15 px-2 py-0.5 text-[10px] font-semibold text-cyan"
                     >
                       <Music2 className="h-2.5 w-2.5" />
                       {b.nombre_de_la_obra}
@@ -435,7 +516,7 @@ export function KardexRow({
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
 
             {isCurrentYear && hasIdKardex ? (
               // Año actual (2026): credencial real desde Storage (preview + descarga);
@@ -538,7 +619,7 @@ export function KardexRow({
       {previewOpen && row.foto &&
         createPortal(
           <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/90 p-6 anim-fade-in"
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-3 bg-black/90 p-6 anim-fade-in"
             onClick={() => setPreviewOpen(false)}
           >
             <button
@@ -548,13 +629,15 @@ export function KardexRow({
                 setPreviewOpen(false);
               }}
               aria-label="Cerrar"
-              className="absolute right-4 top-4 grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-white/15 bg-black/55 text-white backdrop-blur-md transition hover:border-cyan hover:text-cyan"
+              className="absolute right-4 top-4 z-[220] grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-white/15 bg-black/55 text-white backdrop-blur-md transition hover:border-cyan hover:text-cyan"
             >
               <X className="h-5 w-5" />
             </button>
             <div
               onClick={(e) => e.stopPropagation()}
-              className="relative max-h-[80vh] max-w-full overflow-hidden rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]"
+              className={`relative max-h-[70vh] max-w-full rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)] ${
+                rot % 360 === 0 ? 'overflow-hidden' : 'overflow-visible'
+              }`}
               style={{ background: 'var(--bg-elevated)' }}
             >
               {/* Low-res placeholder ya cacheado (96px del avatar) */}
@@ -575,7 +658,8 @@ export function KardexRow({
                 fetchPriority="high"
                 decoding="async"
                 onLoad={() => setPreviewHiResLoaded(true)}
-                className={`relative block max-h-[80vh] max-w-full transition-opacity duration-200 ${
+                style={{ transform: rot % 360 !== 0 ? `rotate(${rot}deg)` : undefined }}
+                className={`relative block max-h-[70vh] max-w-full transition-all duration-200 ${
                   previewHiResLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
               />
@@ -586,8 +670,61 @@ export function KardexRow({
                 </div>
               )}
             </div>
+
+            {/* Barra de rotación — JUSTO DEBAJO de la foto (solo editable). El
+                giro se previsualiza al instante (CSS) y se persiste al Guardar. */}
+            {canRotar && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="z-[210] flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-1.5 py-1 backdrop-blur-md"
+              >
+                <button
+                  type="button"
+                  onClick={() => setRot((r) => r - 90)}
+                  disabled={savingRot}
+                  aria-label="Girar a la izquierda"
+                  title="Girar a la izquierda"
+                  className="grid h-9 w-9 place-items-center rounded-full text-white transition hover:bg-white/15 disabled:opacity-50"
+                >
+                  <RotateCcw className="h-[18px] w-[18px]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRot((r) => r + 180)}
+                  disabled={savingRot}
+                  aria-label="Girar 180 grados"
+                  title="Girar 180°"
+                  className="grid h-9 min-w-9 place-items-center rounded-full px-2 text-[11px] font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
+                >
+                  180°
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRot((r) => r + 90)}
+                  disabled={savingRot}
+                  aria-label="Girar a la derecha"
+                  title="Girar a la derecha"
+                  className="grid h-9 w-9 place-items-center rounded-full text-white transition hover:bg-white/15 disabled:opacity-50"
+                >
+                  <RotateCw className="h-[18px] w-[18px]" />
+                </button>
+                {rot % 360 !== 0 && (
+                  <button
+                    type="button"
+                    onClick={handleRotarSave}
+                    disabled={savingRot}
+                    className="ml-1 flex h-9 items-center gap-1.5 rounded-full bg-cyan px-3.5 text-[12px] font-bold uppercase text-[#04020F] transition hover:bg-[#66F0FF] disabled:opacity-60"
+                    style={{ letterSpacing: '0.5px' }}
+                  >
+                    {savingRot ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BadgeCheck className="h-3.5 w-3.5" />}
+                    {savingRot ? 'Guardando…' : 'Guardar'}
+                  </button>
+                )}
+              </div>
+            )}
+
             <p
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-[12px] font-medium text-white backdrop-blur-md"
+              className="rounded-full bg-black/60 px-4 py-1.5 text-[12px] font-medium text-white backdrop-blur-md"
               style={{ letterSpacing: '0.3px' }}
             >
               {nombre}

@@ -1,6 +1,12 @@
 <?php
 declare(strict_types=1);
 
+// uploadPublicFile() usa uuidv4() (definido en helpers.php). Se requiere acá
+// para que CUALQUIER endpoint que use el cliente Storage lo tenga disponible,
+// aunque no incluya helpers.php explícitamente (evita "undefined function
+// uuidv4()" — pasaba en kardex-foto.php al cambiar la foto).
+require_once __DIR__ . '/helpers.php';
+
 class SupabaseClient
 {
     public function __construct(

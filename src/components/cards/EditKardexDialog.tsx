@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { X, Save, AlertCircle, Camera } from 'lucide-react';
+import { X, Save, AlertCircle, Camera, RotateCcw, RotateCw, Loader2 } from 'lucide-react';
 import type { KardexRow as KRow } from '@/types/domain';
 import { kardexApi, type KardexEditablePatch } from '@/lib/api/kardex';
 import { webpProxy } from '@/lib/utils/img';
@@ -38,6 +38,8 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
   const [fotoFailed, setFotoFailed] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [rot, setRot] = useState(0);
+  const [savingRot, setSavingRot] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const localUrlRef = useRef<string | null>(null);
 
@@ -66,12 +68,40 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
     setFotoFailed(false);
     setPendingFile(null);
     setPreviewOpen(false);
+    setRot(0);
     if (localUrlRef.current) {
       URL.revokeObjectURL(localUrlRef.current);
       localUrlRef.current = null;
     }
     setErrMsg(null);
   }, [open, row]);
+
+  // El giro pendiente se descarta al cerrar el visor.
+  useEffect(() => {
+    if (!previewOpen) setRot(0);
+  }, [previewOpen]);
+
+  async function handleRotarSave() {
+    if (!row?.id_kardex || pendingFile) return;
+    const g = (((rot % 360) + 360) % 360) as 0 | 90 | 180 | 270;
+    if (g !== 90 && g !== 180 && g !== 270) {
+      setRot(0);
+      return;
+    }
+    setSavingRot(true);
+    setErrMsg(null);
+    try {
+      const res = await kardexApi.rotarFoto(row.id_kardex, g);
+      setFotoUrl(res.foto);
+      setFotoFailed(false);
+      setRot(0);
+      await qc.invalidateQueries({ queryKey: ['kardex'] });
+    } catch (e: unknown) {
+      setErrMsg(e instanceof Error ? e.message : 'Error al rotar la foto');
+    } finally {
+      setSavingRot(false);
+    }
+  }
 
   // Cleanup blob URL al desmontar
   useEffect(() => {
@@ -358,7 +388,7 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
 
       {previewOpen && fotoUrl && (
         <div
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 p-6 anim-fade-in"
+          className="fixed inset-0 z-[300] flex flex-col items-center justify-center gap-3 bg-black/90 p-6 anim-fade-in"
           onClick={(e) => {
             e.stopPropagation();
             setPreviewOpen(false);
@@ -371,7 +401,7 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
               setPreviewOpen(false);
             }}
             aria-label="Cerrar"
-            className="absolute right-4 top-4 grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-md transition hover:border-cyan hover:text-cyan"
+            className="absolute right-4 top-4 z-[320] grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur-md transition hover:border-cyan hover:text-cyan"
           >
             <X className="h-5 w-5" />
           </button>
@@ -380,8 +410,61 @@ export function EditKardexDialog({ open, row, onClose }: Props) {
             alt={form.nombre_y_apellido || 'Foto'}
             onClick={(e) => e.stopPropagation()}
             draggable={false}
-            className="max-h-[80vh] max-w-full rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]"
+            style={{ transform: rot % 360 !== 0 ? `rotate(${rot}deg)` : undefined }}
+            className="max-h-[70vh] max-w-full rounded-2xl shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)] transition-transform duration-200"
           />
+
+          {/* Barra de rotación JUSTO DEBAJO de la foto — sólo sobre la foto ya
+              guardada (no sobre un archivo pendiente sin subir). */}
+          {row.id_kardex && !pendingFile && !fotoUrl.startsWith('blob:') && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="z-[310] flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-1.5 py-1 backdrop-blur-md"
+            >
+              <button
+                type="button"
+                onClick={() => setRot((r) => r - 90)}
+                disabled={savingRot}
+                aria-label="Girar a la izquierda"
+                title="Girar a la izquierda"
+                className="grid h-9 w-9 place-items-center rounded-full text-white transition hover:bg-white/15 disabled:opacity-50"
+              >
+                <RotateCcw className="h-[18px] w-[18px]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setRot((r) => r + 180)}
+                disabled={savingRot}
+                aria-label="Girar 180 grados"
+                title="Girar 180°"
+                className="grid h-9 min-w-9 place-items-center rounded-full px-2 text-[11px] font-bold text-white transition hover:bg-white/15 disabled:opacity-50"
+              >
+                180°
+              </button>
+              <button
+                type="button"
+                onClick={() => setRot((r) => r + 90)}
+                disabled={savingRot}
+                aria-label="Girar a la derecha"
+                title="Girar a la derecha"
+                className="grid h-9 w-9 place-items-center rounded-full text-white transition hover:bg-white/15 disabled:opacity-50"
+              >
+                <RotateCw className="h-[18px] w-[18px]" />
+              </button>
+              {rot % 360 !== 0 && (
+                <button
+                  type="button"
+                  onClick={handleRotarSave}
+                  disabled={savingRot}
+                  className="ml-1 flex h-9 items-center gap-1.5 rounded-full bg-cyan px-3.5 text-[12px] font-bold uppercase text-[#04020F] transition hover:bg-[#66F0FF] disabled:opacity-60"
+                  style={{ letterSpacing: '0.5px' }}
+                >
+                  {savingRot ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                  {savingRot ? 'Guardando…' : 'Guardar'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>,
