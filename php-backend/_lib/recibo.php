@@ -334,7 +334,13 @@ HTML;
  */
 function reciboGenerarPdfBytes(string $html, float $alturaMm = 150): array
 {
-    require_once __DIR__ . '/../vendor/autoload.php';
+    // Guard: require de archivo ausente es fatal uncatchable. Lanzar excepción atrapable
+    // para que el llamador (generación de recibo) lo maneje sin tumbar todo el request.
+    $autoload = __DIR__ . '/../vendor/autoload.php';
+    if (!is_file($autoload)) {
+        throw new \RuntimeException('mPDF no disponible: falta vendor/autoload.php en el backend');
+    }
+    require_once $autoload;
     $tmpDir = sys_get_temp_dir() . '/mpdf-' . getmypid();
     if (!is_dir($tmpDir)) @mkdir($tmpDir, 0777, true);
 
