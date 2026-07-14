@@ -45,11 +45,15 @@ export const DIVISIONES = [
 ] as const;
 
 export const SUBDIVISIONES = [
-  { value: "solo", label: "Solo", hint: "1 integrante", min: 1, max: 1 },
-  { value: "duo", label: "Dúo", hint: "2 integrantes", min: 2, max: 2 },
-  { value: "grupo_pequeno", label: "Grupo Pequeño", hint: "5 a 14", min: 5, max: 14 },
-  { value: "grupo_grande", label: "Grupo Grande", hint: "15 a 60", min: 15, max: 60 },
+  { value: "solo", label: "Solo", hint: "1 integrante", min: 1, max: 1, disabled: true },
+  { value: "duo", label: "Dúo", hint: "2 integrantes", min: 2, max: 2, disabled: true },
+  { value: "grupo_pequeno", label: "Grupo Pequeño", hint: "5 a 14", min: 5, max: 14, disabled: false },
+  { value: "grupo_grande", label: "Grupo Grande", hint: "15 a 60", min: 15, max: 60, disabled: false },
 ] as const;
+
+/** Subdivisiones bloqueadas para la inscripción 2026: Solo y Dúo ya no están
+ *  disponibles. Se muestran en el formulario pero no se pueden seleccionar. */
+export const SUBDIVISIONES_BLOQUEADAS: readonly string[] = SUBDIVISIONES.filter((s) => s.disabled).map((s) => s.value);
 
 export const MODALIDADES = [
   "FOLKLORE ORIENTAL TRADICIONAL",
@@ -201,7 +205,11 @@ export const step2Schema = z
       message: "La cantidad de bailarines no coincide con la subdivisión elegida",
       path: ["cantidad"],
     }
-  );
+  )
+  .refine((data) => !SUBDIVISIONES_BLOQUEADAS.includes(data.subdivision), {
+    message: "Solo y Dúo no están disponibles para inscripción",
+    path: ["subdivision"],
+  });
 
 export const inscripcionSchema = step1Schema.and(step2Schema);
 
