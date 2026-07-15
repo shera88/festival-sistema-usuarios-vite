@@ -11,6 +11,10 @@ import type { Inscripcion, KardexRow, Year } from '@/types/domain';
 
 const YEARS = ['2023', '2024', '2025', '2026'] as const satisfies readonly Year[];
 
+// Normaliza nombre de agrupación: trim + colapsa espacios + mayúsculas + sin acentos.
+const norm = (s: string) =>
+  s.trim().replace(/\s+/g, ' ').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
 export interface AgrupacionMeta {
   id_agrupacion: string | null;
   estado_credenciales: string | null;
@@ -52,10 +56,6 @@ export function KardexTab() {
   }, [rows, search]);
 
   const groups = useMemo(() => {
-    // Agrupa por id_agrupacion cuando exista; sino por nombre normalizado.
-    // Normalize: trim + collapse whitespace + upper + sin acentos.
-    const norm = (s: string) =>
-      s.trim().replace(/\s+/g, ' ').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const m: Record<
       string,
       { displayName: string; logo: string | null; rows: KardexRow[] }
@@ -70,8 +70,19 @@ export function KardexTab() {
       if (!m[key].logo && r.enlace_del_logo) m[key].logo = r.enlace_del_logo;
       m[key].rows.push(r);
     }
+    // Agrupaciones INSCRITAS sin kardex → tarjeta vacía (0 integrantes), para que el
+    // representante las vea y sepa cuáles le faltan cargar. Solo cuando no hay búsqueda.
+    if (!search.trim()) {
+      for (const i of inscripciones) {
+        const rawName = (i.agrupacion || '').trim();
+        if (!rawName) continue;
+        const key = `name:${norm(rawName)}`;
+        if (!m[key]) m[key] = { displayName: rawName, logo: i.enlace_del_logo ?? null, rows: [] };
+        else if (!m[key].logo && i.enlace_del_logo) m[key].logo = i.enlace_del_logo;
+      }
+    }
     return m;
-  }, [filtered]);
+  }, [filtered, inscripciones, search]);
 
   const insts = useMemo(
     () =>
@@ -83,14 +94,17 @@ export function KardexTab() {
 
   const stats = useMemo(() => {
     const totalIntegrantes = rows.length;
-    const agrupaciones = new Set(rows.map((r) => r.agrupacion).filter(Boolean)).size;
+    // Agrupaciones con kardex + inscritas sin kardex (las que aparecen vacías).
+    const setAgr = new Set<string>();
+    for (const r of rows) if (r.agrupacion) setAgr.add(norm(r.agrupacion));
+    for (const i of inscripciones) if (i.agrupacion) setAgr.add(norm(i.agrupacion));
     const cargos = new Set(rows.map((r) => r.cargo).filter(Boolean)).size;
     return [
       { label: `Integrantes ${year}`, value: totalIntegrantes, accent: 'fuchsia' as const },
-      { label: 'Agrupaciones', value: agrupaciones, accent: 'cyan' as const },
+      { label: 'Agrupaciones', value: setAgr.size, accent: 'cyan' as const },
       { label: 'Cargos distintos', value: cargos, accent: 'gold' as const },
     ];
-  }, [rows, year]);
+  }, [rows, inscripciones, year]);
 
   return (
     <div className="space-y-4 p-4 sm:p-6">
