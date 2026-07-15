@@ -24,6 +24,13 @@ const DUR_SUBDIV: Record<string, string> = {
   SOLO: '2:30', DUO: '3:30', 'DÚO': '3:30', 'GRUPO PEQUEÑO': '5:00', 'GRUPO CHICO': '5:00', 'GRUPO GRANDE': '6:30',
 };
 const BUFFER_SEG = 90; // colchón entre bailes (cambio de escenario)
+// Color de encabezado por día — cada programa se distingue por color.
+const DIA_ACCENT: Record<Dia, string> = {
+  MARTES: '#7C3AED', MIERCOLES: '#0891B2', JUEVES: '#CA8A04', VIERNES: '#DB2777',
+};
+const DIA_RGB: Record<Dia, [number, number, number]> = {
+  MARTES: [124, 58, 237], MIERCOLES: [8, 145, 178], JUEVES: [202, 138, 4], VIERNES: [219, 39, 119],
+};
 
 interface ActoRPC {
   id_inscripcion: string;
@@ -33,6 +40,7 @@ interface ActoRPC {
   obra: string | null;
   ciudad: string | null;
   subdivision: string | null;
+  modalidad: string | null;
   dia: string | null;
   bloque: string | null;
   logo_url: string | null;
@@ -144,19 +152,20 @@ export function ProgramaTab() {
         startY: 74,
         rowPageBreak: 'avoid',
         margin: { top: 40, bottom: 34, left: 40, right: 40 },
-        head: [['N', 'Hora', 'Agrupacion', 'Obra', 'Subdiv.', 'Dur.']],
+        head: [['N', 'Agrupacion', 'Obra', 'Modalidad', 'Subdiv.', 'Hora', 'Dur.']],
         body: rows.map((r) => [
           String(r.n).padStart(2, '0'),
-          r.hora,
           r.nombre_agrupacion || r.agrupacion || '',
           r.obra || '',
+          r.modalidad || '',
           (r.subdivision || '').replace('GRUPO ', 'G. '),
+          r.hora,
           r.dur,
         ]),
         styles: { fontSize: 9, cellPadding: 5, overflow: 'linebreak', valign: 'middle', lineColor: [224, 221, 228], lineWidth: 0.5, textColor: [40, 38, 45] },
-        headStyles: { fillColor: [124, 58, 237], textColor: 255, fontSize: 9, halign: 'left', fontStyle: 'bold' },
+        headStyles: { fillColor: DIA_RGB[diaSel], textColor: 255, fontSize: 9, halign: 'left', fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [246, 244, 250] },
-        columnStyles: { 0: { cellWidth: 28, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 46, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 165 }, 3: { cellWidth: 145 }, 4: { cellWidth: 66 }, 5: { cellWidth: 44, halign: 'center' } },
+        columnStyles: { 0: { cellWidth: 24, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 128 }, 2: { cellWidth: 108 }, 3: { cellWidth: 100 }, 4: { cellWidth: 58 }, 5: { cellWidth: 44, halign: 'center', fontStyle: 'bold' }, 6: { cellWidth: 40, halign: 'center' } },
       });
       const base = ('programa-' + DIA_LABEL[diaSel] + '-2026').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const url = URL.createObjectURL(doc.output('blob'));
@@ -196,7 +205,7 @@ export function ProgramaTab() {
               className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
                 active ? 'text-white' : `ring-1 ring-glass-border hover:bg-white/5 ${has ? 'text-text-white' : 'text-text-45'}`
               }`}
-              style={active ? { background: 'var(--purple)' } : undefined}
+              style={active ? { background: DIA_ACCENT[d] } : undefined}
             >
               {DIA_LABEL[d]}
               {has && !active && <span className="ml-1.5 text-[11px] text-text-45">{porDia[d]!.length}</span>}
@@ -225,7 +234,7 @@ export function ProgramaTab() {
         {(porDia[diaSel] ? [diaSel] : []).map((dia) => {
           const rows = porDia[dia]!;
           return (
-            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} actos · inicio ${HORA_INICIO[dia]}`} defaultOpen>
+            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} actos · inicio ${HORA_INICIO[dia]}`} accent={DIA_ACCENT[dia]} defaultOpen>
               <div className="space-y-2">
                 {rows.map((r) => {
                   const nombre = r.nombre_agrupacion || r.agrupacion || 'Agrupación';
