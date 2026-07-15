@@ -20,7 +20,10 @@ if (!isset($_GET['nocache'])) {
     }
 }
 
-$filter = buildContextFilter($user);
+// Las tablas ≤2025 no tienen id_contacto; 2026 sí. Filtro por año para no perder
+// agrupaciones ligadas al representante solo por id_contacto (mismo criterio que kardex/inscripciones).
+$filterBase = buildContextFilter($user);         // históricas (sin id_contacto)
+$filter2026 = buildContextFilter($user, true);   // 2026 (con id_contacto)
 $years = ['2023', '2024', '2025', '2026'];
 $agg = [];
 
@@ -50,16 +53,18 @@ $track = function (string $id, string $nombre, ?string $logo, string $y) use (&$
     }
 };
 
-// 1) Inscripciones donde el user es encargado/director/coreógrafo — paralelo
-if ($filter !== null) {
-    $batch = [];
-    foreach ($years as $y) {
-        $batch[] = [
-            'table' => "registro_de_inscripcion_$y",
-            'qs'    => $filter . '&select=id_agrupacion,agrupacion,enlace_del_logo&limit=2000',
-            '_year' => $y,
-        ];
-    }
+// 1) Inscripciones donde el user es encargado/director/coreógrafo/contacto — paralelo
+$batch = [];
+foreach ($years as $y) {
+    $fy = ((int)$y >= 2026) ? $filter2026 : $filterBase;
+    if ($fy === null) continue;
+    $batch[] = [
+        'table' => "registro_de_inscripcion_$y",
+        'qs'    => $fy . '&select=id_agrupacion,agrupacion,enlace_del_logo&limit=2000',
+        '_year' => $y,
+    ];
+}
+if ($batch) {
     $results = supabase()->selectRawBatch($batch);
     foreach ($batch as $i => $b) {
         foreach (($results[$i] ?? []) as $r) {

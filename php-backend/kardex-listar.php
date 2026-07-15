@@ -15,7 +15,11 @@ if (!in_array($year, ['2023', '2024', '2025', '2026'], true)) {
     exit;
 }
 
-$filter = buildContextFilter($user);
+// id_contacto solo existe en registro_de_inscripcion_2026+ (mismo scope que inscripciones.php).
+// Sin este flag, agrupaciones ligadas al representante solo por id_contacto (no por
+// id_agrupacion/encargado/director/coreografo) quedaban fuera del seed y su kardex nunca se
+// consultaba, aunque tuvieran integrantes cargados.
+$filter = buildContextFilter($user, (int)$year >= 2026);
 if (!$filter) { sendJson([$year => []]); exit; }
 
 $insc = supabase()->selectRaw(
