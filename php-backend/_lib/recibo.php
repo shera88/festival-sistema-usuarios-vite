@@ -167,8 +167,10 @@ function reciboEstimarAltura(array $data): float
         $nFields += (int)floor(mb_strlen((string)$det['obra']) / 38); // wrap aprox a ~72mm
     }
     $nFields++; // Método
-    // Solo credencial agrega la fila "Credenciales" (inscripción/pre-venta ya no
-    // muestran subdivisión/bailarines/entradas — igual que gestión).
+    // Inscripción por participante agrega 2 filas (Tipo + Bailarines); credencial 1 (Credenciales).
+    if ($concepto === 'inscripcion' && (int)($det['cantidad'] ?? 0) > 0) {
+        $nFields += 2;
+    }
     if ($esCred && !empty($det['cantidad'])) {
         $nFields++;
     }
@@ -225,7 +227,32 @@ function reciboRenderHtml(array $data): string
     // Credencial NO muestra Saldo/Saldo actual (igual que gestión): solo subtotal + abonado.
     $hasSaldo   = !$esCred && $montoTotal > 0.5;
 
-    $titulo = $esCred ? 'RECIBO DE CREDENCIALES' : 'RECIBO DE INSCRIPCIÓN';
+    // Credencial: si faltara la cantidad, derivarla de monto/precio para que el
+    // recibo SIEMPRE diga cuántas credenciales se están pagando.
+    if ($esCred && $cantidad <= 0 && $monto > 0) {
+        $cantidad = (int) round($monto / ($pu > 0 ? $pu : 15.0));
+    }
+
+    // Tipo de grupo (Solo/Dúo/Grupo Chico/Grupo Grande): prioriza la subdivisión
+    // guardada; si falta, se deriva de la cantidad (mismos rangos que la convocatoria).
+    $tipoGrupo = function (string $subdiv, int $cant): string {
+        $s = mb_strtoupper(trim($subdiv));
+        $map = [
+            'SOLO' => 'Solo', 'DUO' => 'Dúo', 'DÚO' => 'Dúo',
+            'GRUPO CHICO' => 'Grupo Chico', 'GRUPO PEQUEÑO' => 'Grupo Chico', 'GRUPO PEQUENO' => 'Grupo Chico',
+            'GRUPO GRANDE' => 'Grupo Grande',
+        ];
+        if (isset($map[$s])) return $map[$s];
+        if ($cant === 1) return 'Solo';
+        if ($cant === 2) return 'Dúo';
+        if ($cant >= 15) return 'Grupo Grande';
+        if ($cant >= 3) return 'Grupo Chico';
+        return '';
+    };
+
+    $esPreventa = $concepto === 'convenio_entradas';
+    $titulo = $esCred ? 'RECIBO DE CREDENCIALES'
+            : ($esPreventa ? 'RECIBO DE PRE-VENTA' : 'RECIBO DE INSCRIPCIÓN');
     $unidad = $esCred ? 'credenciales' : 'entradas';
 
     // ── Campos inline ──
@@ -233,9 +260,14 @@ function reciboRenderHtml(array $data): string
     $campos .= $kv('Nombre', $nombre);
     $campos .= $kv('Agrupación', $agNombre);
     if ($obra !== '') $campos .= $kv('Obra', $obra);
+    // Inscripción POR PARTICIPANTE: tipo de grupo + cantidad de bailarines.
+    // Pre-venta (convenio_entradas) NO lleva estos campos: el tipo va en el título.
+    if ($concepto === 'inscripcion' && $cantidad > 0) {
+        $campos .= $kv('Tipo', $tipoGrupo($subdiv, $cantidad));
+        $campos .= $kv('Bailarines', (string)$cantidad);
+    }
     $campos .= $kv('Método', $metodo);
-    // Igual que el recibo de gestión: solo las credenciales muestran una fila extra
-    // (cantidad). Inscripción / pre-venta NO muestran subdivisión, bailarines ni entradas.
+    // Credenciales: fila con la cantidad que se está pagando.
     if ($esCred && $cantidad > 0) {
         $campos .= $kv('Credenciales', (string)$cantidad);
     }
@@ -319,7 +351,7 @@ function reciboRenderHtml(array $data): string
   $money
   <div class="solid"></div>
 
-  <div class="center ft"><span class="c1">Coliseo Santa Rosita</span></div>
+  <div class="center ft"><span class="c1">Coliseo Polideportivo UAGRM</span></div>
   <div class="center ft"><span class="c2">Tel: (591) 69485185</span></div>
   <div class="center ft"><span class="c3">festivaldanzarte.com</span></div>
   <div class="accent-thin"></div>
