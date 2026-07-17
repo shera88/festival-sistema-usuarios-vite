@@ -8,8 +8,11 @@
  *
  * Reglas:
  *  - Solo 2026.
- *  - Usuario tiene contexto sobre la agrupación del row.
- *  - Agrupación NO cerrada (423 si lo está).
+ *  - Usuario tiene contexto sobre la agrupación del row, O el registro es SU
+ *    PROPIA fila (ci del row = numero_de_carnet de la sesión, solo dígitos):
+ *    los bailarines con login de kárdex pueden cambiar su foto de perfil.
+ *    Esta excepción aplica SOLO acá (foto), no a editar/eliminar.
+ *  - Agrupación NO cerrada (423 si lo está; admins bypass).
  *  - Imagen ≤ 5 MB, MIME image/{jpeg,png,webp,gif}.
  */
 declare(strict_types=1);
@@ -56,7 +59,7 @@ if (!in_array($mime, $allowed, true)) {
 $sb = supabase();
 $row = $sb->selectOne(
     'registro_kardex_2026',
-    'id_kardex,id_agrupacion',
+    'id_kardex,id_agrupacion,ci',
     ['id_kardex' => "eq.$id_kardex"]
 );
 if (!$row) {
@@ -64,10 +67,23 @@ if (!$row) {
     exit;
 }
 $id_agrupacion = (string)($row['id_agrupacion'] ?? '');
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
+// Set REAL de agrupaciones (primaria + todas las de sus inscripciones).
+$userAgrups = resolveUserAgrupaciones($user);
 // Admins / super-admin operan sobre CUALQUIER agrupación (igual que multimedia-*).
 $esAdmin = sesionEsAdmin();
-if (!$esAdmin && !in_array($id_agrupacion, $userAgrups, true)) {
+$autorizado = $esAdmin || in_array($id_agrupacion, $userAgrups, true);
+if (!$autorizado) {
+    // Excepción "foto propia": si el registro corresponde a la persona logueada
+    // (ci del row = numero_de_carnet de la sesión, comparados solo por dígitos),
+    // puede cambiar su propia foto aunque no gestione la agrupación. Aplica SOLO
+    // a este endpoint (foto), no a editar/eliminar.
+    $ciRow  = preg_replace('/\D/', '', (string)($row['ci'] ?? ''));
+    $ciUser = preg_replace('/\D/', '', (string)($user['numero_de_carnet'] ?? ''));
+    if ($ciRow !== '' && $ciRow === $ciUser) {
+        $autorizado = true;
+    }
+}
+if (!$autorizado) {
     sendJson(['error' => 'No autorizado'], 403);
     exit;
 }

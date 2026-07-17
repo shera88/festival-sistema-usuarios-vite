@@ -6,6 +6,11 @@ function startSecureSession(): void
     if (session_status() === PHP_SESSION_ACTIVE) return;
 
     $cfg = require __DIR__ . '/../config.php';
+    // Sesión de larga vida (config: 7 días). El cookie se renueva en cada request,
+    // pero el GC del servidor (session.gc_maxlifetime, default ~24 min) borraba el
+    // ARCHIVO de sesión por inactividad → el usuario veía "No autenticado" al volver.
+    // Elevamos gc_maxlifetime en runtime (+ .user.ini para el GC del host).
+    @ini_set('session.gc_maxlifetime', (string)(int)$cfg['session_lifetime']);
     // Cookies cross-origin (Capacitor, Vercel) requieren SameSite=None + Secure.
     // Detectamos HTTPS (no permitir None sin Secure).
     $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')

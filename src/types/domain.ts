@@ -79,6 +79,11 @@ export interface Inscripcion {
   multimedia_confirmado?: boolean | null;
   audio_url_multimedia?: string | null;
   video_led_url_multimedia?: string | null;
+  /** Saldo del compromiso por_participante de esta obra (vista deudas_2026,
+   *  solo pagos verificados). null = sin compromiso (p.ej. convenio) o año pasado. */
+  saldo_pago?: number | null;
+  /** 'habilitado' (saldo <= 0) | 'pendiente' (debe) | null (sin dato). Solo 2026. */
+  estado_pago?: 'habilitado' | 'pendiente' | null;
 }
 
 export interface MultimediaArchivo {
@@ -187,6 +192,11 @@ export interface MembresiaEstado {
   paquete_pagada: boolean;
   /** La persona tiene al menos una fila de kárdex. */
   tiene_kardex: boolean;
+  /** Puede comprar la membresía (ya no requiere kárdex). */
+  puede_comprar?: boolean;
+  /** Identidad de sesión que ancla la membresía (id_contacto o id_kardex). */
+  owner_id?: string | null;
+  origen?: string | null;
 }
 
 export interface VideosResponse {

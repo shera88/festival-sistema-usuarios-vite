@@ -29,7 +29,15 @@ FILES = [
     "kardex-editar.php",
     "kardex-verificar.php",
     "kardex-eliminar.php",
+    "impersonar.php",          # supervision super admin (entrar/salir) — faltaba en prod
+    "agrupacion-cerrar.php",   # marcar COMPLETADO / reabrir (estado libre) — scope multi-agrupacion
+    "search-participants.php", # busqueda supervision: tambien por agrupacion
+    "supervisar-directorio.php",  # directorio con roles/dia para el modal supervisar (super admin)
+    "inscripciones.php",       # + saldo_pago/estado_pago por fila (chip habilitado/pendiente)
+    "me.php",                  # devuelve es_super_admin → gatea la UI de supervision (faltaba)
+    "login.php",               # sesion + user_data para el gate super admin
     "_lib/auth.php",           # sesionEsAdmin() + bypass supervision
+    "_lib/context.php",        # resolveUserAgrupaciones (strval keys) — fix 403 agrupaciones num.
     "_lib/regen.php",          # regenCredencial() -> webhook n8n
     "_lib/supabase.php",       # require helpers.php (fix uuidv4 en subir/rotar foto)
 ]

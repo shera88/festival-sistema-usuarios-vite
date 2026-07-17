@@ -92,7 +92,10 @@ if (!$row) {
     exit;
 }
 $id_agrupacion = (string)($row['id_agrupacion'] ?? '');
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
+// Set REAL de agrupaciones (primaria + TODAS las de sus inscripciones): un
+// representante/director/coreógrafo edita todo lo de SUS agrupaciones, no solo
+// la primaria del contacto. Ver context.php::resolveUserAgrupaciones.
+$userAgrups = resolveUserAgrupaciones($user);
 // Admins / super-admin editan CUALQUIER agrupación (igual que multimedia-*).
 $esAdmin = sesionEsAdmin();
 if (!$esAdmin && !in_array($id_agrupacion, $userAgrups, true)) {

@@ -49,7 +49,9 @@ if ($id_agrupacion === '') {
 
 // 2) Verificar contexto del usuario: el id_agrupacion del row debe estar en
 //    los ids del user.
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
+// Set REAL de agrupaciones (primaria + todas las de sus inscripciones): edita
+// todo lo de SUS agrupaciones, no solo la primaria. Ver resolveUserAgrupaciones.
+$userAgrups = resolveUserAgrupaciones($user);
 // Admins / super-admin eliminan de CUALQUIER agrupación (igual que multimedia-*).
 $esAdmin = sesionEsAdmin();
 if (!$esAdmin && !in_array($id_agrupacion, $userAgrups, true)) {

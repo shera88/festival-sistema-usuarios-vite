@@ -161,6 +161,17 @@ try {
     );
 
     $idContactoUuid = $idContacto ?: null;
+    // Si el form no linkeó id_contacto (persona escrita a mano), resolver por
+    // carnet contra contactos global. Solo linkea si el CI da UN único contacto:
+    // reps/dir/coreo/solicitantes SÍ están ahí; bailarines/staff NO → quedan
+    // NULL (correcto: entran por login de kardex, que usa id_kardex).
+    if (!$idContactoUuid && $ci !== null && $ci !== '') {
+        $cand = $sb->selectRaw('festival_contactos_global',
+            'select=id_contacto&numero_de_carnet=eq.' . rawurlencode((string)$ci) . '&limit=2');
+        if (is_array($cand) && count($cand) === 1 && !empty($cand[0]['id_contacto'])) {
+            $idContactoUuid = (string)$cand[0]['id_contacto'];
+        }
+    }
 
     $sb->insert('registro_kardex_2026', [
         'id_kardex'           => $id_kardex,

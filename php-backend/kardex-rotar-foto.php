@@ -60,7 +60,8 @@ if (!$row) {
 }
 
 $id_agrupacion = (string)($row['id_agrupacion'] ?? '');
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
+// Set REAL de agrupaciones (primaria + todas las de sus inscripciones).
+$userAgrups = resolveUserAgrupaciones($user);
 // Admins / super-admin operan sobre CUALQUIER agrupación (mismo criterio que
 // multimedia-*). El resto (coreógrafo/director/representante) sólo las suyas.
 $esAdmin = sesionEsAdmin();

@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
+require __DIR__ . '/_lib/promo.php';
 
 handlePreflight();
 requireMethod('POST');
@@ -52,30 +53,39 @@ if ($tipo === 'paquete') {
     $metaKey       = '_membresia_videos';
 }
 
-$rows = supabase()->selectRaw(
+$sb = supabase();
+$ownerId = $idContacto;   // identidad de sesión: kárdex→id_kardex, contacto→UUID
+$memCol       = ($tipo === 'paquete') ? 'paquete_reservo' : 'reservo';
+$memColPagada = ($tipo === 'paquete') ? 'paquete_pagada'  : 'pagada';
+
+// Kárdex del usuario (OPCIONAL ahora): da reserva (precio promo), pago legacy e
+// id_kardex de referencia. Ya NO se exige tener kárdex para comprar.
+$rows = $sb->selectRaw(
     'registro_kardex_2026',
     'select=id_kardex,' . $colReservo . ',' . $colPagada . '&' . $idFilter . '&limit=50'
 );
-if (!is_array($rows) || count($rows) === 0) {
-    sendJson(['error' => 'No encontramos tu registro de kárdex. Registrá tu kárdex primero.'], 409);
+$reservo = false; $idKardex = null; $yaPagoLegacy = false;
+if (is_array($rows)) {
+    foreach ($rows as $r) {
+        if (!empty($r[$colPagada])) $yaPagoLegacy = true;
+        if (!empty($r[$colReservo])) { $reservo = true; if ($idKardex === null) $idKardex = (string)$r['id_kardex']; }
+    }
+    if ($idKardex === null && count($rows) > 0) $idKardex = (string)$rows[0]['id_kardex'];
+}
+
+// Membresía existente (tabla nueva, fuente de verdad): pago + reserva por owner_id.
+$memExist = $sb->selectOne('membresias_videos_2026',
+    'id,reservo,pagada,paquete_reservo,paquete_pagada',
+    ['owner_id' => 'eq.' . $ownerId]);
+if ($memExist && !empty($memExist[$memCol])) $reservo = true;
+
+if ($yaPagoLegacy || ($memExist && !empty($memExist[$memColPagada]))) {
+    sendJson(['error' => 'Esta membresía ya está pagada.'], 409);
     exit;
 }
 
-// ¿Ya pagó esta membresía? No hay nada que cobrar.
-foreach ($rows as $r) {
-    if (!empty($r[$colPagada])) {
-        sendJson(['error' => 'Esta membresía ya está pagada.'], 409);
-        exit;
-    }
-}
-
-// Reservó = cualquiera de SUS filas con el flag de reserva → precio promo. El
-// id_kardex a marcar: preferí una fila reservada; si no, la primera.
-$reservo = false; $idKardex = null;
-foreach ($rows as $r) {
-    if (!empty($r[$colReservo])) { $reservo = true; if ($idKardex === null) $idKardex = (string)$r['id_kardex']; }
-}
-if ($idKardex === null) $idKardex = (string)$rows[0]['id_kardex'];
+// Promo pre-festival: todos pagan el precio de oferta (reserva) hasta que arranque.
+if (promoMembresiaTodos()) $reservo = true;
 
 $productId = $reservo ? $prodReserva : $prodRegular;
 if ($productId <= 0) { sendJson(['error' => 'El producto de esta membresía no está configurado.'], 500); exit; }
@@ -92,8 +102,10 @@ $payload = [
     ],
     'line_items'  => [['product_id' => $productId, 'quantity' => 1]],
     'meta_data'   => [
-        ['key' => '_id_kardex',   'value' => $idKardex],
+        ['key' => '_id_kardex',   'value' => (string)$idKardex],
         ['key' => '_id_contacto', 'value' => $idContacto],
+        ['key' => '_owner_id',    'value' => $ownerId],
+        ['key' => '_origen',      'value' => $origen],
         ['key' => $metaKey,       'value' => '2026'],
     ],
 ];
@@ -120,6 +132,24 @@ if ($code < 200 || $code >= 300 || empty($order['id'])) {
     ], 502);
     exit;
 }
+
+// Registrar/actualizar la membresía PENDIENTE por owner_id con el order_id, para
+// que el webhook de pago (n8n) la marque pagada por owner_id / order_id.
+$memRow = [
+    'owner_id'    => $ownerId,
+    'origen'      => $origen,
+    'id_kardex'   => $idKardex ?: null,
+    'id_contacto' => ($origen === 'contacto') ? $idContacto : null,
+    'order_id'    => (string)$order['id'],
+    $memCol       => $reservo,   // refleja la reserva real (kárdex), no el click
+];
+try {
+    if ($memExist && !empty($memExist['id'])) {
+        $sb->update('membresias_videos_2026', 'owner_id', $ownerId, $memRow);
+    } else {
+        $sb->insert('membresias_videos_2026', $memRow);
+    }
+} catch (\Throwable $e) { /* no bloquea el checkout */ }
 
 // URL de pago de la orden (pay-for-order de WooCommerce).
 $payUrl = rtrim($wc['site_url'], '/') . '/checkout/order-pay/' . (int)$order['id']

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/hooks/AuthProvider';
@@ -38,7 +39,10 @@ export default function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-          <Toaster theme="dark" position="top-right" />
+          {createPortal(
+            <Toaster theme="dark" position="top-right" style={{ zIndex: 2147483647 }} />,
+            document.body,
+          )}
           <UpdateBanner />
         </AuthProvider>
       </BrowserRouter>

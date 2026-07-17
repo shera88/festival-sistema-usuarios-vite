@@ -23,10 +23,12 @@ export function UserHero({ user }: Props) {
 
   // CTA contextual del header: solo en Inscripciones (→ Nueva Inscripción) y
   // Kardex (→ Nuevo Kardex). En las demás vistas NO aparece ningún botón arriba.
+  // "Nuevo Kardex" solo para quienes gestionan (representante/director/coreógrafo
+  // y staff de kárdex); los bailarines (solo lectura) no lo ven.
   const cta =
     pathname.startsWith('/inscripciones')
       ? { to: '/inscripcion', long: 'Nueva Inscripción', short: 'Inscribir', aria: 'Nueva inscripción', Icon: FilePlus }
-      : pathname.startsWith('/kardex')
+      : pathname.startsWith('/kardex') && puedeEditar
         ? { to: '/kardex-form', long: 'Nuevo Kardex', short: 'Kardex', aria: 'Nuevo kardex', Icon: UserPlus }
         : null;
 

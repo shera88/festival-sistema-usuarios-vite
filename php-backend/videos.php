@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
 require __DIR__ . '/_lib/context.php';
+require __DIR__ . '/_lib/promo.php';
 
 handlePreflight();
 requireMethod('GET');
@@ -64,48 +65,76 @@ sendJson(['videos' => $videos ?: new stdClass(), 'membresia' => $membresia]);
  */
 function estadoMembresia(array $user): array
 {
-    // Resolver por IDENTIDAD DE SESIÓN, no por CI (el CI viene sucio/compartido).
-    // Login de kárdex → id_contacto de sesión ES el id_kardex. Login de contacto →
-    // sus filas de kárdex están vinculadas por id_contacto (UUID).
+    // Ancla = IDENTIDAD DE SESIÓN (owner_id): login kárdex → id_kardex; login
+    // contacto → id_contacto (UUID). La membresía vive en membresias_videos_2026
+    // (desacoplada del kárdex) para que reps/dir/coreo compren SIN kárdex y la
+    // membresía siga sirviendo si después meten kárdex. Se lee tanto la tabla
+    // nueva (fuente de verdad) como los flags legacy del kárdex (compat hacia atrás).
     $idContacto = trim((string)($user['id_contacto'] ?? ''));
     if ($idContacto === '') return membresiaVacia();
-    $origen = $user['origen'] ?? 'contacto';
+    $origen  = $user['origen'] ?? 'contacto';
+    $ownerId = $idContacto;
     $idFilter = ($origen === 'kardex')
         ? 'id_kardex=eq.' . rawurlencode($idContacto)
         : 'id_contacto=eq.' . rawurlencode($idContacto);
 
+    // Reservó + pagos legacy: de las filas de kárdex del usuario (si tiene).
+    $reservo = false; $paqueteReservo = false; $idKardex = null; $tieneKardex = false;
+    $pagada = false; $paquetePagada = false;
     try {
-        $rows = supabase()->selectRaw(
+        $kar = supabase()->selectRaw(
             'registro_kardex_2026',
             'select=id_kardex,membresia,membresia_pagada,membresia_paquete,membresia_paquete_pagada&' . $idFilter . '&limit=50'
         );
-    } catch (\Throwable $e) {
-        return membresiaVacia();
+    } catch (\Throwable $e) { $kar = []; }
+    if (is_array($kar) && count($kar) > 0) {
+        $tieneKardex = true;
+        foreach ($kar as $r) {
+            if (!empty($r['membresia']))                $reservo = true;
+            if (!empty($r['membresia_paquete']))        $paqueteReservo = true;
+            if (!empty($r['membresia_pagada']))         $pagada = true;          // legacy
+            if (!empty($r['membresia_paquete_pagada'])) $paquetePagada = true;   // legacy
+            if ($idKardex === null && !empty($r['id_kardex'])) $idKardex = (string)$r['id_kardex'];
+        }
     }
-    if (!is_array($rows) || count($rows) === 0) return membresiaVacia();
 
-    $pagada = false; $reservo = false; $paquetePagada = false; $paqueteReservo = false; $idKardex = null;
-    foreach ($rows as $r) {
-        if (!empty($r['membresia_pagada']))         $pagada = true;
-        if (!empty($r['membresia']))                $reservo = true;
-        if (!empty($r['membresia_paquete_pagada'])) $paquetePagada = true;
-        if (!empty($r['membresia_paquete']))        $paqueteReservo = true;
-        if ($idKardex === null && !empty($r['id_kardex'])) $idKardex = (string)$r['id_kardex'];
+    // Pago (fuente de verdad): tabla nueva por owner_id.
+    try {
+        $mem = supabase()->selectRaw(
+            'membresias_videos_2026',
+            'select=reservo,pagada,paquete_reservo,paquete_pagada&owner_id=eq.' . rawurlencode($ownerId) . '&limit=1'
+        );
+    } catch (\Throwable $e) { $mem = []; }
+    if (is_array($mem) && count($mem) > 0) {
+        $m = $mem[0];
+        if (!empty($m['pagada']))          $pagada = true;
+        if (!empty($m['paquete_pagada']))  $paquetePagada = true;
+        if (!empty($m['reservo']))         $reservo = true;
+        if (!empty($m['paquete_reservo'])) $paqueteReservo = true;
     }
+
+    // Promo pre-festival: todos ven el precio de oferta (reserva) hasta que arranque.
+    if (promoMembresiaTodos()) { $reservo = true; $paqueteReservo = true; }
+
     return [
         'id_kardex'       => $idKardex,
+        'owner_id'        => $ownerId,
+        'origen'          => $origen,
         'reservo'         => $reservo,
         'pagada'          => $pagada,
         'paquete_reservo' => $paqueteReservo,
         'paquete_pagada'  => $paquetePagada,
-        'tiene_kardex'    => true,
+        'tiene_kardex'    => $tieneKardex,
+        'puede_comprar'   => true,   // ya no se exige kárdex para comprar
     ];
 }
 
 function membresiaVacia(): array
 {
     return [
-        'id_kardex' => null, 'reservo' => false, 'pagada' => false,
-        'paquete_reservo' => false, 'paquete_pagada' => false, 'tiene_kardex' => false,
+        'id_kardex' => null, 'owner_id' => null, 'origen' => null,
+        'reservo' => false, 'pagada' => false,
+        'paquete_reservo' => false, 'paquete_pagada' => false,
+        'tiene_kardex' => false, 'puede_comprar' => false,
     ];
 }

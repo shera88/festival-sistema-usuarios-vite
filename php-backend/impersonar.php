@@ -56,17 +56,34 @@ if ($idReal === '' || !esSuperAdmin($idReal)) {
 }
 
 // Credencial del target (carnet o teléfono) para reusar validate_login.
+// search_login_users devuelve DOS orígenes: 'contacto' (id_contacto real de
+// festival_contactos_global) y 'kardex' (donde el id_contacto ES un id_kardex,
+// gente que NO está en festival_contactos_global). Hay que resolver la credencial
+// del MISMO modo que validate_login, o daría "Persona no encontrada" para kárdex.
+$cred = '';
 $c = supabase()->selectOne(
     'festival_contactos_global',
     'id_contacto,numero_de_carnet,telefono',
     ['id_contacto' => "eq.$target"]
 );
-if (!$c) {
-    sendJson(['error' => 'Persona no encontrada'], 404);
-    exit;
+if ($c) {
+    $cred = trim((string)($c['numero_de_carnet'] ?? ''));
+    if ($cred === '') $cred = trim((string)($c['telefono'] ?? ''));
+} else {
+    // Persona de kárdex: el target es un id_kardex. validate_login la valida por
+    // id_kardex + ci/telefono (solo dígitos).
+    $k = supabase()->selectOne(
+        'registro_kardex_2026',
+        'id_kardex,ci,telefono',
+        ['id_kardex' => "eq.$target"]
+    );
+    if (!$k) {
+        sendJson(['error' => 'Persona no encontrada'], 404);
+        exit;
+    }
+    $cred = preg_replace('/\D/', '', (string)($k['ci'] ?? ''));
+    if ($cred === '') $cred = preg_replace('/\D/', '', (string)($k['telefono'] ?? ''));
 }
-$cred = trim((string)($c['numero_de_carnet'] ?? ''));
-if ($cred === '') $cred = trim((string)($c['telefono'] ?? ''));
 if ($cred === '') {
     sendJson(['error' => 'La persona no tiene carnet ni teléfono registrados'], 422);
     exit;

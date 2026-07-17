@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Download, Loader2, ExternalLink } from 'lucide-react';
+import { X, Download, Loader2, ExternalLink, RefreshCw } from 'lucide-react';
 
 // pdf.js cargado bajo demanda desde CDN (igual que en la gestión). Render de la
 // 1ª página del PDF a un canvas → vista previa tipo "imagen" del recibo/convenio.
@@ -44,6 +44,9 @@ interface Props {
   actionLoading?: boolean;
   /** URL para "abrir en pestaña" (fallback si el render falla). */
   openUrl?: string;
+  /** Si se pasa, muestra un botón "Regenerar" cuando el archivo no carga (no existe). */
+  onRegenerar?: () => void;
+  regenerando?: boolean;
   onClose: () => void;
 }
 
@@ -55,6 +58,8 @@ export function PdfPreviewModal({
   actionLabel = 'Descargar / Abrir',
   actionLoading = false,
   openUrl,
+  onRegenerar,
+  regenerando = false,
   onClose,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -123,14 +128,32 @@ export function PdfPreviewModal({
         <div className="flex flex-1 items-center justify-center overflow-auto p-4" style={{ background: 'rgba(0,0,0,0.3)' }}>
           {loading && <Loader2 className="h-6 w-6 animate-spin text-text-45" />}
           {err && (
-            <a
-              href={openUrl || url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-cyan-400 underline"
-            >
-              <ExternalLink className="h-4 w-4" /> {isImage ? 'Abrir imagen' : 'Abrir PDF'}
-            </a>
+            <div className="flex flex-col items-center gap-3 text-center">
+              <p className="text-sm text-text-45">
+                {onRegenerar
+                  ? 'La credencial aún no está generada.'
+                  : (isImage ? 'No se pudo cargar la imagen.' : 'No se pudo cargar el PDF.')}
+              </p>
+              {onRegenerar && (
+                <button
+                  onClick={onRegenerar}
+                  disabled={regenerando}
+                  className="flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold uppercase text-white transition-transform active:scale-[0.98] disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #6C2EFF 100%)', letterSpacing: '0.6px' }}
+                >
+                  {regenerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  Regenerar credencial
+                </button>
+              )}
+              <a
+                href={openUrl || url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-cyan-400 underline"
+              >
+                <ExternalLink className="h-4 w-4" /> {isImage ? 'Abrir imagen' : 'Abrir PDF'}
+              </a>
+            </div>
           )}
           {isImage ? (
             <img

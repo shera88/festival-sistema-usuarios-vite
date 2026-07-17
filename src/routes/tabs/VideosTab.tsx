@@ -111,15 +111,27 @@ export function VideosTab() {
     <div className="space-y-4 p-4 sm:p-6">
       <StatsCards stats={stats} />
 
-      {membresia && membresia.tiene_kardex && !membresia.paquete_pagada && (
+      {membresia && (membresia.puede_comprar ?? membresia.tiene_kardex) && !membresia.paquete_pagada && (
         <>
           {!membresia.pagada && (
             <div className="flex flex-col gap-3 rounded-xl border border-[rgba(34,211,238,0.35)] bg-[rgba(34,211,238,0.08)] p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-text-white">Membresía de Videos 2026</p>
+                <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-text-white">
+                  Membresía de Videos 2026
+                  {membresia.reservo && (
+                    <span className="rounded-full border border-[rgba(251,191,36,0.45)] bg-[rgba(251,191,36,0.14)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--amber-accent)]">
+                      Oferta −{Math.round((1 - MEMBRESIA_VIDEOS.precioReserva / MEMBRESIA_VIDEOS.precioRegular) * 100)}%
+                    </span>
+                  )}
+                </p>
                 <p className="mt-0.5 text-xs text-text-65">
                   Accedé a los videos de tus bailes del Festival Danzarte 2026.
                 </p>
+                {membresia.reservo && (
+                  <p className="mt-1 text-[11px] font-semibold text-[var(--amber-accent)]">
+                    Precio de preventa · por tiempo limitado
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -127,7 +139,17 @@ export function VideosTab() {
                 disabled={unlocking}
                 className="shrink-0 rounded-full bg-primary-gradient px-5 py-2 text-sm font-bold text-white shadow-[0_4px_16px_rgba(124,58,237,0.45)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
               >
-                {unlocking ? 'Abriendo pago…' : `Comprar · ${unlockPrice} Bs`}
+                {unlocking ? (
+                  'Abriendo pago…'
+                ) : (
+                  <>
+                    Comprar ·{' '}
+                    {membresia.reservo && (
+                      <s className="mr-1 font-normal opacity-60">{MEMBRESIA_VIDEOS.precioRegular} Bs</s>
+                    )}
+                    {unlockPrice} Bs
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -136,13 +158,18 @@ export function VideosTab() {
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-text-white">
                 Paquete Completo 2026
-                <span className="rounded-full border border-[rgba(251,191,36,0.4)] bg-[rgba(251,191,36,0.12)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--amber-accent)]">
-                  Oferta
+                <span className="rounded-full border border-[rgba(251,191,36,0.45)] bg-[rgba(251,191,36,0.14)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--amber-accent)]">
+                  Oferta{membresia.paquete_reservo ? ` −${Math.round((1 - MEMBRESIA_PAQUETE.precioReserva / MEMBRESIA_PAQUETE.precioRegular) * 100)}%` : ''}
                 </span>
               </p>
               <p className="mt-0.5 text-xs text-text-65">
                 Accedé a TODOS los videos del festival, no solo los tuyos.
               </p>
+              {membresia.paquete_reservo && (
+                <p className="mt-1 text-[11px] font-semibold text-[var(--amber-accent)]">
+                  Precio de preventa · por tiempo limitado
+                </p>
+              )}
             </div>
             <button
               type="button"
@@ -150,7 +177,17 @@ export function VideosTab() {
               disabled={unlocking}
               className="shrink-0 rounded-full bg-primary-gradient px-5 py-2 text-sm font-bold text-white shadow-[0_4px_16px_rgba(168,85,247,0.45)] transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
             >
-              {unlocking ? 'Abriendo pago…' : `Comprar · ${paquetePrice} Bs`}
+              {unlocking ? (
+                'Abriendo pago…'
+              ) : (
+                <>
+                  Comprar ·{' '}
+                  {membresia.paquete_reservo && (
+                    <s className="mr-1 font-normal opacity-60">{MEMBRESIA_PAQUETE.precioRegular} Bs</s>
+                  )}
+                  {paquetePrice} Bs
+                </>
+              )}
             </button>
           </div>
         </>

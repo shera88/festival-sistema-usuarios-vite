@@ -10,6 +10,9 @@ import { useInscripciones } from '@/hooks/queries';
 import { useAuth } from '@/hooks/useAuth';
 import { webpProxy } from '@/lib/utils/img';
 
+// Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
+const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
+
 // Días del sorteo + horario de inicio (según la convocatoria).
 const DIAS = ['MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const;
 type Dia = (typeof DIAS)[number];
@@ -24,12 +27,22 @@ const DUR_SUBDIV: Record<string, string> = {
   SOLO: '2:30', DUO: '3:30', 'DÚO': '3:30', 'GRUPO PEQUEÑO': '5:00', 'GRUPO CHICO': '5:00', 'GRUPO GRANDE': '6:30',
 };
 const BUFFER_SEG = 90; // colchón entre bailes (cambio de escenario)
+// Ensayos: mismo orden que la presentación, pero inicio 08:00, 8 min por
+// agrupación + 1 min de puente entre agrupaciones (slot de 9 min).
+const HORA_INICIO_ENSAYO = '08:00';
+const ENSAYO_SEG = 8 * 60;
+const PUENTE_ENSAYO_SEG = 60;
 // Color de encabezado por día — cada programa se distingue por color.
 const DIA_ACCENT: Record<Dia, string> = {
   MARTES: '#7C3AED', MIERCOLES: '#0891B2', JUEVES: '#CA8A04', VIERNES: '#DB2777',
 };
 const DIA_RGB: Record<Dia, [number, number, number]> = {
   MARTES: [124, 58, 237], MIERCOLES: [8, 145, 178], JUEVES: [202, 138, 4], VIERNES: [219, 39, 119],
+};
+// Colores de cabecera por bloque en el PDF (menor vs mayor bien diferenciados).
+const BLOQUE_RGB: Record<'MENOR' | 'MAYOR', [number, number, number]> = {
+  MENOR: [8, 145, 178],   // cian
+  MAYOR: [124, 58, 237],  // violeta
 };
 
 interface ActoRPC {
@@ -46,6 +59,8 @@ interface ActoRPC {
   logo_url: string | null;
   orden: number | null;
   duracion: string | null;
+  categoria: string | null;
+  genero: string | null;
 }
 interface Fila extends ActoRPC {
   n: number;
@@ -83,6 +98,8 @@ export function ProgramaTab() {
   const q = useQuery({ queryKey: ['programa', '2026'], queryFn: fetchPrograma, enabled: !!user, staleTime: 30_000 });
   const inscQ = useInscripciones('2026', !!user);
   const actos = useMemo(() => (q.data ?? []) as ActoRPC[], [q.data]);
+  const [mode, setMode] = useState<'presentacion' | 'ensayo'>('presentacion');
+  const esEnsayo = mode === 'ensayo';
 
   // Set de id_agrupacion propios (del usuario logueado) para resaltar "tus turnos".
   const misAgr = useMemo(() => {
@@ -101,16 +118,16 @@ export function ProgramaTab() {
         delDia.filter((a) => String(a.bloque || '').toUpperCase() === blq).sort((x, y) => (x.orden ?? 0) - (y.orden ?? 0));
       const seq = [...ord('MENOR'), ...ord('MAYOR')];
       if (!seq.length) continue;
-      let cur = hhmmSeg(HORA_INICIO[dia]);
+      let cur = hhmmSeg(esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia]);
       out[dia] = seq.map((a, i) => {
         const hora = segHHMM(cur);
-        const dur = a.duracion || DUR_SUBDIV[String(a.subdivision || '').toUpperCase().trim()] || '5:00';
-        cur += durSeg(dur) + BUFFER_SEG;
+        const dur = esEnsayo ? '8:00' : a.duracion || DUR_SUBDIV[String(a.subdivision || '').toUpperCase().trim()] || '5:00';
+        cur += esEnsayo ? ENSAYO_SEG + PUENTE_ENSAYO_SEG : durSeg(dur) + BUFFER_SEG;
         return { ...a, n: i + 1, hora, dur, mio: a.id_agrupacion ? misAgr.has(String(a.id_agrupacion)) : false };
       });
     }
     return out;
-  }, [actos, misAgr]);
+  }, [actos, misAgr, esEnsayo]);
 
   const diasConProg = DIAS.filter((d) => porDia[d]);
   const totalActos = actos.length;
@@ -141,33 +158,84 @@ export function ProgramaTab() {
     try {
       const { jsPDF } = await import('jspdf');
       await import('jspdf-autotable');
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
       const auto = doc as unknown as { autoTable: (o: unknown) => void; lastAutoTable: { finalY: number } };
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(20, 18, 15);
-      doc.text('Programa de presentacion - ' + DIA_LABEL[diaSel] + ' - XVIII Festival Danzarte 2026', 40, 42);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(120);
-      doc.text('Inicio ' + HORA_INICIO[diaSel] + ' - ' + rows.length + ' actos - ~1:30 entre bailes (horarios aproximados)', 40, 58);
-      doc.setTextColor(0);
-      auto.autoTable({
-        startY: 74,
-        rowPageBreak: 'avoid',
-        margin: { top: 40, bottom: 34, left: 40, right: 40 },
-        head: [['N', 'Agrupacion', 'Obra', 'Modalidad', 'Subdiv.', 'Hora', 'Dur.']],
-        body: rows.map((r) => [
-          String(r.n).padStart(2, '0'),
-          r.nombre_agrupacion || r.agrupacion || '',
-          r.obra || '',
-          r.modalidad || '',
-          (r.subdivision || '').replace('GRUPO ', 'G. '),
-          r.hora,
-          r.dur,
-        ]),
-        styles: { fontSize: 9, cellPadding: 5, overflow: 'linebreak', valign: 'middle', lineColor: [224, 221, 228], lineWidth: 0.5, textColor: [40, 38, 45] },
-        headStyles: { fillColor: DIA_RGB[diaSel], textColor: 255, fontSize: 9, halign: 'left', fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [246, 244, 250] },
-        columnStyles: { 0: { cellWidth: 24, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 128 }, 2: { cellWidth: 108 }, 3: { cellWidth: 100 }, 4: { cellWidth: 58 }, 5: { cellWidth: 44, halign: 'center', fontStyle: 'bold' }, 6: { cellWidth: 40, halign: 'center' } },
-      });
-      const base = ('programa-' + DIA_LABEL[diaSel] + '-2026').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      const W = 210, H = 297;
+      const padL = 18, padR = 18, padT = 46, padB = 34; // header termina ~30.5mm, footer empieza ~30mm del fondo
+
+      // Membrete oficial (header + footer) como fondo full-page, en cada página.
+      const fetchImg = async (u: string): Promise<string | null> => {
+        try {
+          const r = await fetch(u); if (!r.ok) return null;
+          const b = await r.blob();
+          return await new Promise<string | null>((res) => {
+            const fr = new FileReader();
+            fr.onload = () => res(typeof fr.result === 'string' ? fr.result : null);
+            fr.onerror = () => res(null);
+            fr.readAsDataURL(b);
+          });
+        } catch { return null; }
+      };
+      const membrete = await fetchImg(URL_MEMBRETE);
+      const drawMembrete = () => { if (membrete) { try { doc.addImage(membrete, 'PNG', 0, 0, W, H, 'mb', 'FAST'); } catch { /* noop */ } } };
+
+      const capFirst = (s: string | null) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : '—');
+
+      const drawTitulo = () => {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(20, 18, 15);
+        doc.text((esEnsayo ? 'Programa de ensayos' : 'Programa de presentacion') + ' - ' + DIA_LABEL[diaSel] + ' - XVIII Festival Danzarte 2026', padL, padT);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120);
+        doc.text(
+          esEnsayo
+            ? 'Inicio 08:00 - ' + rows.length + ' ensayos - 8 min c/u + 1 min de puente (horarios aproximados)'
+            : 'Inicio ' + HORA_INICIO[diaSel] + ' - ' + rows.length + ' actos - ~1:30 entre bailes (horarios aproximados)',
+          padL, padT + 5,
+        );
+        doc.setDrawColor(...DIA_RGB[diaSel]); doc.setLineWidth(0.6); doc.line(padL, padT + 7, W - padR, padT + 7);
+        doc.setTextColor(0);
+      };
+
+      // Membrete (fondo) UNA vez por página, ANTES de la tabla; título solo en la pág. 1.
+      const paginado = new Set<number>();
+      const onPage = (data: { pageNumber: number }) => {
+        if (paginado.has(data.pageNumber)) return;
+        drawMembrete();
+        if (data.pageNumber === 1) drawTitulo();
+        paginado.add(data.pageNumber);
+      };
+
+      // Bloques MENOR y MAYOR en el MISMO PDF, cada uno con su cabecera de color.
+      let y = padT + 11;
+      for (const blq of ['MENOR', 'MAYOR'] as const) {
+        const rb = rows.filter((r) => String(r.bloque || '').toUpperCase() === blq);
+        if (!rb.length) continue;
+        const color = BLOQUE_RGB[blq];
+        auto.autoTable({
+          startY: y,
+          rowPageBreak: 'avoid',
+          margin: { top: padT, bottom: padB, left: padL, right: padR },
+          willDrawPage: onPage,
+          head: [
+            [{ content: 'BLOQUE ' + blq, colSpan: 6, styles: { fillColor: color, textColor: 255, fontStyle: 'bold', fontSize: 9.5, halign: 'left' } }],
+            ['N', 'Agrupacion', 'Obra', 'Categoria', 'Genero', 'Hora'],
+          ],
+          body: rb.map((r) => [
+            String(r.n).padStart(2, '0'),
+            r.nombre_agrupacion || r.agrupacion || '',
+            r.obra || '',
+            capFirst(r.categoria),
+            capFirst(r.genero),
+            r.hora,
+          ]),
+          styles: { fontSize: 7.5, cellPadding: 1.4, overflow: 'linebreak', valign: 'middle', lineColor: [224, 221, 228], lineWidth: 0.2, textColor: [40, 38, 45] },
+          headStyles: { fillColor: color, textColor: 255, fontSize: 7.5, halign: 'left', fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [246, 244, 250] },
+          columnStyles: { 0: { cellWidth: 9, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 48 }, 2: { cellWidth: 44 }, 3: { cellWidth: 28 }, 4: { cellWidth: 29 }, 5: { cellWidth: 16, halign: 'center', fontStyle: 'bold' } },
+        });
+        y = auto.lastAutoTable.finalY + 6;
+      }
+
+      const base = ((esEnsayo ? 'ensayos-' : 'programa-') + DIA_LABEL[diaSel] + '-2026').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const url = URL.createObjectURL(doc.output('blob'));
       const a = document.createElement('a'); a.href = url; a.download = base + '.pdf'; a.rel = 'noopener';
       document.body.appendChild(a); a.click(); a.remove();
@@ -180,7 +248,9 @@ export function ProgramaTab() {
   return (
     <div className="space-y-4 p-4 sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-[15px] font-bold text-text-white">Programa de presentación</h1>
+        <h1 className="text-[15px] font-bold text-text-white">
+          {esEnsayo ? 'Programa de ensayos' : 'Programa de presentación'}
+        </h1>
         {porDia[diaSel] && (
           <button
             type="button"
@@ -192,6 +262,32 @@ export function ProgramaTab() {
           </button>
         )}
       </div>
+
+      <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-glass-border bg-glass-bg p-1.5 backdrop-blur-md">
+        {([['presentacion', 'Presentación'], ['ensayo', 'Ensayos']] as const).map(([m, label]) => {
+          const active = mode === m;
+          return (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={
+                active
+                  ? 'rounded-xl bg-[linear-gradient(135deg,var(--cyan),var(--fuchsia))] px-2 py-2 text-[13px] font-semibold text-white shadow'
+                  : 'rounded-xl px-2 py-2 text-[13px] font-medium text-text-45 hover:text-text-90'
+              }
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {esEnsayo && (
+        <p className="text-[11px] text-text-45">
+          Ensayos desde las 08:00 · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2 overflow-x-auto rounded-2xl border border-glass-border bg-glass-bg p-3 backdrop-blur-md no-scrollbar">
         {DIAS.map((d) => {
@@ -216,10 +312,6 @@ export function ProgramaTab() {
 
       <StatsCards stats={stats} />
 
-      <div className="rounded-2xl border border-glass-border bg-glass-bg p-4 text-[12px] leading-relaxed text-text-70 backdrop-blur-md">
-        Orden de presentación estimado. Inicio: Martes/Miércoles/Jueves 19:00 · Viernes 15:00. Se considera ~1:30 min entre bailes por cambio de escenario, así que <b>los horarios son aproximados</b>.
-      </div>
-
       {q.isLoading && <LoadingSkeleton rows={3} />}
 
       {!q.isLoading && diasConProg.length === 0 && (
@@ -234,7 +326,7 @@ export function ProgramaTab() {
         {(porDia[diaSel] ? [diaSel] : []).map((dia) => {
           const rows = porDia[dia]!;
           return (
-            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} actos · inicio ${HORA_INICIO[dia]}`} accent={DIA_ACCENT[dia]} defaultOpen>
+            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia]}`} accent={DIA_ACCENT[dia]} defaultOpen>
               <div className="space-y-2">
                 {rows.map((r) => {
                   const nombre = r.nombre_agrupacion || r.agrupacion || 'Agrupación';
@@ -245,12 +337,11 @@ export function ProgramaTab() {
                         r.mio ? 'border-fuchsia/60 bg-fuchsia/10' : 'border-glass-border bg-glass-bg'
                       }`}
                     >
-                      <div className="w-8 shrink-0 text-center text-[15px] font-extrabold text-text-white tabular-nums">
-                        {String(r.n).padStart(2, '0')}
+                      <div className="w-11 shrink-0 text-center text-[12px] font-normal text-gold tabular-nums">
+                        {r.hora}
                       </div>
-                      <div className="w-13 shrink-0 text-center">
-                        <div className="text-[14px] font-bold text-gold tabular-nums">{r.hora}</div>
-                        <div className="text-[10px] text-text-45 tabular-nums">{r.dur}</div>
+                      <div className="w-7 shrink-0 text-center text-[15px] font-extrabold text-text-white tabular-nums">
+                        {String(r.n).padStart(2, '0')}
                       </div>
                       {r.logo_url ? (
                         <img
@@ -271,7 +362,7 @@ export function ProgramaTab() {
                           </span>
                           {r.mio && (
                             <span className="shrink-0 rounded-md border border-fuchsia/40 bg-fuchsia/10 px-1.5 py-px text-[9px] font-bold uppercase text-fuchsia" style={{ letterSpacing: '0.5px' }}>
-                              Tu agrupación
+                              {esEnsayo ? 'Tu ensayo' : 'Tu participación'}
                             </span>
                           )}
                         </div>

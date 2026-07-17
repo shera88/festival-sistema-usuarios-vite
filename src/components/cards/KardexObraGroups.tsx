@@ -6,6 +6,8 @@ import { KardexRow } from './KardexRow';
 interface Props {
   rows: KRow[];
   canEdit?: boolean;
+  /** Rol de gestión (puede_editar / super admin) — gatea verificar/editar/eliminar. */
+  canManage?: boolean;
   isCurrentYear?: boolean;
   locked?: boolean;
 }
@@ -68,7 +70,7 @@ function groupByCargo(rows: KRow[]): CargoGroup[] {
  * Quienes no tienen bailes asignados (staff, dirección, etc.) caen en el grupo
  * "Sin baile asignado".
  */
-export function KardexObraGroups({ rows, canEdit, isCurrentYear, locked }: Props) {
+export function KardexObraGroups({ rows, canEdit, canManage, isCurrentYear, locked }: Props) {
   const buckets = useMemo<ObraBucket[]>(() => {
     const m = new Map<string, ObraBucket>();
     for (const r of rows) {
@@ -96,13 +98,14 @@ export function KardexObraGroups({ rows, canEdit, isCurrentYear, locked }: Props
   }, [rows]);
 
   return (
-    <div className="divide-y divide-glass-border">
+    <div className="space-y-2.5 p-2 sm:p-3">
       {buckets.map((obra, i) => (
         <ObraSection
           key={obra.id}
           obra={obra}
           defaultOpen={i === 0}
           canEdit={canEdit}
+          canManage={canManage}
           isCurrentYear={isCurrentYear}
           locked={locked}
         />
@@ -115,12 +118,14 @@ function ObraSection({
   obra,
   defaultOpen = false,
   canEdit,
+  canManage,
   isCurrentYear,
   locked,
 }: {
   obra: ObraBucket;
   defaultOpen?: boolean;
   canEdit?: boolean;
+  canManage?: boolean;
   isCurrentYear?: boolean;
   locked?: boolean;
 }) {
@@ -130,8 +135,16 @@ function ObraSection({
 
   const n = obra.rows.length;
   return (
-    <div>
-      {/* ── NIVEL 2 · OBRA ── barra de acento + ícono lleno + label fuerte.
+    <div
+      className="overflow-hidden rounded-lg border border-white/10 border-l-2"
+      style={{
+        // Borde izquierdo de acento (fucsia = obra, dorado = sin baile) + fondo
+        // propio elevado para que la sección no se camufle con el card.
+        borderLeftColor: isNone ? 'rgba(232,208,152,0.75)' : 'rgba(217,70,239,0.75)',
+        background: 'rgba(255,255,255,0.03)',
+      }}
+    >
+      {/* ── NIVEL 2 · OBRA ── header con fondo propio + ícono lleno + label fuerte.
           "Sin baile asignado" en ámbar (bucket que requiere acción). */}
       <div
         role="button"
@@ -146,13 +159,11 @@ function ObraSection({
         }}
         className="group flex w-full cursor-pointer items-stretch text-left transition select-none"
       >
-        <span
-          className="w-1 shrink-0 transition-colors"
-          style={{ background: isNone ? 'rgba(232,208,152,0.75)' : 'rgba(217,70,239,0.75)' }}
-        />
         <div
-          className="flex flex-1 items-center gap-3 px-3 py-3 transition group-hover:brightness-125 sm:px-4"
-          style={{ background: isNone ? 'rgba(232,208,152,0.06)' : 'rgba(217,70,239,0.06)' }}
+          className={`flex flex-1 items-center gap-3 px-3 py-3 transition group-hover:brightness-125 sm:px-4 ${
+            open ? 'border-b border-white/10' : ''
+          }`}
+          style={{ background: isNone ? 'rgba(232,208,152,0.12)' : 'rgba(217,70,239,0.12)' }}
         >
           <span
             className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
@@ -195,22 +206,23 @@ function ObraSection({
               {/* ── NIVEL 3 · CARGO ── pill chico indentado + línea divisoria (subordinado). */}
               <div className="flex items-center gap-2.5 py-2 pl-7 pr-4 sm:pl-8">
                 <span
-                  className="inline-flex items-center gap-1.5 rounded-md bg-white/[0.06] px-2 py-0.5 text-[9px] font-semibold uppercase text-text-65"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.10] px-2 py-0.5 text-[9px] font-semibold uppercase text-text-65"
                   style={{ letterSpacing: '0.7px' }}
                 >
                   {cg.label}
                   <span className="text-text-45">{cg.rows.length}</span>
                 </span>
-                <span className="h-px flex-1 bg-glass-border" />
+                <span className="h-px flex-1 bg-white/10" />
               </div>
               {/* ── NIVEL 4 · PERSONAS ── rail izquierdo + indentación (hijos del cargo). */}
-              <div className="ml-7 border-l border-glass-border sm:ml-8">
+              <div className="ml-7 border-l border-white/10 sm:ml-8">
                 {cg.rows.map((r, i) => (
                   <KardexRow
                     key={`${obra.id}:${r.id_kardex ?? i}`}
                     row={r}
                     canDelete={canEdit}
                     canEdit={canEdit}
+                    canManage={canManage}
                     isCurrentYear={isCurrentYear}
                     locked={locked}
                   />

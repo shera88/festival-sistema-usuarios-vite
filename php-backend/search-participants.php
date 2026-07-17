@@ -15,6 +15,27 @@ if (strlen($q) < 1) {
 
 $rows = supabase()->rpc('search_login_users', ['p_query' => $q]);
 
+// Además del RPC (nombre/carnet/teléfono), búsqueda por AGRUPACIÓN: contactos
+// cuya agrupación matchee el texto. Merge + dedupe por id_contacto.
+$porAgrupacion = supabase()->selectRaw(
+    'festival_contactos_global',
+    'select=id_contacto,numero_de_carnet,nombre_y_apellido,telefono,correo_electronico,ciudad,imagen_contacto,id_agrupacion,nombre_agrupacion,enlace_del_logo,rol_primario,es_representante,es_director,es_coreografo,id_original_representante,id_original_director,id_original_coreografo'
+    . '&nombre_agrupacion=ilike.' . rawurlencode('*' . $q . '*')
+    . '&limit=15'
+);
+
+$vistos = [];
+foreach ($rows as $r) {
+    $id = (string)($r['id_contacto'] ?? '');
+    if ($id !== '') $vistos[$id] = true;
+}
+foreach ($porAgrupacion as $r) {
+    $id = (string)($r['id_contacto'] ?? '');
+    if ($id === '' || isset($vistos[$id])) continue;
+    $vistos[$id] = true;
+    $rows[] = $r;
+}
+
 $normalized = array_map(function ($c) {
     return [
         'id'                          => $c['id_contacto'] ?? null,

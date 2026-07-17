@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, MessageCircle, Trash2, Pencil, BadgeCheck, X, Loader2, Music2, Video, Crown, RotateCcw, RotateCw } from 'lucide-react';
+import { ChevronDown, MessageCircle, Trash2, Pencil, BadgeCheck, X, Loader2, Music2, Video, Crown, RotateCcw, RotateCw, Camera } from 'lucide-react';
 import type { KardexRow as KRow } from '@/types/domain';
 import { whatsappLink } from '@/lib/utils/whatsapp';
 import { webpProxy } from '@/lib/utils/img';
@@ -10,6 +10,7 @@ import { EditKardexDialog } from './EditKardexDialog';
 import { BailesMultiselect, type BaileSel } from '@/components/kardex/BailesMultiselect';
 import { LazyImage } from '@/components/shared/LazyImage';
 import { kardexApi } from '@/lib/api/kardex';
+import { useAuth } from '@/hooks/useAuth';
 import { PdfPreviewModal } from '@/components/PdfPreviewModal';
 import { descargarArchivo } from '@/lib/utils/descargarArchivo';
 
@@ -23,6 +24,9 @@ interface Props {
   row: KRow;
   canDelete?: boolean;
   canEdit?: boolean;
+  /** Rol de gestión (puede_editar / super admin). Sin él (bailarines) NO se ve
+   *  el switch de verificar ni editar/eliminar: solo los detalles. */
+  canManage?: boolean;
   /** Año actual de festival (2026+) — controla si se ve switch verificado */
   isCurrentYear?: boolean;
   /** Si la agrupación está cerrada → switch visible pero read-only */
@@ -33,20 +37,25 @@ export function KardexRow({
   row,
   canDelete = false,
   canEdit = false,
+  canManage = false,
   isCurrentYear = false,
   locked = false,
 }: Props) {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [uploadingFoto, setUploadingFoto] = useState(false);
+  const ownFotoInputRef = useRef<HTMLInputElement | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMsg, setInfoMsg] = useState<{ title: string; body: string } | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewHiResLoaded, setPreviewHiResLoaded] = useState(false);
   const [credPreviewOpen, setCredPreviewOpen] = useState(false);
+  const [regenerandoCred, setRegenerandoCred] = useState(false);
   // Rotación de foto (giro efímero previsualizado por CSS; se persiste al Guardar).
   const [rot, setRot] = useState(0);
   const [savingRot, setSavingRot] = useState(false);
@@ -89,6 +98,37 @@ export function KardexRow({
   const fotoOpt = webpProxy(row.foto, 96);
   const hasIdKardex = !!row.id_kardex;
   const canRotar = canEdit && !locked && hasIdKardex && !!row.foto;
+
+  // Fila PROPIA de un usuario solo-lectura (bailarín): puede cambiar SU foto de
+  // perfil (único control visible para él). Match por CI = carnet, solo dígitos.
+  const soloDigitos = (s: unknown) => String(s ?? '').replace(/\D/g, '');
+  const ciUser = soloDigitos(user?.numero_de_carnet);
+  const isOwnRow = ciUser !== '' && soloDigitos(row.ci) === ciUser;
+  const canOwnFoto = !canManage && isOwnRow && isCurrentYear && hasIdKardex && !locked;
+
+  async function handleOwnFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (ownFotoInputRef.current) ownFotoInputRef.current.value = '';
+    if (!file || !row.id_kardex) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setInfoMsg({ title: 'Imagen muy grande', body: 'La imagen supera el máximo de 5 MB.' });
+      setInfoOpen(true);
+      return;
+    }
+    setUploadingFoto(true);
+    try {
+      await kardexApi.subirFoto(row.id_kardex, file);
+      await qc.invalidateQueries({ queryKey: ['kardex'] });
+    } catch (err: unknown) {
+      setInfoMsg({
+        title: 'No se pudo actualizar la foto',
+        body: err instanceof Error ? err.message : 'Error al subir la foto',
+      });
+      setInfoOpen(true);
+    } finally {
+      setUploadingFoto(false);
+    }
+  }
 
   // El giro pendiente se descarta al cerrar el preview o al llegar una foto nueva.
   useEffect(() => {
@@ -406,7 +446,38 @@ export function KardexRow({
           </button>
         )}
 
-        {isCurrentYear && hasIdKardex && (
+        {/* Bailarín (solo lectura) en SU propia fila: único control = cambiar su foto */}
+        {canOwnFoto && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!uploadingFoto) ownFotoInputRef.current?.click();
+              }}
+              aria-label="Cambiar mi foto de perfil"
+              title="Cambiar mi foto de perfil"
+              disabled={uploadingFoto}
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-md border border-glass-border text-text-65 transition hover:border-cyan/60 hover:text-cyan disabled:opacity-60"
+            >
+              {uploadingFoto ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Camera className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <input
+              ref={ownFotoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={handleOwnFotoChange}
+              onClick={(e) => e.stopPropagation()}
+              className="hidden"
+            />
+          </>
+        )}
+
+        {canManage && isCurrentYear && hasIdKardex && (
           <button
             type="button"
             role="switch"
@@ -612,6 +683,25 @@ export function KardexRow({
           onAction={() => {
             void descargarArchivo(credencialUrl2026(row.id_kardex!), `Credencial - ${nombre}.pdf`, 'Credencial');
           }}
+          onRegenerar={async () => {
+            if (!row.id_kardex) return;
+            setRegenerandoCred(true);
+            try {
+              await kardexApi.regenerarCredencial(row.id_kardex);
+              setCredPreviewOpen(false);
+              setInfoMsg({
+                title: 'Regenerando credencial',
+                body: 'La credencial se está generando y quedará vinculada en unos segundos. Volvé a abrirla en un momento.',
+              });
+              setInfoOpen(true);
+            } catch (e) {
+              setInfoMsg({ title: 'No se pudo regenerar', body: (e as Error).message || 'Error al iniciar la regeneración.' });
+              setInfoOpen(true);
+            } finally {
+              setRegenerandoCred(false);
+            }
+          }}
+          regenerando={regenerandoCred}
           onClose={() => setCredPreviewOpen(false)}
         />
       )}

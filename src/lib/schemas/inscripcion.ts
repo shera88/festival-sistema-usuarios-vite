@@ -44,9 +44,13 @@ export const DIVISIONES = [
   { value: "adultos", label: "Adultos", hint: "36+ años" },
 ] as const;
 
+// Solo y Dúo se habilitan temporalmente hasta el 16/07/2026 23:59 (Bolivia, UTC-4).
+// El 17 se re-bloquean SOLOS: el gate es por fecha, no hay que revertir código.
+const SOLO_DUO_DISABLED = Date.now() > new Date("2026-07-16T23:59:59-04:00").getTime();
+
 export const SUBDIVISIONES = [
-  { value: "solo", label: "Solo", hint: "1 integrante", min: 1, max: 1, disabled: true },
-  { value: "duo", label: "Dúo", hint: "2 integrantes", min: 2, max: 2, disabled: true },
+  { value: "solo", label: "Solo", hint: "1 integrante", min: 1, max: 1, disabled: SOLO_DUO_DISABLED },
+  { value: "duo", label: "Dúo", hint: "2 integrantes", min: 2, max: 2, disabled: SOLO_DUO_DISABLED },
   { value: "grupo_pequeno", label: "Grupo Pequeño", hint: "5 a 14", min: 5, max: 14, disabled: false },
   { value: "grupo_grande", label: "Grupo Grande", hint: "15 a 60", min: 15, max: 60, disabled: false },
 ] as const;

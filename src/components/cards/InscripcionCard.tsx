@@ -109,6 +109,18 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   if (insc.subdivision) chips.push({ variant: 'sub', text: insc.subdivision });
   if (insc.modalidad) chips.push({ variant: 'mod', text: insc.modalidad });
 
+  // Estado de pago del baile (solo festival vigente 2026). Fuente de verdad:
+  // mismo cálculo del tab Pagos (deudas_2026, solo pagos verificados) resuelto
+  // server-side en inscripciones.php. Sin dato (convenio / sin compromiso) → sin chip.
+  const pagoChip =
+    year === '2026'
+      ? insc.estado_pago === 'habilitado'
+        ? { text: 'Habilitado', cls: 'border-green/50 text-green', bg: 'rgba(16,185,129,0.12)' }
+        : insc.estado_pago === 'pendiente'
+          ? { text: 'Pendiente de pago', cls: 'border-gold/50 text-gold', bg: 'rgba(232,208,152,0.12)' }
+          : null
+      : null;
+
   return (
     <article
       className={`overflow-hidden rounded-xl border transition anim-fade-in-up ${
@@ -181,6 +193,24 @@ export function InscripcionCard({ insc, notas, year }: Props) {
         </div>
 
         </button>
+
+        {/* Estado de pago del baile: pill destacado junto a los botones de la
+            derecha. En móvil el texto largo se abrevia para no desbordar. */}
+        {pagoChip && (
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase leading-none ${pagoChip.cls}`}
+            style={{ letterSpacing: '0.5px', background: pagoChip.bg }}
+            title={
+              pagoChip.text === 'Habilitado'
+                ? 'Baile habilitado para participar: pago verificado'
+                : 'Pendiente de pago: el baile se habilita al verificarse su pago'
+            }
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'currentColor' }} />
+            <span className="hidden sm:inline">{pagoChip.text}</span>
+            <span className="sm:hidden">{pagoChip.text === 'Habilitado' ? 'Habilitado' : 'Pendiente'}</span>
+          </span>
+        )}
 
         {puedeEditar && (
           <button
@@ -352,7 +382,12 @@ export function InscripcionCard({ insc, notas, year }: Props) {
               )}
               {audioUrl && (
                 <div className="mt-3">
-                  <AudioPlayer src={audioUrl} downloadName={mediaBase} />
+                  {/* Descarga de audio SOLO en el año vigente (2026); en años
+                      pasados el player queda sin botón de descargar. */}
+                  <AudioPlayer
+                    src={audioUrl}
+                    downloadName={year === '2026' ? mediaBase : undefined}
+                  />
                 </div>
               )}
               {mmEnabled && (
@@ -410,15 +445,8 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                 </button>
               </div>
               )}
-              {insc.informe && (
-                <div
-                  className="mt-3 rounded-md border-l-2 border-cyan/40 px-3.5 py-2.5 text-[12px] text-text-90"
-                  style={{ background: 'rgba(0,229,255,0.04)', lineHeight: '1.55' }}
-                >
-                  <strong className="font-semibold text-cyan">Informe: </strong>
-                  {insc.informe}
-                </div>
-              )}
+              {/* El campo `informe` es una nota interna del CRM (agente/precios) —
+                  NO se muestra en el portal del participante. */}
             </>
           )}
 
