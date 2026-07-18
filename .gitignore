@@ -75,3 +75,12 @@ screenshots/
 
 # Backups de reconciliación (artefactos, no fuente)
 migrations/backup_*.csv
+
+# Cookies de sesión curl (sensible) + backups locales
+cookies*.txt
+**/cookies*.txt
+_backups/
+_prod_backup*/
+**/_bot_kb_backup.csv
+# SQL scratch local (los reales van en migrations/)
+sql/
