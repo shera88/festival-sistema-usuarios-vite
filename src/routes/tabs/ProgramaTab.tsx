@@ -43,7 +43,9 @@ const DIA_RGB: Record<Dia, [number, number, number]> = {
 // Colores de cabecera por bloque en el PDF (menor vs mayor bien diferenciados).
 const BLOQUE_RGB: Record<'MENOR' | 'MAYOR', [number, number, number]> = {
   MENOR: [8, 145, 178],   // cian
-  MAYOR: [124, 58, 237],  // violeta
+  // Fucsia de marca (--fuchsia #FF1FA8) oscurecida para impresión, igual que el
+  // cian del bloque menor: así el par queda cian + rosa como el logo.
+  MAYOR: [180, 24, 124],  // rosa de marca
 };
 
 interface ActoRPC {
@@ -341,20 +343,20 @@ export function ProgramaTab() {
           willDrawPage: onPage,
           head: [
             [{ content: 'BLOQUE ' + blq, colSpan: 6, styles: { fillColor: color, textColor: 255, fontStyle: 'bold', fontSize: 9.5, halign: 'left' } }],
-            ['N', 'Agrupacion', 'Obra', 'Categoria', 'Genero', 'Hora'],
+            ['Hora', 'N', 'Agrupacion', 'Obra', 'Categoria', 'Genero'],
           ],
           body: rb.map((r) => [
+            r.hora,
             String(r.n).padStart(2, '0'),
             r.nombre_agrupacion || r.agrupacion || '',
             r.obra || '',
             capFirst(r.categoria),
             capFirst(r.genero),
-            r.hora,
           ]),
           styles: { fontSize: 7.5, cellPadding: 1.4, overflow: 'linebreak', valign: 'middle', lineColor: [224, 221, 228], lineWidth: 0.2, textColor: [40, 38, 45] },
           headStyles: { fillColor: color, textColor: 255, fontSize: 7.5, halign: 'left', fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [246, 244, 250] },
-          columnStyles: { 0: { cellWidth: 9, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 48 }, 2: { cellWidth: 44 }, 3: { cellWidth: 28 }, 4: { cellWidth: 29 }, 5: { cellWidth: 16, halign: 'center', fontStyle: 'bold' } },
+          columnStyles: { 0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 9, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 48 }, 3: { cellWidth: 44 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } },
         });
         y = auto.lastAutoTable.finalY + 6;
       }
