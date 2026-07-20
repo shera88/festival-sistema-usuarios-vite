@@ -44,9 +44,13 @@ export const DIVISIONES = [
   { value: "adultos", label: "Adultos", hint: "36+ años" },
 ] as const;
 
-// Solo y Dúo se habilitan temporalmente hasta el 16/07/2026 23:59 (Bolivia, UTC-4).
-// El 17 se re-bloquean SOLOS: el gate es por fecha, no hay que revertir código.
-const SOLO_DUO_DISABLED = Date.now() > new Date("2026-07-16T23:59:59-04:00").getTime();
+// Solo y Dúo estuvieron abiertos hasta el 16/07/2026 23:59 y el gate por fecha los
+// volvió a cerrar el 17. El 20/07/2026 se reabrieron a pedido y SIN fecha de cierre:
+// quedan habilitados hasta nuevo aviso, así que el interruptor es explícito y no
+// una fecha, para que no se cierren solos sin que nadie lo pida.
+// Para volver a cerrarlos: poner true. Para cerrarlos en una fecha, restaurar
+//   Date.now() > new Date("AAAA-MM-DDT23:59:59-04:00").getTime()
+const SOLO_DUO_DISABLED = false;
 
 export const SUBDIVISIONES = [
   { value: "solo", label: "Solo", hint: "1 integrante", min: 1, max: 1, disabled: SOLO_DUO_DISABLED },
