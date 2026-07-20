@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase/client';
 import { useInscripciones } from '@/hooks/queries';
 import { useAuth } from '@/hooks/useAuth';
 import { webpProxy } from '@/lib/utils/img';
+import { ZoomableImage } from '@/components/ui/zoomable-image';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
@@ -184,11 +185,13 @@ export function ActoRow({ r, esEnsayo }: { r: Fila; esEnsayo: boolean }) {
           {/* Coreógrafo: foto (con respaldo a iniciales) + nombre */}
           <div className="flex items-center gap-3 rounded-lg border border-glass-border bg-white/3 p-2.5">
             {r.coreografo_foto ? (
-              <img
-                src={webpProxy(r.coreografo_foto, 96) ?? undefined}
-                alt=""
-                className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-gold/30"
-                loading="lazy"
+              // Tocar la foto la amplía a pantalla completa (rueda/pinch para acercar, ESC para salir).
+              <ZoomableImage
+                src={webpProxy(r.coreografo_foto, 96) ?? r.coreografo_foto}
+                zoomSrc={webpProxy(r.coreografo_foto, 1400, 88) ?? r.coreografo_foto}
+                alt={r.coreografo ? `Coreógrafo ${r.coreografo}` : 'Foto del coreógrafo'}
+                triggerClassName="h-11 w-11 shrink-0 rounded-full ring-1 ring-gold/30 transition hover:ring-2 hover:ring-gold"
+                className="h-11 w-11 rounded-full object-cover"
               />
             ) : (
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-[12px] font-bold text-text-45 ring-1 ring-white/10">

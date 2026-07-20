@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ActoRow } from '@/routes/tabs/ProgramaTab';
 
 /**
@@ -96,5 +96,29 @@ describe('ActoRow — fila desplegable del programa', () => {
     expect(screen.queryByText('Ciudad')).toBeNull();
     expect(screen.queryByText('Género')).toBeNull();
     expect(screen.getByText('Modalidad')).toBeTruthy(); // los que sí tienen valor siguen
+  });
+
+  it('la foto del coreógrafo se amplía al tocarla, en alta resolución', () => {
+    // jsdom no implementa showModal; se espía para comprobar que el lightbox abre.
+    const showModal = vi.fn(function (this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    });
+    HTMLDialogElement.prototype.showModal = showModal as never;
+    HTMLDialogElement.prototype.close = vi.fn() as never;
+
+    const { container } = render(<ActoRow r={base} esEnsayo={false} />);
+    fireEvent.click(screen.getByRole('button'));
+
+    const zoom = screen.getByRole('button', { name: /Ampliar imagen: Coreógrafo KELVIN SOSSA GUTIERREZ/i });
+    fireEvent.click(zoom);
+    expect(showModal).toHaveBeenCalled();
+
+    // La miniatura pide 96px; la ampliación pide una versión grande (no la miniatura).
+    const anchos = Array.from(container.querySelectorAll('img'))
+      .map((i) => new URL(i.getAttribute('src') ?? '', 'http://x').searchParams.get('w'))
+      .filter(Boolean)
+      .map(Number);
+    expect(Math.max(...anchos)).toBeGreaterThan(Math.min(...anchos));
+    expect(Math.max(...anchos)).toBeGreaterThanOrEqual(1400);
   });
 });
