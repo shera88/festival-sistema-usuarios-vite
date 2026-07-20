@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileDown } from 'lucide-react';
+import { FileDown, ChevronDown } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { StatsCards } from '@/components/shared/StatsCards';
@@ -61,6 +61,9 @@ interface ActoRPC {
   duracion: string | null;
   categoria: string | null;
   genero: string | null;
+  // Agregados por la migración 056 (para el detalle desplegable del acto).
+  coreografo: string | null;
+  coreografo_foto: string | null;
 }
 interface Fila extends ActoRPC {
   n: number;
@@ -85,6 +88,124 @@ async function fetchPrograma(): Promise<ActoRPC[]> {
   }
   const all = (await Promise.all(calls)).flat();
   return all.filter((a) => a.orden != null); // solo actos con orden sorteado
+}
+
+/* ─────────────── Fila de acto: se despliega al tocarla ───────────────
+   Cabecera igual que antes (hora · orden · logo · agrupación · obra) y, al
+   abrir, la ficha esencial de la obra + el coreógrafo con su foto. */
+export function ActoRow({ r, esEnsayo }: { r: Fila; esEnsayo: boolean }) {
+  const [open, setOpen] = useState(false);
+  const nombre = r.nombre_agrupacion || r.agrupacion || 'Agrupación';
+  const bloqueTxt = r.bloque ? (String(r.bloque).toUpperCase() === 'MAYOR' ? 'Mayor' : 'Menor') : '';
+  const datos: Array<[string, string | null]> = [
+    ['Modalidad', r.modalidad],
+    ['Género', r.genero],
+    ['Categoría', r.categoria],
+    ['Tamaño', r.subdivision],
+    [esEnsayo ? 'Ensayo' : 'Duración', r.dur],
+    ['Ciudad', r.ciudad],
+  ];
+  const visibles = datos.filter(([, v]) => v && String(v).trim());
+
+  return (
+    <article
+      className={`overflow-hidden rounded-xl border transition ${
+        open ? 'border-gold/30 bg-glass-bg' : r.mio ? 'border-fuchsia/60 bg-fuchsia/10' : 'border-glass-border bg-glass-bg'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-3 p-2.5 text-left transition-colors hover:bg-white/3"
+      >
+        <div className="w-11 shrink-0 text-center text-[12px] font-normal text-gold tabular-nums">{r.hora}</div>
+        <div className="w-7 shrink-0 text-center text-[15px] font-extrabold text-text-white tabular-nums">
+          {String(r.n).padStart(2, '0')}
+        </div>
+        {r.logo_url ? (
+          <img
+            src={webpProxy(r.logo_url, 80) ?? undefined}
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-[11px] font-bold text-text-45 ring-1 ring-white/10">
+            {initials(nombre)}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-[13px] font-semibold uppercase text-text-white" style={{ letterSpacing: '0.3px' }}>
+              {nombre}
+            </span>
+            {r.mio && (
+              <span
+                className="shrink-0 rounded-md border border-fuchsia/40 bg-fuchsia/10 px-1.5 py-px text-[9px] font-bold uppercase text-fuchsia"
+                style={{ letterSpacing: '0.5px' }}
+              >
+                {esEnsayo ? 'Tu ensayo' : 'Tu participación'}
+              </span>
+            )}
+          </div>
+          <div className="truncate text-[11px] text-text-45">
+            {r.obra ? `"${r.obra}"` : 'Sin obra'}
+            {r.subdivision ? ` · ${r.subdivision}` : ''}
+            {bloqueTxt ? ` · ${bloqueTxt}` : ''}
+          </div>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 transition-transform duration-300 ${open ? 'rotate-180 text-gold' : 'text-text-45'}`}
+        />
+      </button>
+
+      {open && (
+        <div className="border-t border-glass-border p-3 anim-fade-in">
+          {r.obra && (
+            <div className="mb-3">
+              <div className="text-[9px] font-bold uppercase tracking-wide text-text-45">Obra</div>
+              <div className="text-[13px] font-semibold text-text-white">"{r.obra}"</div>
+            </div>
+          )}
+
+          {visibles.length > 0 && (
+            <dl className="mb-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
+              {visibles.map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-[9px] font-bold uppercase tracking-wide text-text-45">{k}</dt>
+                  <dd className="truncate text-[12px] text-text-white" title={String(v)}>
+                    {v}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {/* Coreógrafo: foto (con respaldo a iniciales) + nombre */}
+          <div className="flex items-center gap-3 rounded-lg border border-glass-border bg-white/3 p-2.5">
+            {r.coreografo_foto ? (
+              <img
+                src={webpProxy(r.coreografo_foto, 96) ?? undefined}
+                alt=""
+                className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-gold/30"
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/5 text-[12px] font-bold text-text-45 ring-1 ring-white/10">
+                {initials(r.coreografo || '—')}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="text-[9px] font-bold uppercase tracking-wide text-text-45">Coreógrafo</div>
+              <div className="truncate text-[13px] font-semibold text-text-white">
+                {r.coreografo || 'Sin coreógrafo registrado'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </article>
+  );
 }
 
 function initials(name: string): string {
@@ -328,52 +449,9 @@ export function ProgramaTab() {
           return (
             <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia]}`} accent={DIA_ACCENT[dia]} defaultOpen>
               <div className="space-y-2">
-                {rows.map((r) => {
-                  const nombre = r.nombre_agrupacion || r.agrupacion || 'Agrupación';
-                  return (
-                    <div
-                      key={r.id_inscripcion}
-                      className={`flex items-center gap-3 rounded-xl border p-2.5 transition-colors ${
-                        r.mio ? 'border-fuchsia/60 bg-fuchsia/10' : 'border-glass-border bg-glass-bg'
-                      }`}
-                    >
-                      <div className="w-11 shrink-0 text-center text-[12px] font-normal text-gold tabular-nums">
-                        {r.hora}
-                      </div>
-                      <div className="w-7 shrink-0 text-center text-[15px] font-extrabold text-text-white tabular-nums">
-                        {String(r.n).padStart(2, '0')}
-                      </div>
-                      {r.logo_url ? (
-                        <img
-                          src={webpProxy(r.logo_url, 80) ?? undefined}
-                          alt=""
-                          className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-[11px] font-bold text-text-45 ring-1 ring-white/10">
-                          {initials(nombre)}
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-[13px] font-semibold uppercase text-text-white" style={{ letterSpacing: '0.3px' }}>
-                            {nombre}
-                          </span>
-                          {r.mio && (
-                            <span className="shrink-0 rounded-md border border-fuchsia/40 bg-fuchsia/10 px-1.5 py-px text-[9px] font-bold uppercase text-fuchsia" style={{ letterSpacing: '0.5px' }}>
-                              {esEnsayo ? 'Tu ensayo' : 'Tu participación'}
-                            </span>
-                          )}
-                        </div>
-                        <div className="truncate text-[11px] text-text-45">
-                          {r.obra ? `"${r.obra}"` : 'Sin obra'}{r.subdivision ? ` · ${r.subdivision}` : ''}
-                          {r.bloque ? ` · ${String(r.bloque).toUpperCase() === 'MAYOR' ? 'Mayor' : 'Menor'}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {rows.map((r) => (
+                  <ActoRow key={r.id_inscripcion} r={r} esEnsayo={esEnsayo} />
+                ))}
               </div>
             </DayGroup>
           );
