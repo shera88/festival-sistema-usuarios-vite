@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ActoRow } from '@/routes/tabs/ProgramaTab';
+import { ActoRow, hhmmAmPm } from '@/routes/tabs/ProgramaTab';
 
 /**
  * Fila del programa: al tocarla se despliega la ficha esencial de la obra y el
@@ -29,6 +29,30 @@ const base = {
   dur: '6:30',
   mio: false,
 };
+
+describe('hhmmAmPm — hora en 12 h con AM/PM', () => {
+  // El mediodía y la medianoche son donde se rompen casi todas las conversiones
+  // a 12 h: 12 % 12 da 0, y "00:xx" tiende a salir como "00:xx AM" en vez de 12.
+  it.each([
+    ['00:00', '12:00 AM'],
+    ['00:15', '12:15 AM'],
+    ['08:00', '08:00 AM'],
+    ['11:59', '11:59 AM'],
+    ['12:00', '12:00 PM'],
+    ['12:30', '12:30 PM'],
+    ['13:00', '01:00 PM'],
+    ['15:00', '03:00 PM'],
+    ['19:00', '07:00 PM'],
+    ['23:59', '11:59 PM'],
+  ])('%s -> %s', (entrada, esperado) => {
+    expect(hhmmAmPm(entrada)).toBe(esperado);
+  });
+
+  it('mantiene la hora con dos dígitos para que la columna quede alineada', () => {
+    expect(hhmmAmPm('09:05')).toHaveLength('09:05 AM'.length);
+    expect(hhmmAmPm('13:05')).toHaveLength('01:05 PM'.length);
+  });
+});
 
 describe('ActoRow — fila desplegable del programa', () => {
   it('muestra la cabecera y mantiene el detalle cerrado al inicio', () => {

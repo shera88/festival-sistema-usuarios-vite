@@ -77,7 +77,16 @@ interface Fila extends ActoRPC {
 
 const durSeg = (m: string) => { const p = String(m || '').split(':'); return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0); };
 const hhmmSeg = (t: string) => { const p = String(t || '0:0').split(':'); return (Number(p[0]) || 0) * 3600 + (Number(p[1]) || 0) * 60; };
-const segHHMM = (x: number) => { const v = Math.round(x); return String(Math.floor(v / 3600)).padStart(2, '0') + ':' + String(Math.floor((v % 3600) / 60)).padStart(2, '0'); };
+// Reloj de 12 horas con AM/PM. La hora va con dos dígitos para que la columna
+// quede alineada. Único formateador: lo usan tanto la lista como el PDF.
+const ampm = (h24: number, min: number) => {
+  const suf = h24 < 12 ? 'AM' : 'PM';
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return String(h12).padStart(2, '0') + ':' + String(min).padStart(2, '0') + ' ' + suf;
+};
+const segHHMM = (x: number) => { const v = Math.round(x); return ampm(Math.floor(v / 3600), Math.floor((v % 3600) / 60)); };
+/** Convierte un 'HH:MM' de 24 h (los de HORA_INICIO) al formato con AM/PM. */
+export const hhmmAmPm = (t: string) => { const p = String(t || '0:0').split(':'); return ampm(Number(p[0]) || 0, Number(p[1]) || 0); };
 
 async function fetchPrograma(): Promise<ActoRPC[]> {
   const calls: Promise<ActoRPC[]>[] = [];
@@ -121,7 +130,7 @@ export function ActoRow({ r, esEnsayo }: { r: Fila; esEnsayo: boolean }) {
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 p-2.5 text-left transition-colors hover:bg-white/3"
       >
-        <div className="w-11 shrink-0 text-center text-[12px] font-normal text-gold tabular-nums">{r.hora}</div>
+        <div className="w-16 shrink-0 text-center text-[12px] font-normal text-gold tabular-nums">{r.hora}</div>
         <div className="w-7 shrink-0 text-center text-[15px] font-extrabold text-text-white tabular-nums">
           {String(r.n).padStart(2, '0')}
         </div>
@@ -313,8 +322,8 @@ export function ProgramaTab() {
         doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120);
         doc.text(
           esEnsayo
-            ? 'Inicio 08:00 - ' + rows.length + ' ensayos - 8 min c/u + 1 min de puente (horarios aproximados)'
-            : 'Inicio ' + HORA_INICIO[diaSel] + ' - ' + rows.length + ' actos - ~1:30 entre bailes (horarios aproximados)',
+            ? 'Inicio ' + hhmmAmPm(HORA_INICIO_ENSAYO) + ' - ' + rows.length + ' ensayos - 8 min c/u + 1 min de puente (horarios aproximados)'
+            : 'Inicio ' + hhmmAmPm(HORA_INICIO[diaSel]) + ' - ' + rows.length + ' actos - ~1:30 entre bailes (horarios aproximados)',
           padL, padT + 5,
         );
         doc.setDrawColor(...DIA_RGB[diaSel]); doc.setLineWidth(0.6); doc.line(padL, padT + 7, W - padR, padT + 7);
@@ -356,7 +365,9 @@ export function ProgramaTab() {
           styles: { fontSize: 7.5, cellPadding: 1.4, overflow: 'linebreak', valign: 'middle', lineColor: [224, 221, 228], lineWidth: 0.2, textColor: [40, 38, 45] },
           headStyles: { fillColor: color, textColor: 255, fontSize: 7.5, halign: 'left', fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [246, 244, 250] },
-          columnStyles: { 0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 9, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 48 }, 3: { cellWidth: 44 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } },
+          // Hora pasó a 12 h con AM/PM ('08:00 AM'), así que necesita 20 mm en vez de 16;
+          // los 4 mm salen de Agrupacion y Obra. Total sin cambios: 174 mm = ancho útil.
+          columnStyles: { 0: { cellWidth: 20, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 9, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 46 }, 3: { cellWidth: 42 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } },
         });
         y = auto.lastAutoTable.finalY + 6;
       }
@@ -384,7 +395,8 @@ export function ProgramaTab() {
             disabled={pdfLoading}
             className="inline-flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold text-text-white ring-1 ring-glass-border transition-colors hover:bg-white/5 disabled:opacity-50"
           >
-            <FileDown className="h-4 w-4" /> {pdfLoading ? 'Generando…' : `Descargar ${DIA_LABEL[diaSel]}`}
+            <FileDown className="h-4 w-4" />{' '}
+            {pdfLoading ? 'Generando…' : `Descargar ${esEnsayo ? 'ensayos' : 'programa'} ${DIA_LABEL[diaSel]}`}
           </button>
         )}
       </div>
@@ -411,7 +423,7 @@ export function ProgramaTab() {
 
       {esEnsayo && (
         <p className="text-[11px] text-text-45">
-          Ensayos desde las 08:00 · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
+          Ensayos desde las {hhmmAmPm(HORA_INICIO_ENSAYO)} · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
         </p>
       )}
 
@@ -452,7 +464,7 @@ export function ProgramaTab() {
         {(porDia[diaSel] ? [diaSel] : []).map((dia) => {
           const rows = porDia[dia]!;
           return (
-            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia]}`} accent={DIA_ACCENT[dia]} defaultOpen>
+            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${hhmmAmPm(esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia])}`} accent={DIA_ACCENT[dia]} defaultOpen>
               <div className="space-y-2">
                 {rows.map((r) => (
                   <ActoRow key={r.id_inscripcion} r={r} esEnsayo={esEnsayo} />
