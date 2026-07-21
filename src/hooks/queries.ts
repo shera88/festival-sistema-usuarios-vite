@@ -16,6 +16,11 @@ export type RankingObra = {
   enlace_del_logo: string | null;
   nota_final: number | null;
   jurados: number;
+  // Agregados por migrations/ranking_publico_con_bloque.sql, para agrupar el
+  // ranking por bloque igual que el programa y los PDF. `division` es el
+  // respaldo: si la inscripción no trae bloque, se deriva de ella.
+  bloque: string | null;
+  division: string | null;
 };
 
 /**

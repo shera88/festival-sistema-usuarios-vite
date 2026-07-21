@@ -7,6 +7,7 @@ import { StatsCards } from '@/components/shared/StatsCards';
 import { DayGroup } from '@/components/shared/DayGroup';
 import { CalificacionCard } from '@/components/cards/CalificacionCard';
 import { useCalificaciones, useRankingPublico, useDetalleObra, type RankingObra, type NotaPublica } from '@/hooks/queries';
+import { BloqueGroup, agruparPorBloque } from '@/components/shared/BloqueHeader';
 import { dayOrderIndex } from '@/lib/utils/days';
 import { calcularPromedioFinal, fmtScore } from '@/lib/utils/scoring';
 import { clasificacionDe, esDiaClasificatoria } from '@/lib/utils/finals';
@@ -275,9 +276,21 @@ function RankingVivo({ enabled }: { enabled: boolean }) {
         <EmptyState>El ranking todavía no tiene notas cargadas.</EmptyState>
       ) : (
         <div className="space-y-2">
-          {ranked.map((o, i) => (
-            <ObraRow key={o.id_inscripcion} o={o} lead={String(i + 1)} rank showChip />
-          ))}
+          {/* Agrupado por bloque, como el programa y los PDF. La posición que se
+              muestra es la del ranking COMPLETO, no la de adentro del bloque:
+              si una obra va 3ª en general, dice 3 aunque sea la 1ª de su bloque. */}
+          {agruparPorBloque(ranked, (o) => ({ bloque: o.bloque, division: o.division })).map((g) => {
+            const filas = g.items.map((o) => (
+              <ObraRow key={o.id_inscripcion} o={o} lead={String(ranked.indexOf(o) + 1)} rank showChip />
+            ));
+            return g.bloque ? (
+              <BloqueGroup key={g.bloque} bloque={g.bloque} cantidad={g.items.length}>
+                {filas}
+              </BloqueGroup>
+            ) : (
+              <div key="sin" className="space-y-2">{filas}</div>
+            );
+          })}
         </div>
       )}
     </div>

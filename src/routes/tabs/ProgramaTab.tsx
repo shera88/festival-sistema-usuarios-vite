@@ -10,6 +10,7 @@ import { useInscripciones } from '@/hooks/queries';
 import { useAuth } from '@/hooks/useAuth';
 import { webpProxy } from '@/lib/utils/img';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
+import { BloqueGroup, agruparPorBloque } from '@/components/shared/BloqueHeader';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
@@ -367,7 +368,7 @@ export function ProgramaTab() {
           alternateRowStyles: { fillColor: [246, 244, 250] },
           // Hora pasó a 12 h con AM/PM ('08:00 AM'), así que necesita 20 mm en vez de 16;
           // los 4 mm salen de Agrupacion y Obra. Total sin cambios: 174 mm = ancho útil.
-          columnStyles: { 0: { cellWidth: 20, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 9, halign: 'center', fontStyle: 'bold' }, 2: { cellWidth: 46 }, 3: { cellWidth: 42 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } },
+          columnStyles: { 0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 9, halign: 'center' }, 2: { cellWidth: 46 }, 3: { cellWidth: 42 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } },
         });
         y = auto.lastAutoTable.finalY + 6;
       }
@@ -466,9 +467,24 @@ export function ProgramaTab() {
           return (
             <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${hhmmAmPm(esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia])}`} accent={DIA_ACCENT[dia]} defaultOpen>
               <div className="space-y-2">
-                {rows.map((r) => (
-                  <ActoRow key={r.id_inscripcion} r={r} esEnsayo={esEnsayo} />
-                ))}
+                {/* Separado en BLOQUE MENOR / BLOQUE MAYOR, igual que el PDF.
+                    Las filas ya vienen ordenadas menor→mayor y por orden de
+                    sorteo, así que agrupar no altera la secuencia. */}
+                {agruparPorBloque(rows, (r) => ({ bloque: r.bloque, division: null })).map((g) =>
+                  g.bloque ? (
+                    <BloqueGroup key={g.bloque} bloque={g.bloque} cantidad={g.items.length}>
+                      {g.items.map((r) => (
+                        <ActoRow key={r.id_inscripcion} r={r} esEnsayo={esEnsayo} />
+                      ))}
+                    </BloqueGroup>
+                  ) : (
+                    <div key="sin" className="space-y-2">
+                      {g.items.map((r) => (
+                        <ActoRow key={r.id_inscripcion} r={r} esEnsayo={esEnsayo} />
+                      ))}
+                    </div>
+                  ),
+                )}
               </div>
             </DayGroup>
           );

@@ -1,6 +1,6 @@
 /**
  * Clasificación a la final (Sábado/Domingo) — misma regla que la app de jurados
- * (`finalDeCampos`): corte 70 para colegios/universidades, 75 para el resto;
+ * (`finalDeCampos`): corte 75 para colegios/universidades, 80 para el resto;
  * si clasifica → Folklore va el Domingo, el resto el Sábado.
  */
 /**
@@ -13,6 +13,16 @@ export function esDiaClasificatoria(dia: string | null): boolean {
   return d === 'MARTES' || d === 'MIERCOLES' || d === 'MIÉRCOLES' || d === 'JUEVES' || d === 'VIERNES';
 }
 
+/** Nota mínima para clasificar a la final, según categoría. */
+export const NOTA_MINIMA_FINAL_COLEGIOS = 75;
+export const NOTA_MINIMA_FINAL_RESTO = 80;
+
+export function notaMinimaFinal(categoria: string | null): number {
+  return /COLEGIO|UNIVERSID/.test((categoria ?? '').toUpperCase())
+    ? NOTA_MINIMA_FINAL_COLEGIOS
+    : NOTA_MINIMA_FINAL_RESTO;
+}
+
 export function clasificacionDe(
   nota: number | null,
   modalidad: string | null,
@@ -20,7 +30,7 @@ export function clasificacionDe(
   categoria: string | null,
 ): 'Sábado' | 'Domingo' | null {
   if (nota == null) return null;
-  const corte = /COLEGIO|UNIVERSID/.test((categoria ?? '').toUpperCase()) ? 70 : 75;
+  const corte = notaMinimaFinal(categoria);
   if (nota < corte) return null;
   return /FOLCLOR|FOLKLOR/.test(`${modalidad ?? ''} ${genero ?? ''}`.toUpperCase())
     ? 'Domingo'
