@@ -50,7 +50,7 @@ export const DIVISIONES = [
 // una fecha, para que no se cierren solos sin que nadie lo pida.
 // Para volver a cerrarlos: poner true. Para cerrarlos en una fecha, restaurar
 //   Date.now() > new Date("AAAA-MM-DDT23:59:59-04:00").getTime()
-const SOLO_DUO_DISABLED = false;
+const SOLO_DUO_DISABLED = true;
 
 export const SUBDIVISIONES = [
   { value: "solo", label: "Solo", hint: "1 integrante", min: 1, max: 1, disabled: SOLO_DUO_DISABLED },
@@ -64,8 +64,8 @@ export const SUBDIVISIONES = [
 export const SUBDIVISIONES_BLOQUEADAS: readonly string[] = SUBDIVISIONES.filter((s) => s.disabled).map((s) => s.value);
 
 export const MODALIDADES = [
-  "FOLKLORE ORIENTAL TRADICIONAL",
-  "FOLKLORE ORIENTAL DE PROYECCIÓN",
+  "FOLCLORE ORIENTAL TRADICIONAL",
+  "FOLCLORE ORIENTAL DE PROYECCIÓN",
   "FOLCLORE ANDINO",
   "FOLCLORE DEL VALLE",
   "FOLCLORE DEL CHACO",
@@ -92,8 +92,8 @@ export const MODALIDADES = [
  * derive_genero().
  */
 export const MODALIDAD_GENERO: Record<(typeof MODALIDADES)[number], "FOLKLORE" | "ACADEMICO" | "URBANO"> = {
-  "FOLKLORE ORIENTAL TRADICIONAL": "FOLKLORE",
-  "FOLKLORE ORIENTAL DE PROYECCIÓN": "FOLKLORE",
+  "FOLCLORE ORIENTAL TRADICIONAL": "FOLKLORE",
+  "FOLCLORE ORIENTAL DE PROYECCIÓN": "FOLKLORE",
   "FOLCLORE ANDINO": "FOLKLORE",
   "FOLCLORE DEL VALLE": "FOLKLORE",
   "FOLCLORE DEL CHACO": "FOLKLORE",
