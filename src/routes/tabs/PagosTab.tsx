@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, AlertCircle, FileText, ChevronDown, ArrowUpRight, Sparkles, Receipt, Loader2, Pencil } from 'lucide-react';
 import { pagosApi } from '@/lib/api/pagos';
@@ -288,10 +288,15 @@ function PagosTabContent() {
                     {items.length}
                   </span>
                 </button>
+                {/* Sección colapsable. Sin límite de alto cuando está abierta:
+                    antes estimaba `items.length * 260 + 100`, y como un card
+                    crece al desplegar sus pagos, el overflow-hidden recortaba la
+                    lista (se veían 2 de 6 pagos). La animación de cierre se
+                    mantiene con el max-height en 0. */}
                 <div
                   className="overflow-hidden transition-all duration-400 ease-out"
                   style={{
-                    maxHeight: isCollapsed ? '0px' : `${items.length * 260 + 100}px`,
+                    maxHeight: isCollapsed ? '0px' : 'none',
                     opacity: isCollapsed ? 0 : 1,
                   }}
                 >
@@ -723,6 +728,21 @@ function CompromisoCard({
     [pagosParciales],
   );
 
+  // Alto real del drawer de pagos. Se mide en vez de estimarse por fila: la
+  // altura de una fila varía (fecha/método/botones envuelven según el ancho),
+  // y con la estimación fija la lista quedaba recortada por overflow-hidden.
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const [drawerH, setDrawerH] = useState(0);
+  useLayoutEffect(() => {
+    const el = drawerRef.current;
+    if (!el) return;
+    const medir = () => setDrawerH(el.scrollHeight);
+    medir();
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [pagosSorted.length, expanded]);
+
   return (
     <div
       className="group/card relative overflow-hidden rounded-2xl transition-all duration-300 hover:-translate-y-px"
@@ -967,15 +987,20 @@ function CompromisoCard({
         )}
       </div>
 
-      {/* Drawer con animación slide */}
+      {/* Drawer con animación slide.
+          El alto se MIDE del contenido real (scrollHeight) en vez de estimarlo.
+          Antes era `n * 88 + 64`, y como una fila puede pasar de 88px (fecha +
+          método + botones envuelven), con varios pagos el `overflow-hidden`
+          recortaba la lista: se veían 2 de 6. */}
       <div
         className="overflow-hidden transition-all duration-400 ease-out"
         style={{
-          maxHeight: expanded ? `${pagosSorted.length * 88 + 64}px` : '0px',
+          maxHeight: expanded ? `${drawerH}px` : '0px',
           opacity: expanded ? 1 : 0,
         }}
       >
         <div
+          ref={drawerRef}
           className="border-t border-white/[0.04] divide-y divide-white/[0.03]"
           style={{ background: '#080614' }}
         >
