@@ -297,12 +297,6 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
         message={
           <>
             <p>¿Está seguro que ya están todos sus bailarines y personal?</p>
-            <p className="mt-2 text-text-45">
-              <strong className="text-text-65">Una vez confirmado, la agrupación quedará bloqueada</strong> y no podrá añadir ni eliminar personas hasta que el administrador habilite los cambios.
-            </p>
-            <p className="mt-2 font-mono text-cyan">
-              {verificadosCount}/{rows.length} integrantes verificados
-            </p>
             {errMsg && <p className="mt-2 text-[12px] text-red-400">{errMsg}</p>}
           </>
         }

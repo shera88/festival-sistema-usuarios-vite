@@ -337,7 +337,10 @@ export function KardexRow({
             setOpen((v) => !v);
           }
         }}
-        className="flex w-full cursor-pointer items-center gap-2.5 px-3 py-3 text-left select-none sm:gap-3 sm:px-4"
+        // `flex-wrap` + el min-width del bloque de texto hacen que, cuando el
+        // ancho no alcanza (móvil), los botones de acción bajen solos a una
+        // segunda línea en vez de comprimir el nombre hasta dejarlo ilegible.
+        className="flex w-full cursor-pointer flex-wrap items-center gap-x-2 gap-y-1.5 px-2 py-3 text-left select-none sm:flex-nowrap sm:gap-3 sm:px-4"
       >
         <button
           type="button"
@@ -405,10 +408,13 @@ export function KardexRow({
           )}
         </button>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="min-w-0 truncate text-[13px] font-medium text-text-white">{nombre}</span>
-            <MembresiaBadge row={row} />
+        {/* El NOMBRE ocupa su propia línea a todo el ancho de la columna: antes
+            compartía renglón con el badge de membresía (shrink-0), que se quedaba
+            con el espacio y dejaba el nombre truncado a una o dos letras en móvil.
+            El badge baja a la línea del cargo, donde sí hay lugar. */}
+        <div className="min-w-0 flex-1 basis-0">
+          <div className="truncate text-[13px] font-medium text-text-white" title={nombre}>
+            {nombre}
           </div>
           <div
             className="mt-0.5 truncate text-[10px] uppercase text-text-45"
@@ -417,6 +423,17 @@ export function KardexRow({
             {row.cargo || '—'}
           </div>
         </div>
+
+        {/* Badge de membresía a la DERECHA, en el renglón de arriba: en móvil
+            queda justo encima del switch, que baja con el resto de controles. */}
+        <div className="ml-auto shrink-0">
+          <MembresiaBadge row={row} />
+        </div>
+
+        {/* Todos los controles viven en UN contenedor: así, cuando el ancho no
+            alcanza y bajan de línea, lo hacen juntos y alineados a la derecha
+            (antes se desparramaban sueltos, con el switch cayendo a la izquierda). */}
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:gap-3">
 
         {wa && (
           <a
@@ -516,6 +533,7 @@ export function KardexRow({
             open ? 'rotate-180 text-fuchsia' : 'text-text-45'
           }`}
         />
+        </div>
       </div>
 
       {open && (

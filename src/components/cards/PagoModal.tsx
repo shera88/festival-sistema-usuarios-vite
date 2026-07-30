@@ -28,9 +28,6 @@ function bs(n: number): string {
 
 export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   const [monto, setMonto] = useState<string>('');
-  // Credencial: el usuario elige CUÁNTAS credenciales comprar (valor inicial =
-  // bailarines de la agrupación). El monto se deriva: cantidad × precio unitario.
-  const [cantidadCred, setCantidadCred] = useState<string>('');
   const [idMetodo, setIdMetodo] = useState<string>('');
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
@@ -55,15 +52,12 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   useEffect(() => {
     if (!compromiso) {
       setMonto('');
-      setCantidadCred('');
       setComprobante(null);
       setComprobanteUrl(null);
       setErr(null);
       return;
     }
     setMonto('');
-    // Cantidad inicial de credenciales = bailarines (valor de arranque, editable).
-    setCantidadCred(compromiso.concepto === 'credencial' ? String(compromiso.bailarines ?? '') : '');
     setIdMetodo(metodosQR[0]?.id_metodo ?? '');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compromiso, metodos]);
@@ -92,10 +86,11 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
   const precioUnit = isCredencial && compromiso.bailarines && compromiso.bailarines > 0
     ? Math.round(compromiso.monto_total / compromiso.bailarines)
     : 15;
-  const cantidadNum = Math.max(0, Math.floor(Number(cantidadCred) || 0));
+  // La cantidad de credenciales NO la elige el usuario: la fija el compromiso
+  // (1 por persona del kárdex, deduplicada por CI dentro de la agrupación).
+  const cantidadNum = Math.max(0, Math.floor(compromiso.bailarines ?? 0));
 
   const montoNum = (() => {
-    if (isCredencial) return cantidadNum * precioUnit;
     const n = Number(monto);
     if (!isFinite(n) || n <= 0) return 0;
     return Math.min(n, compromiso.saldo);
@@ -138,25 +133,16 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
     const c = compromiso;
     if (!c) return;
 
-    let m: number;
-    let cantidad: number | undefined;
-    if (isCredencial) {
-      if (cantidadNum < 1) {
-        setErr('Indique cuántas credenciales desea comprar');
-        return;
-      }
-      cantidad = cantidadNum;
-      m = cantidadNum * precioUnit;
-    } else {
-      m = Number(monto);
-      if (!isFinite(m) || m <= 0) {
-        setErr('Monto inválido');
-        return;
-      }
-      if (m > c.saldo + 0.01) {
-        setErr(`Monto excede el saldo (${bs(c.saldo)})`);
-        return;
-      }
+    // Todos los conceptos (credencial incluido) abonan un MONTO libre contra el
+    // saldo. La cantidad de credenciales ya no se manda: la fija el compromiso.
+    const m = Number(monto);
+    if (!isFinite(m) || m <= 0) {
+      setErr('Monto inválido');
+      return;
+    }
+    if (m > c.saldo + 0.01) {
+      setErr(`Monto excede el saldo (${bs(c.saldo)})`);
+      return;
     }
     if (!idMetodo) {
       setErr('Seleccione método de pago');
@@ -174,7 +160,6 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
         id_referencia: c.id_referencia,
         monto: m,
         id_metodo_pago: idMetodo,
-        cantidad,
         comprobante,
       });
       onSaved();
@@ -265,26 +250,17 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
               className="grid grid-cols-3 divide-x divide-white/[0.06] rounded-2xl border border-white/[0.06] py-3"
               style={{ background: 'rgba(255,255,255,0.02)' }}
             >
-              {isCredencial ? (
-                <>
-                  {/* Credencial: Total = cantidad × 15 (vivo), no hay saldo parcial */}
-                  <StatBox label="Total" value={bs(montoNum)} color={cfg.accent} bold />
-                  <StatBox label="Precio c/u" value={bs(precioUnit)} />
-                  <StatBox label="Credenciales" value={String(cantidadNum)} />
-                </>
-              ) : (
-                <>
-                  <StatBox label="Total" value={bs(compromiso.monto_total)} />
-                  <StatBox label="Pagado" value={bs(compromiso.pagado_verificado + montoNum)} color="#10B981" />
-                  <StatBox
-                    label={montoNum > 0 ? 'Quedará' : 'Saldo'}
-                    value={bs(saldoRestante)}
-                    color={cubreTotal ? '#10B981' : cfg.accent}
-                    bold
-                    hint={montoNum > 0 ? `de ${bs(compromiso.saldo)}` : undefined}
-                  />
-                </>
-              )}
+              {/* Credencial ahora se abona a cuenta igual que inscripción y
+                  pre-venta: mismo trío Total / Pagado / Saldo. */}
+              <StatBox label="Total" value={bs(compromiso.monto_total)} />
+              <StatBox label="Pagado" value={bs(compromiso.pagado_verificado + montoNum)} color="#10B981" />
+              <StatBox
+                label={montoNum > 0 ? 'Quedará' : 'Saldo'}
+                value={bs(saldoRestante)}
+                color={cubreTotal ? '#10B981' : cfg.accent}
+                bold
+                hint={montoNum > 0 ? `de ${bs(compromiso.saldo)}` : undefined}
+              />
             </div>
 
             {/* Monto a pagar (o cantidad de credenciales) — hero input */}
@@ -294,81 +270,66 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
                   className="mb-2 block text-[9.5px] font-bold uppercase text-text-45"
                   style={{ letterSpacing: '1.4px', fontFamily: FONT_DISPLAY }}
                 >
-                  {isCredencial ? 'Cantidad de credenciales a comprar' : 'Monto a pagar'}
+                  Monto a pagar
                 </span>
                 <div className="relative">
-                  {isCredencial ? (
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      step="1"
-                      min="1"
-                      value={cantidadCred}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v === '') { setCantidadCred(''); return; }
-                        const n = Math.floor(Number(v));
-                        if (!isFinite(n) || n < 0) return;
-                        setCantidadCred(String(n));
-                      }}
-                      required
-                      placeholder="0"
-                      className="pago-input-hero w-full"
-                      style={{
-                        fontFamily: FONT_MONO,
-                        fontSize: '28px',
-                        fontWeight: 600,
-                        letterSpacing: '-0.025em',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    />
-                  ) : (
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      step="1"
-                      min="0"
-                      max={compromiso.saldo}
-                      value={monto}
-                      onChange={(e) => handleMontoChange(e.target.value)}
-                      required
-                      placeholder="0"
-                      className="pago-input-hero w-full"
-                      style={{
-                        fontFamily: FONT_MONO,
-                        fontSize: '28px',
-                        fontWeight: 600,
-                        letterSpacing: '-0.025em',
-                        fontVariantNumeric: 'tabular-nums',
-                      }}
-                    />
-                  )}
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="0"
+                    max={compromiso.saldo}
+                    value={monto}
+                    onChange={(e) => handleMontoChange(e.target.value)}
+                    required
+                    placeholder="0"
+                    className="pago-input-hero w-full"
+                    style={{
+                      fontFamily: FONT_MONO,
+                      fontSize: '28px',
+                      fontWeight: 600,
+                      letterSpacing: '-0.025em',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  />
                   <span
                     className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[14px] font-semibold text-text-45"
                     style={{ fontFamily: FONT_DISPLAY }}
                   >
-                    {isCredencial ? 'cred.' : 'Bs'}
+                    Bs
                   </span>
                 </div>
               </label>
 
-              {/* Credencial: monto derivado (cantidad × precio unitario) */}
-              {isCredencial && (
+              {/* Credencial: la cantidad es FIJA (1 por persona del kárdex). Se
+                  muestra como dato, no como campo editable. */}
+              {isCredencial && cantidadNum > 0 && (
                 <div
                   className="mt-2 flex items-center justify-between rounded-xl border px-3.5 py-2.5"
                   style={{ borderColor: `${cfg.accent}30`, background: `${cfg.accent}08`, fontFamily: FONT_DISPLAY }}
                 >
                   <span className="text-[10.5px] font-semibold uppercase text-text-45" style={{ letterSpacing: '0.8px' }}>
-                    {cantidadNum} × {bs(precioUnit)}
+                    {cantidadNum} credenciales × {bs(precioUnit)}
                   </span>
                   <span className="text-[15px] font-bold tabular-nums text-text-white" style={{ fontFamily: FONT_MONO }}>
-                    {bs(montoNum)}
+                    {bs(compromiso.monto_total)}
                   </span>
                 </div>
               )}
 
-              {/* Quick chips: 25/50/75/100% (solo pagos con saldo fijo, no credencial) */}
-              {!isCredencial && (
+              {/* Sin kárdex cargado todavía: no hay nada que cobrar aún. */}
+              {isCredencial && cantidadNum === 0 && (
+                <div
+                  className="mt-2 rounded-xl border px-3.5 py-2.5 text-[11px] text-text-45"
+                  style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', fontFamily: FONT_DISPLAY }}
+                >
+                  Aún sin credenciales para pagar. El total se calcula solo a medida
+                  que registre participantes en el kárdex.
+                </div>
+              )}
+
+              {/* Quick chips: 25/50/75/100% — ahora también para credencial */}
+              {(
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {[0.25, 0.5, 0.75, 1].map((frac) => {
                   const amount = Math.round(compromiso.saldo * frac);
@@ -403,8 +364,9 @@ export function PagoModal({ compromiso, metodos, onClose, onSaved }: Props) {
               </div>
               )}
 
-              {/* Preview en vivo: barra progreso + delta (solo pagos con saldo fijo) */}
-              {!isCredencial && (
+              {/* Preview en vivo: barra progreso + delta — también para credencial,
+                  que desde ahora tiene saldo parcial como los demás conceptos. */}
+              {(
               <div
                 className="mt-3 rounded-2xl border px-3.5 py-3"
                 style={{

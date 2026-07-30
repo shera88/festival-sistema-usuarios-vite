@@ -215,7 +215,9 @@ function ObraSection({
                 <span className="h-px flex-1 bg-white/10" />
               </div>
               {/* ── NIVEL 4 · PERSONAS ── rail izquierdo + indentación (hijos del cargo). */}
-              <div className="ml-7 border-l border-white/10 sm:ml-8">
+              {/* En móvil el sangrado se reduce: 28px de indent sobre 390 de
+                  pantalla dejaban el nombre del integrante en ~50px. */}
+              <div className="ml-2 border-l border-white/10 sm:ml-8">
                 {cg.rows.map((r, i) => (
                   <KardexRow
                     key={`${obra.id}:${r.id_kardex ?? i}`}

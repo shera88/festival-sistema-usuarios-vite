@@ -43,8 +43,10 @@ $id_referencia  = trim((string)($_POST['id_referencia'] ?? ''));
 $monto          = (float)($_POST['monto'] ?? 0);
 $id_metodo_pago = trim((string)($_POST['id_metodo_pago'] ?? ''));
 $observacion    = trim((string)($_POST['observacion'] ?? '')) ?: null;
-// Cantidad de credenciales a comprar (solo credencial). La inscripción da un valor
-// inicial pero el usuario puede ajustarlo → fija el compromiso (override) y el monto.
+// Cantidad de credenciales. YA NO la elige el usuario: el compromiso la deriva
+// del kárdex (1 por persona, deduplicada por CI dentro de la agrupación). Se
+// sigue leyendo sólo por compatibilidad con clientes viejos, pero NO altera ni
+// el compromiso ni el monto.
 $cantidadCred   = isset($_POST['cantidad']) ? (int)$_POST['cantidad'] : null;
 const PRECIO_CREDENCIAL = 15;
 
@@ -128,27 +130,20 @@ if (!in_array($id_agrupacion, $userAgrups, true)) {
     exit;
 }
 
-// Credencial con cantidad ajustada: el usuario define cuántas comprar. Se fija el
-// override (compromisos_credenciales_2026) → el compromiso pasa a valer
-// cantidad × 15 Bs, y el monto del pago se calcula desde ahí (autoridad server).
-if ($conceptoCanon === 'credencial' && $cantidadCred !== null) {
-    if ($cantidadCred < 1) { sendJson(['error' => 'Cantidad de credenciales inválida'], 400); exit; }
-    try {
-        $sb->upsert('compromisos_credenciales_2026', [
-            'id_compromiso'   => $id_referencia,
-            'id_agrupacion'   => $id_agrupacion,
-            'cantidad'        => $cantidadCred,
-            'precio_unitario' => PRECIO_CREDENCIAL,
-            'origen'          => 'manual',
-            'updated_at'      => date('c'),
-        ], 'id_agrupacion');
-    } catch (RuntimeException $e) {
-        sendJson(['error' => 'No se pudo fijar la cantidad de credenciales: ' . $e->getMessage()], 500);
-        exit;
-    }
-    // El monto lo manda el frontend (cantidad × 15) pero el server lo recomputa
-    // para no confiar en el cliente.
-    $monto = $cantidadCred * PRECIO_CREDENCIAL;
+// Credencial: la CANTIDAD ya no la define el usuario.
+//
+// Antes, mandar `cantidad` fijaba un override manual en compromisos_credenciales_2026
+// y el server recomputaba `monto = cantidad × 15`. Eso tenía dos efectos no deseados:
+//   1. el total del compromiso cambiaba según lo que el usuario tipeara, y
+//   2. al forzar el monto, era IMPOSIBLE abonar a cuenta (siempre se pagaba el total).
+//
+// Ahora la cantidad la deriva la vista deudas_2026 desde el kárdex (1 credencial
+// por persona, deduplicada por CI dentro de la agrupación) y el `monto` recibido
+// se respeta tal cual: la validación de saldo de más abajo permite abonos
+// parciales hasta completar, igual que inscripción y pre-venta.
+if ($conceptoCanon === 'credencial' && $cantidadCred !== null && $cantidadCred < 1) {
+    sendJson(['error' => 'Cantidad de credenciales inválida'], 400);
+    exit;
 }
 
 // Validar saldo (no permitir pagar de más)

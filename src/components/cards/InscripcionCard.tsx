@@ -134,11 +134,14 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           : 'linear-gradient(180deg, var(--bg-card) 0%, var(--bg-elevated) 100%)',
       }}
     >
-      <div className="flex w-full items-center gap-3 p-4">
+      {/* En móvil el header va en DOS filas: arriba logo+textos a todo el ancho
+          (así el nombre de la obra y los chips no quedan aplastados contra los
+          botones), abajo la fila de acciones. Desde `sm` vuelve a una sola fila. */}
+      <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 p-4">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          className="flex min-w-0 flex-1 basis-full items-center gap-3 text-left sm:basis-auto"
         >
         <div
           className={`h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 transition ${
@@ -193,6 +196,10 @@ export function InscripcionCard({ insc, notas, year }: Props) {
         </div>
 
         </button>
+
+        {/* Fila de acciones. En móvil ocupa su propia línea alineada a la
+            derecha; desde `sm` queda pegada al bloque de texto como antes. */}
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
 
         {/* Estado de pago del baile: pill destacado junto a los botones de la
             derecha. En móvil el texto largo se abrevia para no desbordar. */}
@@ -287,6 +294,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
             }`}
           />
         </button>
+        </div>
       </div>
 
       {open && (
