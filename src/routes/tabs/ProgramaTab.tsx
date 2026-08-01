@@ -89,6 +89,30 @@ const segHHMM = (x: number) => { const v = Math.round(x); return ampm(Math.floor
 /** Convierte un 'HH:MM' de 24 h (los de HORA_INICIO) al formato con AM/PM. */
 export const hhmmAmPm = (t: string) => { const p = String(t || '0:0').split(':'); return ampm(Number(p[0]) || 0, Number(p[1]) || 0); };
 
+/* ─────────────── Horarios definidos por el administrador ───────────────
+   La hora de inicio del programa y la de ensayos se fijan en la app de jurados
+   (tabla `dias_horarios`) y se leen acá por la RPC pública `obtener_horarios`.
+   Un día sin fila —o con la hora en null— conserva el default de la convocatoria,
+   de modo que el cálculo no cambia mientras el administrador no lo defina. */
+type Horarios = Record<string, { inicio: string | null; ensayo: string | null }>;
+
+const esHHMM = (t: unknown) => (/^\d{1,2}:\d{2}$/.test(String(t ?? '').trim()) ? String(t).trim() : null);
+
+async function fetchHorarios(): Promise<Horarios> {
+  const r = await supabase.rpc('obtener_horarios', { p_ano: '2026' });
+  const filas = (r.data as Array<{ dia?: string; hora_inicio?: string; hora_ensayo?: string }> | null) ?? [];
+  const out: Horarios = {};
+  for (const h of filas) {
+    const dia = String(h.dia ?? '').toUpperCase().trim();
+    if (dia) out[dia] = { inicio: esHHMM(h.hora_inicio), ensayo: esHHMM(h.hora_ensayo) };
+  }
+  return out;
+}
+
+/** Hora de inicio efectiva del día: la del administrador si la definió, si no el default. */
+const inicioDe = (h: Horarios, dia: Dia) => h[dia]?.inicio || HORA_INICIO[dia];
+const ensayoDe = (h: Horarios, dia: Dia) => h[dia]?.ensayo || HORA_INICIO_ENSAYO;
+
 async function fetchPrograma(): Promise<ActoRPC[]> {
   const calls: Promise<ActoRPC[]>[] = [];
   for (const dia of DIAS) {
@@ -229,10 +253,36 @@ function initials(name: string): string {
   return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[1][0]).toUpperCase();
 }
 
+/* Filas de un día: menor y luego mayor, en el orden sorteado, con la hora
+   acumulada (inicio + duración + colchón). Es una función pura y a propósito:
+   así el PDF puede rearmarlas con los horarios recién consultados, sin depender
+   de que la pantalla ya se haya vuelto a dibujar. */
+function armarDia(
+  actos: ActoRPC[], dia: Dia, esEnsayo: boolean, misAgr: Set<string>, horarios: Horarios,
+): Fila[] {
+  const delDia = actos.filter((a) => String(a.dia || '').toUpperCase() === dia);
+  const ord = (blq: string) =>
+    delDia.filter((a) => String(a.bloque || '').toUpperCase() === blq).sort((x, y) => (x.orden ?? 0) - (y.orden ?? 0));
+  const seq = [...ord('MENOR'), ...ord('MAYOR')];
+  if (!seq.length) return [];
+  let cur = hhmmSeg(esEnsayo ? ensayoDe(horarios, dia) : inicioDe(horarios, dia));
+  return seq.map((a, i) => {
+    const hora = segHHMM(cur);
+    const dur = esEnsayo ? '8:00' : a.duracion || DUR_SUBDIV[String(a.subdivision || '').toUpperCase().trim()] || '5:00';
+    cur += esEnsayo ? ENSAYO_SEG + PUENTE_ENSAYO_SEG : durSeg(dur) + BUFFER_SEG;
+    return { ...a, n: i + 1, hora, dur, mio: a.id_agrupacion ? misAgr.has(String(a.id_agrupacion)) : false };
+  });
+}
+
 export function ProgramaTab() {
   const { user } = useAuth();
   const q = useQuery({ queryKey: ['programa', '2026'], queryFn: fetchPrograma, enabled: !!user, staleTime: 30_000 });
   const inscQ = useInscripciones('2026', !!user);
+  // Horarios fijados por el administrador. Se vuelven a consultar al momento de
+  // generar el PDF, de manera que un cambio hecho en la app de jurados aparezca
+  // sin necesidad de recargar la página.
+  const horariosQ = useQuery({ queryKey: ['horarios', '2026'], queryFn: fetchHorarios, enabled: !!user, staleTime: 30_000 });
+  const horarios = useMemo<Horarios>(() => horariosQ.data ?? {}, [horariosQ.data]);
   const actos = useMemo(() => (q.data ?? []) as ActoRPC[], [q.data]);
   const [mode, setMode] = useState<'presentacion' | 'ensayo'>('presentacion');
   const esEnsayo = mode === 'ensayo';
@@ -249,21 +299,11 @@ export function ProgramaTab() {
   const porDia = useMemo(() => {
     const out: Partial<Record<Dia, Fila[]>> = {};
     for (const dia of DIAS) {
-      const delDia = actos.filter((a) => String(a.dia || '').toUpperCase() === dia);
-      const ord = (blq: string) =>
-        delDia.filter((a) => String(a.bloque || '').toUpperCase() === blq).sort((x, y) => (x.orden ?? 0) - (y.orden ?? 0));
-      const seq = [...ord('MENOR'), ...ord('MAYOR')];
-      if (!seq.length) continue;
-      let cur = hhmmSeg(esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia]);
-      out[dia] = seq.map((a, i) => {
-        const hora = segHHMM(cur);
-        const dur = esEnsayo ? '8:00' : a.duracion || DUR_SUBDIV[String(a.subdivision || '').toUpperCase().trim()] || '5:00';
-        cur += esEnsayo ? ENSAYO_SEG + PUENTE_ENSAYO_SEG : durSeg(dur) + BUFFER_SEG;
-        return { ...a, n: i + 1, hora, dur, mio: a.id_agrupacion ? misAgr.has(String(a.id_agrupacion)) : false };
-      });
+      const filas = armarDia(actos, dia, esEnsayo, misAgr, horarios);
+      if (filas.length) out[dia] = filas;
     }
     return out;
-  }, [actos, misAgr, esEnsayo]);
+  }, [actos, misAgr, esEnsayo, horarios]);
 
   const diasConProg = DIAS.filter((d) => porDia[d]);
   const totalActos = actos.length;
@@ -288,10 +328,15 @@ export function ProgramaTab() {
   const [pdfLoading, setPdfLoading] = useState(false);
   // Descarga el programa del DÍA seleccionado (no todos). El archivo lleva el nombre del día.
   const descargarPdf = async () => {
-    const rows = porDia[diaSel];
-    if (!rows || pdfLoading) return;
+    if (!porDia[diaSel] || pdfLoading) return;
     setPdfLoading(true);
     try {
+      // Se releen los horarios antes de armar el documento: si el administrador
+      // cambió la hora de inicio en la app de jurados, el PDF ya sale con la nueva
+      // aunque esta página lleve rato abierta.
+      const frescos = (await horariosQ.refetch()).data ?? horarios;
+      const rows = armarDia(actos, diaSel, esEnsayo, misAgr, frescos);
+      if (!rows.length) return;
       const { jsPDF } = await import('jspdf');
       await import('jspdf-autotable');
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
@@ -323,8 +368,8 @@ export function ProgramaTab() {
         doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(120);
         doc.text(
           esEnsayo
-            ? 'Inicio ' + hhmmAmPm(HORA_INICIO_ENSAYO) + ' - ' + rows.length + ' ensayos - 8 min c/u + 1 min de puente (horarios aproximados)'
-            : 'Inicio ' + hhmmAmPm(HORA_INICIO[diaSel]) + ' - ' + rows.length + ' actos - ~1:30 entre bailes (horarios aproximados)',
+            ? 'Inicio ' + hhmmAmPm(ensayoDe(frescos, diaSel)) + ' - ' + rows.length + ' ensayos - 8 min c/u + 1 min de puente (horarios aproximados)'
+            : 'Inicio ' + hhmmAmPm(inicioDe(frescos, diaSel)) + ' - ' + rows.length + ' actos - ~1:30 entre bailes (horarios aproximados)',
           padL, padT + 5,
         );
         doc.setDrawColor(...DIA_RGB[diaSel]); doc.setLineWidth(0.6); doc.line(padL, padT + 7, W - padR, padT + 7);
@@ -424,7 +469,7 @@ export function ProgramaTab() {
 
       {esEnsayo && (
         <p className="text-[11px] text-text-45">
-          Ensayos desde las {hhmmAmPm(HORA_INICIO_ENSAYO)} · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
+          Ensayos desde las {hhmmAmPm(ensayoDe(horarios, diaSel))} · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
         </p>
       )}
 
@@ -465,7 +510,7 @@ export function ProgramaTab() {
         {(porDia[diaSel] ? [diaSel] : []).map((dia) => {
           const rows = porDia[dia]!;
           return (
-            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${hhmmAmPm(esEnsayo ? HORA_INICIO_ENSAYO : HORA_INICIO[dia])}`} accent={DIA_ACCENT[dia]} defaultOpen>
+            <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${hhmmAmPm(esEnsayo ? ensayoDe(horarios, dia) : inicioDe(horarios, dia))}`} accent={DIA_ACCENT[dia]} defaultOpen>
               <div className="space-y-2">
                 {/* Separado en BLOQUE MENOR / BLOQUE MAYOR, igual que el PDF.
                     Las filas ya vienen ordenadas menor→mayor y por orden de

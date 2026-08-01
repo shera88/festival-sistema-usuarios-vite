@@ -11,7 +11,7 @@
 
 | Dev | Branch | Inicio (UTC) | Archivos | Issue |
 |---|---|---|---|---|
-| _(vacío)_ | | | | |
+| shera88 (+ Claude) | `feature/programa-horarios-admin` | 2026-08-01T05:50Z | `src/routes/tabs/ProgramaTab.tsx` | — |
 
 ## HISTORIAL
 
