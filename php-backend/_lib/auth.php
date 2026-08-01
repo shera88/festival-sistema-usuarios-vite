@@ -164,6 +164,36 @@ function sesionEsAdmin(): bool
     return false;
 }
 
+/**
+ * ¿La sesión tiene permisos de SUPER admin EFECTIVOS?
+ *
+ * Mismo criterio que sesionEsAdmin() pero exigiendo super_admin, y contemplando
+ * igual la SUPERVISIÓN: mientras un super admin supervisa a otra persona, la
+ * sesión activa es la del supervisado (que casi nunca es admin), pero quien
+ * opera sigue siendo él. Gatea las acciones reservadas al super admin sobre el
+ * panel ajeno — p. ej. volver a habilitar la carga de multimedia ya confirmada.
+ */
+function sesionEsSuperAdmin(): bool
+{
+    startSecureSession();
+    require_once __DIR__ . '/context.php'; // parseIdCsv (idempotente)
+
+    $u = $_SESSION['user_data'] ?? [];
+    if (is_array($u)) {
+        $id = parseIdCsv($u['id_contacto'] ?? '')[0] ?? '';
+        if ($id !== '' && esSuperAdmin($id)) return true;
+    }
+
+    // Supervisando: el usuario REAL, guardado al iniciar la supervisión.
+    $real = $_SESSION['real_user'] ?? null;
+    if (is_array($real)) {
+        $idReal = parseIdCsv($real['id_contacto'] ?? '')[0] ?? '';
+        if ($idReal !== '' && esSuperAdmin($idReal)) return true;
+    }
+
+    return false;
+}
+
 function requireMethod(string $method): void
 {
     if ($_SERVER['REQUEST_METHOD'] !== strtoupper($method)) {

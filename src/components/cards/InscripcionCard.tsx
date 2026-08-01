@@ -65,10 +65,16 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMsg, setInfoMsg] = useState<{ title: string; body: string } | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [reverting, setReverting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
   const qc = useQueryClient();
   const mmConfirmado = !!insc.multimedia_confirmado;
+  // El super administrador puede deshacer la confirmación. `es_super_admin` es
+  // del usuario REAL, así que sigue siendo cierto mientras supervisa a otra
+  // persona — que es justamente cuando hace falta habilitarle la carga.
+  const puedeRehabilitarMM = mmConfirmado && !!user?.es_super_admin;
 
   async function handleConfirmarMM() {
     setConfirming(true);
@@ -88,6 +94,51 @@ export function InscripcionCard({ insc, notas, year }: Props) {
       setConfirming(false);
     }
   }
+
+  async function handleRevertirMM() {
+    setReverting(true);
+    try {
+      await multimediaApi.revertir(insc.id_inscripcion);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['inscripciones'] }),
+        qc.invalidateQueries({ queryKey: ['multimedia', insc.id_inscripcion] }),
+      ]);
+      setRevertOpen(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al habilitar la carga';
+      setInfoMsg({ title: 'No se pudo habilitar la carga', body: msg });
+      setInfoOpen(true);
+      setRevertOpen(false);
+    } finally {
+      setReverting(false);
+    }
+  }
+
+  /** Interruptor de multimedia confirmada. Sin confirmar, pide confirmación; ya
+   *  confirmada, el super administrador puede volver a habilitar la carga y el
+   *  resto recibe el aviso de siempre. */
+  function handleToggleMM() {
+    if (!mmConfirmado) {
+      setConfirmOpen(true);
+      return;
+    }
+    if (puedeRehabilitarMM) {
+      setRevertOpen(true);
+      return;
+    }
+    setInfoMsg({
+      title: 'Multimedia confirmada',
+      body: 'Esta multimedia ya está confirmada. Contacte al administrador para revertir.',
+    });
+    setInfoOpen(true);
+  }
+
+  /** Texto del interruptor según lo que hará al tocarlo. */
+  const mmToggleLabel = !mmConfirmado
+    ? 'Marcar audio/video como listos'
+    : puedeRehabilitarMM
+      ? 'Habilitar de nuevo la carga (super administrador)'
+      : 'Multimedia confirmada (bloqueado)';
 
   const promedio = calcularPromedioFinal(notas);
   const agrupacionName = insc.agrupacion || '?';
@@ -250,25 +301,17 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           </button>
         )}
 
-        {mmEnabled && puedeEditar && (
+        {/* También al super administrador, aunque supervise a alguien de solo
+            lectura: es quien puede levantar el bloqueo. */}
+        {mmEnabled && (puedeEditar || puedeRehabilitarMM) && (
           <button
             type="button"
             role="switch"
             aria-checked={mmConfirmado}
-            aria-label={mmConfirmado ? 'Multimedia confirmada (bloqueado)' : 'Marcar audio/video como listos'}
-            title={mmConfirmado ? 'Audio/video confirmados' : 'Marcar audio/video como listos'}
-            disabled={confirming}
-            onClick={() => {
-              if (mmConfirmado) {
-                setInfoMsg({
-                  title: 'Multimedia confirmada',
-                  body: 'Esta multimedia ya está confirmada. Contacte al administrador para revertir.',
-                });
-                setInfoOpen(true);
-                return;
-              }
-              setConfirmOpen(true);
-            }}
+            aria-label={mmToggleLabel}
+            title={mmToggleLabel}
+            disabled={confirming || reverting}
+            onClick={handleToggleMM}
             className="relative h-[20px] w-9 shrink-0 cursor-pointer rounded-full border transition disabled:opacity-60"
             style={{
               background: mmConfirmado ? 'var(--cyan)' : 'rgba(255,255,255,0.08)',
@@ -427,19 +470,10 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                   type="button"
                   role="switch"
                   aria-checked={mmConfirmado}
-                  aria-label={mmConfirmado ? 'Multimedia confirmada (bloqueado)' : 'Marcar como confirmado'}
-                  disabled={confirming}
-                  onClick={() => {
-                    if (mmConfirmado) {
-                      setInfoMsg({
-                        title: 'Multimedia confirmada',
-                        body: 'Esta multimedia ya está confirmada. Contacte al administrador para revertir.',
-                      });
-                      setInfoOpen(true);
-                      return;
-                    }
-                    setConfirmOpen(true);
-                  }}
+                  aria-label={mmToggleLabel}
+                  title={mmToggleLabel}
+                  disabled={confirming || reverting}
+                  onClick={handleToggleMM}
                   className="relative h-[18px] w-8 shrink-0 cursor-pointer rounded-full border transition disabled:opacity-60"
                   style={{
                     background: mmConfirmado ? 'var(--cyan)' : 'rgba(255,255,255,0.08)',
@@ -585,6 +619,35 @@ export function InscripcionCard({ insc, notas, year }: Props) {
         onConfirm={handleConfirmarMM}
         onClose={() => {
           if (!confirming) setConfirmOpen(false);
+        }}
+      />
+
+      {/* Solo lo ve el super administrador: deshace la confirmación para que la
+          agrupación pueda volver a subir su música o su video. */}
+      <ConfirmDialog
+        open={revertOpen}
+        variant="primary"
+        title="¿Habilitar de nuevo la carga?"
+        message={
+          <>
+            <p>
+              La multimedia de <strong className="text-text-90">{insc.nombre_de_la_obra || 'esta obra'}</strong> quedará
+              sin confirmar, de modo que se puedan reemplazar o eliminar el audio y el video.
+            </p>
+            <p className="mt-2 text-text-45">
+              Los archivos que ya subió <strong className="text-text-65">no se borran</strong>; solo se levanta el bloqueo.
+            </p>
+            <p className="mt-2 text-[12px] text-text-65">
+              Tendrá que volver a confirmar cuando la versión sea la definitiva.
+            </p>
+          </>
+        }
+        confirmText="Sí, habilitar"
+        cancelText="Cancelar"
+        loading={reverting}
+        onConfirm={handleRevertirMM}
+        onClose={() => {
+          if (!reverting) setRevertOpen(false);
         }}
       />
 
