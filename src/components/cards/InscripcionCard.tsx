@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video } from 'lucide-react';
+import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video, Download } from 'lucide-react';
 import { InscripcionPagosPanel } from '@/routes/tabs/PagosTab';
 import type { Inscripcion, Nota } from '@/types/domain';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,8 @@ import { MultimediaDialog } from './MultimediaDialog';
 import { multimediaApi } from '@/lib/api/multimedia';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { generoDeModalidad, GENERO_LABEL } from '@/lib/schemas/inscripcion';
+import { mediaBaseName, mediaDownloadUrl } from '@/lib/utils/mediaName';
+import { extFromUrl, sanitizeFilename } from '@/lib/utils/descargarArchivo';
 
 interface Props {
   insc: Inscripcion;
@@ -63,10 +65,16 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMsg, setInfoMsg] = useState<{ title: string; body: string } | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [reverting, setReverting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
   const qc = useQueryClient();
   const mmConfirmado = !!insc.multimedia_confirmado;
+  // El super administrador puede deshacer la confirmación. `es_super_admin` es
+  // del usuario REAL, así que sigue siendo cierto mientras supervisa a otra
+  // persona — que es justamente cuando hace falta habilitarle la carga.
+  const puedeRehabilitarMM = mmConfirmado && !!user?.es_super_admin;
 
   async function handleConfirmarMM() {
     setConfirming(true);
@@ -87,6 +95,51 @@ export function InscripcionCard({ insc, notas, year }: Props) {
     }
   }
 
+  async function handleRevertirMM() {
+    setReverting(true);
+    try {
+      await multimediaApi.revertir(insc.id_inscripcion);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['inscripciones'] }),
+        qc.invalidateQueries({ queryKey: ['multimedia', insc.id_inscripcion] }),
+      ]);
+      setRevertOpen(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al habilitar la carga';
+      setInfoMsg({ title: 'No se pudo habilitar la carga', body: msg });
+      setInfoOpen(true);
+      setRevertOpen(false);
+    } finally {
+      setReverting(false);
+    }
+  }
+
+  /** Interruptor de multimedia confirmada. Sin confirmar, pide confirmación; ya
+   *  confirmada, el super administrador puede volver a habilitar la carga y el
+   *  resto recibe el aviso de siempre. */
+  function handleToggleMM() {
+    if (!mmConfirmado) {
+      setConfirmOpen(true);
+      return;
+    }
+    if (puedeRehabilitarMM) {
+      setRevertOpen(true);
+      return;
+    }
+    setInfoMsg({
+      title: 'Multimedia confirmada',
+      body: 'Esta multimedia ya está confirmada. Contacte al administrador para revertir.',
+    });
+    setInfoOpen(true);
+  }
+
+  /** Texto del interruptor según lo que hará al tocarlo. */
+  const mmToggleLabel = !mmConfirmado
+    ? 'Marcar audio/video como listos'
+    : puedeRehabilitarMM
+      ? 'Habilitar de nuevo la carga (super administrador)'
+      : 'Multimedia confirmada (bloqueado)';
+
   const promedio = calcularPromedioFinal(notas);
   const agrupacionName = insc.agrupacion || '?';
   const initials = initialsOf(agrupacionName);
@@ -95,11 +148,29 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const audioUrl = insc.audio_url_multimedia || appsheetAudio(insc.musica);
   const vimeoId = extractVimeoId(insc.url_video);
 
+  // Nombre dinámico para descargar audio/video: "01.- Danzarte - The Black Panter - Martes"
+  // (Orden - Agrupación - Obra - Día). Omite orden/día si faltan.
+  const mediaBase = mediaBaseName(insc);
+  const videoUrl = insc.video_led_url_multimedia;
+  const videoFileName = videoUrl ? sanitizeFilename(mediaBase + extFromUrl(videoUrl, '.mp4')) : null;
+
   const chips: { variant: keyof typeof CHIP_STYLE; text: string }[] = [];
   if (insc.categoria) chips.push({ variant: 'cat', text: insc.categoria });
   if (insc.division) chips.push({ variant: 'div', text: insc.division });
   if (insc.subdivision) chips.push({ variant: 'sub', text: insc.subdivision });
   if (insc.modalidad) chips.push({ variant: 'mod', text: insc.modalidad });
+
+  // Estado de pago del baile (solo festival vigente 2026). Fuente de verdad:
+  // mismo cálculo del tab Pagos (deudas_2026, solo pagos verificados) resuelto
+  // server-side en inscripciones.php. Sin dato (convenio / sin compromiso) → sin chip.
+  const pagoChip =
+    year === '2026'
+      ? insc.estado_pago === 'habilitado'
+        ? { text: 'Habilitado', cls: 'border-green/50 text-green', bg: 'rgba(16,185,129,0.12)' }
+        : insc.estado_pago === 'pendiente'
+          ? { text: 'Pendiente de pago', cls: 'border-gold/50 text-gold', bg: 'rgba(232,208,152,0.12)' }
+          : null
+      : null;
 
   return (
     <article
@@ -114,11 +185,14 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           : 'linear-gradient(180deg, var(--bg-card) 0%, var(--bg-elevated) 100%)',
       }}
     >
-      <div className="flex w-full items-center gap-3 p-4">
+      {/* En móvil el header va en DOS filas: arriba logo+textos a todo el ancho
+          (así el nombre de la obra y los chips no quedan aplastados contra los
+          botones), abajo la fila de acciones. Desde `sm` vuelve a una sola fila. */}
+      <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 p-4">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          className="flex min-w-0 flex-1 basis-full items-center gap-3 text-left sm:basis-auto"
         >
         <div
           className={`h-12 w-12 shrink-0 overflow-hidden rounded-full border-2 transition ${
@@ -174,6 +248,28 @@ export function InscripcionCard({ insc, notas, year }: Props) {
 
         </button>
 
+        {/* Fila de acciones. En móvil ocupa su propia línea alineada a la
+            derecha; desde `sm` queda pegada al bloque de texto como antes. */}
+        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+
+        {/* Estado de pago del baile: pill destacado junto a los botones de la
+            derecha. En móvil el texto largo se abrevia para no desbordar. */}
+        {pagoChip && (
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase leading-none ${pagoChip.cls}`}
+            style={{ letterSpacing: '0.5px', background: pagoChip.bg }}
+            title={
+              pagoChip.text === 'Habilitado'
+                ? 'Baile habilitado para participar: pago verificado'
+                : 'Pendiente de pago: el baile se habilita al verificarse su pago'
+            }
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'currentColor' }} />
+            <span className="hidden sm:inline">{pagoChip.text}</span>
+            <span className="sm:hidden">{pagoChip.text === 'Habilitado' ? 'Habilitado' : 'Pendiente'}</span>
+          </span>
+        )}
+
         {puedeEditar && (
           <button
             type="button"
@@ -183,6 +279,49 @@ export function InscripcionCard({ insc, notas, year }: Props) {
             className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-cyan/30 bg-cyan/10 text-cyan transition hover:bg-cyan/20"
           >
             <Pencil className="h-3.5 w-3.5" strokeWidth={2.2} />
+          </button>
+        )}
+
+        {mmEnabled && puedeEditar && (
+          <button
+            type="button"
+            onClick={() => setMmOpen(true)}
+            aria-label="Subir multimedia (audio / video)"
+            title={mmConfirmado ? 'Multimedia confirmada' : 'Subir audio / video'}
+            className="relative grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-fuchsia/30 bg-fuchsia/10 text-fuchsia transition hover:bg-fuchsia/20"
+          >
+            <Upload className="h-3.5 w-3.5" strokeWidth={2.2} />
+            {!mmConfirmado && !audioUrl && (
+              <span
+                className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 bg-gold"
+                style={{ borderColor: 'var(--bg-card)' }}
+                aria-hidden
+              />
+            )}
+          </button>
+        )}
+
+        {/* También al super administrador, aunque supervise a alguien de solo
+            lectura: es quien puede levantar el bloqueo. */}
+        {mmEnabled && (puedeEditar || puedeRehabilitarMM) && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={mmConfirmado}
+            aria-label={mmToggleLabel}
+            title={mmToggleLabel}
+            disabled={confirming || reverting}
+            onClick={handleToggleMM}
+            className="relative h-[20px] w-9 shrink-0 cursor-pointer rounded-full border transition disabled:opacity-60"
+            style={{
+              background: mmConfirmado ? 'var(--cyan)' : 'rgba(255,255,255,0.08)',
+              borderColor: mmConfirmado ? 'var(--cyan)' : 'var(--glass-border)',
+            }}
+          >
+            <span
+              className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow transition-all"
+              style={{ left: mmConfirmado ? 'calc(100% - 16px)' : '2px' }}
+            />
           </button>
         )}
 
@@ -198,6 +337,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
             }`}
           />
         </button>
+        </div>
       </div>
 
       {open && (
@@ -254,17 +394,35 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                 <Field label="Estado" value={insc.estado} />
                 <Field label="Formato" value={insc.formato_de_inscripcion} />
               </div>
-              {insc.video_led_url_multimedia && (
+              {videoUrl && (
                 <div className="mt-3 rounded-xl border border-fuchsia/25 p-3">
-                  <div
-                    className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase text-fuchsia"
-                    style={{ letterSpacing: '0.5px' }}
-                  >
-                    <Video className="h-3.5 w-3.5" />
-                    Video de la obra
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div
+                      className="flex items-center gap-2 text-[10px] font-medium uppercase text-fuchsia"
+                      style={{ letterSpacing: '0.5px' }}
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      Video Para Pantallas
+                    </div>
+                    {videoUrl && videoFileName && (
+                      <a
+                        href={mediaDownloadUrl(videoUrl, videoFileName)}
+                        download={videoFileName}
+                        className="flex shrink-0 items-center gap-1 rounded-md border border-fuchsia/40 bg-fuchsia/10 px-2 py-1 text-[10px] font-semibold uppercase text-fuchsia transition hover:bg-fuchsia/20"
+                        style={{ letterSpacing: '0.4px' }}
+                      >
+                        <Download className="h-3 w-3" />
+                        Descargar
+                      </a>
+                    )}
                   </div>
+                  {videoFileName && (
+                    <div className="mb-2 truncate text-[11px] text-text-90" title={videoFileName}>
+                      {videoFileName}
+                    </div>
+                  )}
                   <video
-                    src={insc.video_led_url_multimedia}
+                    src={videoUrl}
                     controls
                     preload="metadata"
                     playsInline
@@ -275,7 +433,12 @@ export function InscripcionCard({ insc, notas, year }: Props) {
               )}
               {audioUrl && (
                 <div className="mt-3">
-                  <AudioPlayer src={audioUrl} />
+                  {/* Descarga de audio SOLO en el año vigente (2026); en años
+                      pasados el player queda sin botón de descargar. */}
+                  <AudioPlayer
+                    src={audioUrl}
+                    downloadName={year === '2026' ? mediaBase : undefined}
+                  />
                 </div>
               )}
               {mmEnabled && (
@@ -307,19 +470,10 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                   type="button"
                   role="switch"
                   aria-checked={mmConfirmado}
-                  aria-label={mmConfirmado ? 'Multimedia confirmada (bloqueado)' : 'Marcar como confirmado'}
-                  disabled={confirming}
-                  onClick={() => {
-                    if (mmConfirmado) {
-                      setInfoMsg({
-                        title: 'Multimedia confirmada',
-                        body: 'Esta multimedia ya está confirmada. Contacte al administrador para revertir.',
-                      });
-                      setInfoOpen(true);
-                      return;
-                    }
-                    setConfirmOpen(true);
-                  }}
+                  aria-label={mmToggleLabel}
+                  title={mmToggleLabel}
+                  disabled={confirming || reverting}
+                  onClick={handleToggleMM}
                   className="relative h-[18px] w-8 shrink-0 cursor-pointer rounded-full border transition disabled:opacity-60"
                   style={{
                     background: mmConfirmado ? 'var(--cyan)' : 'rgba(255,255,255,0.08)',
@@ -333,15 +487,8 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                 </button>
               </div>
               )}
-              {insc.informe && (
-                <div
-                  className="mt-3 rounded-md border-l-2 border-cyan/40 px-3.5 py-2.5 text-[12px] text-text-90"
-                  style={{ background: 'rgba(0,229,255,0.04)', lineHeight: '1.55' }}
-                >
-                  <strong className="font-semibold text-cyan">Informe: </strong>
-                  {insc.informe}
-                </div>
-              )}
+              {/* El campo `informe` es una nota interna del CRM (agente/precios) —
+                  NO se muestra en el portal del participante. */}
             </>
           )}
 
@@ -472,6 +619,35 @@ export function InscripcionCard({ insc, notas, year }: Props) {
         onConfirm={handleConfirmarMM}
         onClose={() => {
           if (!confirming) setConfirmOpen(false);
+        }}
+      />
+
+      {/* Solo lo ve el super administrador: deshace la confirmación para que la
+          agrupación pueda volver a subir su música o su video. */}
+      <ConfirmDialog
+        open={revertOpen}
+        variant="primary"
+        title="¿Habilitar de nuevo la carga?"
+        message={
+          <>
+            <p>
+              La multimedia de <strong className="text-text-90">{insc.nombre_de_la_obra || 'esta obra'}</strong> quedará
+              sin confirmar, de modo que se puedan reemplazar o eliminar el audio y el video.
+            </p>
+            <p className="mt-2 text-text-45">
+              Los archivos que ya subió <strong className="text-text-65">no se borran</strong>; solo se levanta el bloqueo.
+            </p>
+            <p className="mt-2 text-[12px] text-text-65">
+              Tendrá que volver a confirmar cuando la versión sea la definitiva.
+            </p>
+          </>
+        }
+        confirmText="Sí, habilitar"
+        cancelText="Cancelar"
+        loading={reverting}
+        onConfirm={handleRevertirMM}
+        onClose={() => {
+          if (!reverting) setRevertOpen(false);
         }}
       />
 

@@ -45,6 +45,16 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<MultimediaArchivo | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Aviso inline (debajo del audio/video) de resultado subir/reemplazar/eliminar.
+  const [flash, setFlash] = useState<{ tipo: 'audio' | 'video_led'; kind: 'ok' | 'err'; text: string } | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showFlash(tipo: 'audio' | 'video_led', kind: 'ok' | 'err', text: string) {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    setFlash({ tipo, kind, text });
+    flashTimer.current = setTimeout(() => setFlash(null), 5000);
+  }
+  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
+
   // Pending = archivo seleccionado pero NO subido aún
   const [pendingAudio, setPendingAudio] = useState<File | null>(null);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
@@ -108,6 +118,7 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
 
   function handleSelect(tipo: 'audio' | 'video_led', file: File) {
     setErrMsg(null);
+    setFlash(null);
     if (tipo === 'audio' && file.size > AUDIO_MAX_BYTES) {
       setErrMsg('Audio muy grande (máx 100 MB).');
       return;
@@ -161,9 +172,10 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
         qc.invalidateQueries({ queryKey: ['inscripciones'] }),
       ]);
       cancelarPending(tipo);
+      showFlash(tipo, 'ok', tipo === 'audio' ? 'Audio subido correctamente' : 'Video subido correctamente');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Error al subir';
-      setErrMsg(msg);
+      showFlash(tipo, 'err', msg);
     } finally {
       setUploading(null);
       setProgress(0);
@@ -173,6 +185,7 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
 
   async function handleDelete() {
     if (!deleteConfirm) return;
+    const esAudio = deleteConfirm.tipo === 'audio';
     setDeleting(true);
     try {
       await multimediaApi.eliminar(deleteConfirm.id_multimedia);
@@ -181,8 +194,9 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
         qc.invalidateQueries({ queryKey: ['inscripciones'] }),
       ]);
       setDeleteConfirm(null);
+      showFlash(esAudio ? 'audio' : 'video_led', 'ok', esAudio ? 'Audio eliminado correctamente' : 'Video eliminado correctamente');
     } catch (e: unknown) {
-      setErrMsg(e instanceof Error ? e.message : 'Error al eliminar');
+      showFlash(esAudio ? 'audio' : 'video_led', 'err', e instanceof Error ? e.message : 'Error al eliminar');
     } finally {
       setDeleting(false);
     }
@@ -280,6 +294,7 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
                   if (f) handleSelect('audio', f);
                 }}
               />
+              {flash?.tipo === 'audio' && <FlashBanner kind={flash.kind} text={flash.text} />}
             </Section>
 
             {/* VIDEO LED */}
@@ -343,6 +358,7 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
                   if (f) handleSelect('video_led', f);
                 }}
               />
+              {flash?.tipo === 'video_led' && <FlashBanner kind={flash.kind} text={flash.text} />}
             </Section>
 
             {errMsg && (
@@ -427,6 +443,33 @@ function Section({
       </div>
       <div>{children}</div>
     </section>
+  );
+}
+
+function FlashBanner({ kind, text }: { kind: 'ok' | 'err'; text: string }) {
+  const ok = kind === 'ok';
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="anim-fade-in-up mt-3 flex items-center gap-3 rounded-xl border px-4 py-3.5 text-[13px] font-bold shadow-lg"
+      style={{
+        borderColor: ok ? 'rgba(52,211,153,0.5)' : 'rgba(248,113,113,0.5)',
+        background: ok ? 'rgba(52,211,153,0.14)' : 'rgba(248,113,113,0.12)',
+        color: ok ? '#6ee7b7' : '#fca5a5',
+        boxShadow: ok
+          ? '0 8px 24px -8px rgba(16,185,129,0.45)'
+          : '0 8px 24px -8px rgba(239,68,68,0.4)',
+      }}
+    >
+      <span
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full"
+        style={{ background: ok ? 'rgba(52,211,153,0.22)' : 'rgba(248,113,113,0.22)' }}
+      >
+        {ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+      </span>
+      <span className="leading-snug">{text}</span>
+    </div>
   );
 }
 
@@ -566,10 +609,13 @@ function ArchivoExistente({
             <button
               type="button"
               onClick={onReemplazar}
-              aria-label="Reemplazar"
-              className="grid h-7 w-7 place-items-center rounded-md border border-glass-border text-text-65 transition hover:border-cyan/60 hover:text-cyan"
+              aria-label="Reemplazar archivo"
+              title="Reemplazar archivo"
+              className="flex h-7 shrink-0 items-center gap-1 rounded-md border border-glass-border px-2 text-[10px] font-semibold uppercase text-text-65 transition hover:border-cyan/60 hover:text-cyan"
+              style={{ letterSpacing: '0.4px' }}
             >
-              <Upload className="h-3.5 w-3.5" />
+              <Upload className="h-3 w-3" />
+              Reemplazar
             </button>
             <button
               type="button"

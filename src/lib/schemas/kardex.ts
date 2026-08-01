@@ -83,8 +83,11 @@ export const kardexSchema = z.object({
       "Solo JPG, PNG o WebP"
     ),
 
-  // Membresía de Videos — casilla opcional; suma +15 Bs al credencial de la agrupación.
+  // Membresía de Videos — casilla opcional (reserva promo, acceso a SUS videos).
   membresia: z.boolean().default(false),
+
+  // Membresía Paquete Completo — casilla opcional (reserva promo, TODOS los videos).
+  membresia_paquete: z.boolean().default(false),
 
   // Bailes de la agrupación en los que participa la persona (multiselect).
   bailes: z

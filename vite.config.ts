@@ -3,8 +3,12 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
-export default defineConfig({
-  base: "/",
+export default defineConfig(({ command }) => ({
+  // En producción el portal se sirve bajo festivaldanzarte.com/portal/, así que
+  // los assets tienen que referenciarse desde ahí. En dev el servidor escucha en
+  // la raíz. Antes esto era "/" fijo y había que acordarse de pasar
+  // `--base=/portal/` a mano: un build sin el flag rompía el sitio.
+  base: command === "build" ? "/portal/" : "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -26,4 +30,4 @@ export default defineConfig({
     outDir: "dist",
     sourcemap: false,
   },
-});
+}));

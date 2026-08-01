@@ -5,10 +5,11 @@ interface Props {
   label: string;
   count?: string;
   defaultOpen?: boolean;
+  accent?: string; // color CSS del encabezado (default: cyan)
   children: ReactNode;
 }
 
-export function DayGroup({ label, count, defaultOpen = true, children }: Props) {
+export function DayGroup({ label, count, defaultOpen = true, accent, children }: Props) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -24,7 +25,7 @@ export function DayGroup({ label, count, defaultOpen = true, children }: Props) 
       >
         <span
           className="flex-1 text-left font-display text-[14px] font-bold uppercase text-cyan"
-          style={{ letterSpacing: '2px' }}
+          style={{ letterSpacing: '2px', ...(accent ? { color: accent } : {}) }}
         >
           {label}
         </span>
@@ -37,7 +38,7 @@ export function DayGroup({ label, count, defaultOpen = true, children }: Props) 
           className={`h-4 w-4 shrink-0 transition-transform ${
             open ? 'rotate-180 text-cyan' : 'text-text-45'
           }`}
-          style={{ transitionDuration: '0.35s' }}
+          style={{ transitionDuration: '0.35s', ...(accent && open ? { color: accent } : {}) }}
         />
       </button>
       {open && <div className="flex flex-col gap-2.5 anim-fade-in">{children}</div>}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { authApi } from '@/lib/api/auth';
@@ -12,6 +13,7 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState<SearchResult | null>(null);
   const [dismissed, setDismissed] = useState(false);
@@ -171,13 +173,25 @@ export function LoginPage() {
             <label className="block text-xs uppercase tracking-wide text-text-45 mb-1.5">
               Contraseña (Carnet)
             </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Su número de carnet"
-              className="w-full rounded-lg border border-glass-border bg-elev px-3 py-2.5 text-text-90 placeholder:text-text-45 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Su número de carnet"
+                className="w-full rounded-lg border border-glass-border bg-elev px-3 py-2.5 pr-11 text-text-90 placeholder:text-text-45 focus:outline-none focus:border-cyan focus:ring-1 focus:ring-cyan"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                tabIndex={-1}
+                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-text-45 transition hover:text-cyan"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
           <button

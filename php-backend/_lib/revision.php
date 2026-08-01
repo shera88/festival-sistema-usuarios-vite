@@ -36,7 +36,14 @@ function _revDescargar(string $url): ?array
 /** Devuelve URL pública del PDF combinado, o null si falla. */
 function revisionGenerarPdf(array $pago, string $agrupacion = ''): ?string
 {
-    require_once __DIR__ . '/../vendor/autoload.php';
+    // Guard: si falta vendor (mpdf) NO reventar el request (require de archivo ausente
+    // es fatal uncatchable). Devolver null → el llamador usa el comprobante crudo.
+    $autoload = __DIR__ . '/../vendor/autoload.php';
+    if (!is_file($autoload)) {
+        error_log('[revision] vendor/autoload.php ausente; se omite el PDF de revisión');
+        return null;
+    }
+    require_once $autoload;
     try {
         $numero  = (string)($pago['numero_recibo'] ?? $pago['id_pago'] ?? 'pago');
         $nombre  = (string)($pago['nombre_pagador'] ?? '—');

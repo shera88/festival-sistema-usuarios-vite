@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, Video, CreditCard, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, type LucideIcon } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol } from '@/lib/roles';
@@ -36,6 +36,7 @@ export function AppSidebar({ open, onClose }: Props) {
         { to: '/inscripciones', label: puedeEditar ? 'Inscripciones' : 'Mis Participaciones', icon: ClipboardList },
         { to: '/kardex', label: puedeEditar ? 'Kardex' : 'Mis Agrupaciones', icon: Users },
         { to: '/calificaciones', label: 'Calificaciones', icon: Award },
+        { to: '/programa', label: 'Programa', icon: CalendarClock },
         { to: '/videos', label: 'Videos', icon: Video },
         // Pagos solo para representantes/directores/coreógrafos (staff). NO bailarines.
         ...(pagosVisibleParaRol(user) ? [{ to: '/pagos', label: 'Pagos', icon: CreditCard }] : []),

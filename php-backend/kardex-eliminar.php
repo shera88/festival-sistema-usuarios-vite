@@ -49,14 +49,18 @@ if ($id_agrupacion === '') {
 
 // 2) Verificar contexto del usuario: el id_agrupacion del row debe estar en
 //    los ids del user.
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
-if (!in_array($id_agrupacion, $userAgrups, true)) {
+// Set REAL de agrupaciones (primaria + todas las de sus inscripciones): edita
+// todo lo de SUS agrupaciones, no solo la primaria. Ver resolveUserAgrupaciones.
+$userAgrups = resolveUserAgrupaciones($user);
+// Admins / super-admin eliminan de CUALQUIER agrupación (igual que multimedia-*).
+$esAdmin = sesionEsAdmin();
+if (!$esAdmin && !in_array($id_agrupacion, $userAgrups, true)) {
     sendJson(['error' => 'No autorizado para esta agrupación'], 403);
     exit;
 }
 
 // 3) Estado de credenciales: debe ser != 'completo'
-if (credCerrada($sb, $id_agrupacion, 2026)) {
+if (!$esAdmin && credCerrada($sb, $id_agrupacion, 2026)) {
     sendJson(['error' => 'Agrupación cerrada. Solicite al administrador habilitar para hacer cambios.'], 423);
     exit;
 }

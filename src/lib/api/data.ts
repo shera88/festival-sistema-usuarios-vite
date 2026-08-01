@@ -16,9 +16,9 @@ export const dataApi = {
   videos: () =>
     api.get<VideosResponse>('/videos.php'),
 
-  /** Inicia el checkout de la Membresía de Videos → devuelve la URL de pago de WooCommerce. */
-  membresiaCheckout: () =>
-    api.post<{ pay_url: string; order_id: number; precio: number }>('/membresia-checkout.php', {}),
+  /** Inicia el checkout de una membresía (videos | paquete) → URL de pago de WooCommerce. */
+  membresiaCheckout: (tipo: 'videos' | 'paquete' = 'videos') =>
+    api.post<{ pay_url: string; order_id: number; precio: number; tipo: string }>('/membresia-checkout.php', { tipo }),
 
   pagos: (year: Year) =>
     api.get<Record<string, unknown[]>>(`/pagos.php?year=${year}`),

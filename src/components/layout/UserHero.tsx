@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Loader2, Pencil, FilePlus, UserPlus } from 'lucide-react';
+import { X, Loader2, Pencil, FilePlus, UserPlus, UserRoundSearch } from 'lucide-react';
 import type { User } from '@/types/domain';
 import { webpProxy } from '@/lib/utils/img';
 
@@ -23,10 +23,12 @@ export function UserHero({ user }: Props) {
 
   // CTA contextual del header: solo en Inscripciones (→ Nueva Inscripción) y
   // Kardex (→ Nuevo Kardex). En las demás vistas NO aparece ningún botón arriba.
+  // "Nuevo Kardex" solo para quienes gestionan (representante/director/coreógrafo
+  // y staff de kárdex); los bailarines (solo lectura) no lo ven.
   const cta =
     pathname.startsWith('/inscripciones')
       ? { to: '/inscripcion', long: 'Nueva Inscripción', short: 'Inscribir', aria: 'Nueva inscripción', Icon: FilePlus }
-      : pathname.startsWith('/kardex')
+      : pathname.startsWith('/kardex') && puedeEditar
         ? { to: '/kardex-form', long: 'Nuevo Kardex', short: 'Kardex', aria: 'Nuevo kardex', Icon: UserPlus }
         : null;
 
@@ -101,6 +103,20 @@ export function UserHero({ user }: Props) {
               className="grid h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md text-text-45 transition hover:bg-white/5 hover:text-cyan"
             >
               <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {/* Cambiar de usuario (supervisión) — SOLO super admin y SOLO en PC:
+              en móvil queda el ícono del topbar. Abre el modal de AppHeader
+              vía evento global (el modal vive allá). */}
+          {user.es_super_admin && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('supervisar:open'))}
+              aria-label="Cambiar de usuario (supervisión)"
+              title="Cambiar de usuario (supervisión)"
+              className="hidden h-6 w-6 shrink-0 cursor-pointer place-items-center rounded-md text-text-45 transition hover:bg-white/5 hover:text-gold sm:grid"
+            >
+              <UserRoundSearch className="h-3.5 w-3.5" />
             </button>
           )}
         </div>

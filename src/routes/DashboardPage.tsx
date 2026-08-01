@@ -9,6 +9,7 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { InscripcionesTab } from './tabs/InscripcionesTab';
 import { KardexTab } from './tabs/KardexTab';
 import { CalificacionesTab } from './tabs/CalificacionesTab';
+import { ProgramaTab } from './tabs/ProgramaTab';
 import { VideosTab } from './tabs/VideosTab';
 import { PagosTab } from './tabs/PagosTab';
 
@@ -64,6 +65,7 @@ export function DashboardPage() {
             <Route path="inscripciones" element={<InscripcionesTab />} />
             <Route path="kardex" element={<KardexTab />} />
             <Route path="calificaciones" element={<CalificacionesTab />} />
+            <Route path="programa" element={<ProgramaTab />} />
             <Route path="videos" element={<VideosTab />} />
             <Route path="pagos" element={<PagosTab />} />
             <Route path="admin/pagos" element={<AdminPagosTab />} />

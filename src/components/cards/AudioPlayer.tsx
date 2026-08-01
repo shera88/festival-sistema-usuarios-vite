@@ -1,9 +1,13 @@
 import { useRef, useState } from 'react';
-import { Play, Pause, Music } from 'lucide-react';
+import { Play, Pause, Music, Download } from 'lucide-react';
+import { extFromUrl, sanitizeFilename } from '@/lib/utils/descargarArchivo';
+import { mediaDownloadUrl } from '@/lib/utils/mediaName';
 
 interface Props {
   src: string;
   title?: string;
+  /** Nombre base para descargar (sin extensión). Si se pasa, muestra el nombre + botón. */
+  downloadName?: string;
 }
 
 function fmtTime(s: number): string {
@@ -13,12 +17,16 @@ function fmtTime(s: number): string {
   return `${m}:${String(ss).padStart(2, '0')}`;
 }
 
-export function AudioPlayer({ src, title = 'Audio de la obra' }: Props) {
+export function AudioPlayer({ src, title = 'Audio de la obra', downloadName }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const fileName = downloadName
+    ? sanitizeFilename(downloadName + extFromUrl(src, '.mp3'))
+    : null;
 
   function toggle() {
     const a = audioRef.current;
@@ -66,13 +74,32 @@ export function AudioPlayer({ src, title = 'Audio de la obra' }: Props) {
         className="hidden"
       />
 
-      <div
-        className="mb-2 flex items-center gap-2 text-[10px] font-medium uppercase text-cyan"
-        style={{ letterSpacing: '0.6px' }}
-      >
-        <Music className="h-3.5 w-3.5" />
-        {title}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div
+          className="flex items-center gap-2 text-[10px] font-medium uppercase text-cyan"
+          style={{ letterSpacing: '0.6px' }}
+        >
+          <Music className="h-3.5 w-3.5" />
+          {title}
+        </div>
+        {fileName && (
+          <a
+            href={mediaDownloadUrl(src, fileName)}
+            download={fileName}
+            className="flex shrink-0 items-center gap-1 rounded-md border border-cyan/40 bg-cyan/10 px-2 py-1 text-[10px] font-semibold uppercase text-cyan transition hover:bg-cyan/20"
+            style={{ letterSpacing: '0.4px' }}
+          >
+            <Download className="h-3 w-3" />
+            Descargar
+          </a>
+        )}
       </div>
+
+      {fileName && (
+        <div className="mb-2 truncate text-[11px] text-text-90" title={fileName}>
+          {fileName}
+        </div>
+      )}
 
       <div className="flex items-center gap-3">
         <button

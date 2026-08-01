@@ -23,7 +23,7 @@ import {
 import { AgrupacionInscritasDropdown } from "@/components/kardex/AgrupacionInscritasDropdown";
 import { BailesMultiselect } from "@/components/kardex/BailesMultiselect";
 import { scrollToFirstError } from "@/lib/form-scroll";
-import { MEMBRESIA_VIDEOS } from "@/lib/membresia";
+import { MEMBRESIA_VIDEOS, MEMBRESIA_PAQUETE } from "@/lib/membresia";
 
 const FIELD_ORDER = [
   "agrupacion",
@@ -95,6 +95,11 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
   const agrupacion = watch("agrupacion") ?? "";
   const telefonoActual = watch("telefono") ?? "";
   const ciActual = watch("ci") ?? "";
+  // Membresías mutuamente excluyentes: el Paquete Completo es superset (TODOS los
+  // videos) de la Membresía de Videos (solo los suyos). Si toma el Paquete, la de
+  // Videos queda deshabilitada (redundante). La de Videos NO bloquea el Paquete
+  // (permite upgradear). "Es una u otra".
+  const membresiaPaquete = watch("membresia_paquete") ?? false;
 
   const telefonoDiffer = useMemo(() => {
     if (!refTelefono) return false;
@@ -386,9 +391,12 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
               type="button"
               role="checkbox"
               aria-checked={!!field.value}
+              disabled={membresiaPaquete}
               onClick={() => field.onChange(!field.value)}
               className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors ${
-                field.value
+                membresiaPaquete
+                  ? "cursor-not-allowed border-border bg-card/40 opacity-45"
+                  : field.value
                   ? "border-[rgba(34,211,238,0.6)] bg-[rgba(34,211,238,0.08)]"
                   : "border-border bg-card/60 hover:border-[rgba(34,211,238,0.4)]"
               }`}
@@ -412,7 +420,9 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
                   </span>
                 </span>
                 <span className="mt-0.5 block text-xs text-foreground/60">
-                  Acceso a todos sus videos del festival 2026. Aproveche y reserve su cupo especial antes del festival.
+                  {membresiaPaquete
+                    ? "Ya incluida en el Paquete Completo — no necesita esta membresía."
+                    : "Acceso a todos sus videos del festival 2026. Aproveche y reserve su cupo especial antes del festival."}
                 </span>
               </span>
               <span className="flex shrink-0 flex-col items-end gap-0.5 leading-none">
@@ -421,6 +431,62 @@ export function KardexForm({ defaultValues }: { defaultValues?: Partial<z.input<
                 </span>
                 <span className="rounded-full bg-primary-gradient px-3 py-1 text-sm font-bold text-white">
                   {MEMBRESIA_VIDEOS.precioReserva} Bs
+                </span>
+              </span>
+            </button>
+          )}
+        />
+      </div>
+
+      {/* 8c. Membresía Paquete Completo — OFERTA: TODOS los videos del festival */}
+      <div data-field-anchor="membresia_paquete">
+        <Controller
+          control={control}
+          name="membresia_paquete"
+          render={({ field }) => (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={!!field.value}
+              onClick={() => {
+                const next = !field.value;
+                field.onChange(next);
+                if (next) setValue("membresia", false); // Paquete gana → apaga Videos
+              }}
+              className={`flex w-full items-center gap-3 rounded-xl border px-4 py-4 text-left transition-colors ${
+                field.value
+                  ? "border-[rgba(168,85,247,0.6)] bg-[rgba(168,85,247,0.10)]"
+                  : "border-border bg-card/60 hover:border-[rgba(168,85,247,0.4)]"
+              }`}
+            >
+              <span
+                className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border ${
+                  field.value ? "border-[rgba(168,85,247,0.9)] bg-[rgba(168,85,247,0.95)]" : "border-border"
+                }`}
+              >
+                {field.value && (
+                  <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 text-black" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-foreground">Añadir Paquete Completo</span>
+                  <span className="rounded-full border border-[rgba(251,191,36,0.4)] bg-[rgba(251,191,36,0.12)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--amber-accent)]">
+                    Oferta
+                  </span>
+                </span>
+                <span className="mt-0.5 block text-xs text-foreground/60">
+                  Acceso a TODOS los videos del festival 2026 (no solo los suyos). Reserve su cupo antes del festival.
+                </span>
+              </span>
+              <span className="flex shrink-0 flex-col items-end gap-0.5 leading-none">
+                <span className="text-xs font-medium text-foreground/40 line-through">
+                  {MEMBRESIA_PAQUETE.precioRegular} Bs
+                </span>
+                <span className="rounded-full bg-primary-gradient px-3 py-1 text-sm font-bold text-white">
+                  {MEMBRESIA_PAQUETE.precioReserva} Bs
                 </span>
               </span>
             </button>

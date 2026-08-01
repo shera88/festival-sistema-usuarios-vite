@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
+require __DIR__ . '/_lib/promo.php';
 
 handlePreflight();
 requireMethod('POST');
@@ -32,32 +33,62 @@ $idFilter = ($origen === 'kardex')
     ? 'id_kardex=eq.' . rawurlencode($idContacto)
     : 'id_contacto=eq.' . rawurlencode($idContacto);
 
-$rows = supabase()->selectRaw(
+// tipo de membresía a cobrar: 'videos' (default) o 'paquete' (todos los videos).
+$body = json_decode((string)file_get_contents('php://input'), true);
+$tipo = (is_array($body) && ($body['tipo'] ?? '') === 'paquete') ? 'paquete' : 'videos';
+
+if ($tipo === 'paquete') {
+    $colReservo    = 'membresia_paquete';
+    $colPagada     = 'membresia_paquete_pagada';
+    $prodReserva   = (int)($wc['producto_paquete_reserva_id'] ?? 0);
+    $prodRegular   = (int)($wc['producto_paquete_regular_id'] ?? 0);
+    $precioReserva = 40; $precioRegular = 80;
+    $metaKey       = '_membresia_paquete';
+} else {
+    $colReservo    = 'membresia';
+    $colPagada     = 'membresia_pagada';
+    $prodReserva   = (int)($wc['producto_reserva_id'] ?? 0);
+    $prodRegular   = (int)($wc['producto_regular_id'] ?? 0);
+    $precioReserva = 20; $precioRegular = 50;
+    $metaKey       = '_membresia_videos';
+}
+
+$sb = supabase();
+$ownerId = $idContacto;   // identidad de sesión: kárdex→id_kardex, contacto→UUID
+$memCol       = ($tipo === 'paquete') ? 'paquete_reservo' : 'reservo';
+$memColPagada = ($tipo === 'paquete') ? 'paquete_pagada'  : 'pagada';
+
+// Kárdex del usuario (OPCIONAL ahora): da reserva (precio promo), pago legacy e
+// id_kardex de referencia. Ya NO se exige tener kárdex para comprar.
+$rows = $sb->selectRaw(
     'registro_kardex_2026',
-    'select=id_kardex,membresia,membresia_pagada&' . $idFilter . '&limit=50'
+    'select=id_kardex,' . $colReservo . ',' . $colPagada . '&' . $idFilter . '&limit=50'
 );
-if (!is_array($rows) || count($rows) === 0) {
-    sendJson(['error' => 'No encontramos tu registro de kárdex. Registrá tu kárdex primero.'], 409);
+$reservo = false; $idKardex = null; $yaPagoLegacy = false;
+if (is_array($rows)) {
+    foreach ($rows as $r) {
+        if (!empty($r[$colPagada])) $yaPagoLegacy = true;
+        if (!empty($r[$colReservo])) { $reservo = true; if ($idKardex === null) $idKardex = (string)$r['id_kardex']; }
+    }
+    if ($idKardex === null && count($rows) > 0) $idKardex = (string)$rows[0]['id_kardex'];
+}
+
+// Membresía existente (tabla nueva, fuente de verdad): pago + reserva por owner_id.
+$memExist = $sb->selectOne('membresias_videos_2026',
+    'id,reservo,pagada,paquete_reservo,paquete_pagada',
+    ['owner_id' => 'eq.' . $ownerId]);
+if ($memExist && !empty($memExist[$memCol])) $reservo = true;
+
+if ($yaPagoLegacy || ($memExist && !empty($memExist[$memColPagada]))) {
+    sendJson(['error' => 'Esta membresía ya está pagada.'], 409);
     exit;
 }
 
-// ¿Ya pagó? No hay nada que cobrar.
-foreach ($rows as $r) {
-    if (!empty($r['membresia_pagada'])) {
-        sendJson(['error' => 'Tu membresía ya está pagada.'], 409);
-        exit;
-    }
-}
+// Promo pre-festival: todos pagan el precio de oferta (reserva) hasta que arranque.
+if (promoMembresiaTodos()) $reservo = true;
 
-// Reservó = cualquiera de SUS filas con membresia=true → precio promo. El id_kardex
-// a marcar: preferí una fila reservada; si no, la primera.
-$reservo = false; $idKardex = null;
-foreach ($rows as $r) {
-    if (!empty($r['membresia'])) { $reservo = true; if ($idKardex === null) $idKardex = (string)$r['id_kardex']; }
-}
-if ($idKardex === null) $idKardex = (string)$rows[0]['id_kardex'];
-
-$productId = $reservo ? (int)$wc['producto_reserva_id'] : (int)$wc['producto_regular_id'];
+$productId = $reservo ? $prodReserva : $prodRegular;
+if ($productId <= 0) { sendJson(['error' => 'El producto de esta membresía no está configurado.'], 500); exit; }
 
 // Crear la orden PENDIENTE en WooCommerce. billing = datos de la SESIÓN (la persona
 // logueada que aprieta el botón); meta _id_kardex = a quién desbloquear al pagar.
@@ -71,9 +102,11 @@ $payload = [
     ],
     'line_items'  => [['product_id' => $productId, 'quantity' => 1]],
     'meta_data'   => [
-        ['key' => '_id_kardex',        'value' => $idKardex],
-        ['key' => '_id_contacto',      'value' => $idContacto],
-        ['key' => '_membresia_videos', 'value' => '2026'],
+        ['key' => '_id_kardex',   'value' => (string)$idKardex],
+        ['key' => '_id_contacto', 'value' => $idContacto],
+        ['key' => '_owner_id',    'value' => $ownerId],
+        ['key' => '_origen',      'value' => $origen],
+        ['key' => $metaKey,       'value' => '2026'],
     ],
 ];
 
@@ -100,6 +133,24 @@ if ($code < 200 || $code >= 300 || empty($order['id'])) {
     exit;
 }
 
+// Registrar/actualizar la membresía PENDIENTE por owner_id con el order_id, para
+// que el webhook de pago (n8n) la marque pagada por owner_id / order_id.
+$memRow = [
+    'owner_id'    => $ownerId,
+    'origen'      => $origen,
+    'id_kardex'   => $idKardex ?: null,
+    'id_contacto' => ($origen === 'contacto') ? $idContacto : null,
+    'order_id'    => (string)$order['id'],
+    $memCol       => $reservo,   // refleja la reserva real (kárdex), no el click
+];
+try {
+    if ($memExist && !empty($memExist['id'])) {
+        $sb->update('membresias_videos_2026', 'owner_id', $ownerId, $memRow);
+    } else {
+        $sb->insert('membresias_videos_2026', $memRow);
+    }
+} catch (\Throwable $e) { /* no bloquea el checkout */ }
+
 // URL de pago de la orden (pay-for-order de WooCommerce).
 $payUrl = rtrim($wc['site_url'], '/') . '/checkout/order-pay/' . (int)$order['id']
         . '/?pay_for_order=true&key=' . rawurlencode((string)($order['order_key'] ?? ''));
@@ -107,5 +158,6 @@ $payUrl = rtrim($wc['site_url'], '/') . '/checkout/order-pay/' . (int)$order['id
 sendJson([
     'pay_url'  => $payUrl,
     'order_id' => (int)$order['id'],
-    'precio'   => $reservo ? 20 : 50,
+    'precio'   => $reservo ? $precioReserva : $precioRegular,
+    'tipo'     => $tipo,
 ]);

@@ -43,8 +43,10 @@ $id_referencia  = trim((string)($_POST['id_referencia'] ?? ''));
 $monto          = (float)($_POST['monto'] ?? 0);
 $id_metodo_pago = trim((string)($_POST['id_metodo_pago'] ?? ''));
 $observacion    = trim((string)($_POST['observacion'] ?? '')) ?: null;
-// Cantidad de credenciales a comprar (solo credencial). La inscripción da un valor
-// inicial pero el usuario puede ajustarlo → fija el compromiso (override) y el monto.
+// Cantidad de credenciales. YA NO la elige el usuario: el compromiso la deriva
+// del kárdex (1 por persona, deduplicada por CI dentro de la agrupación). Se
+// sigue leyendo sólo por compatibilidad con clientes viejos, pero NO altera ni
+// el compromiso ni el monto.
 $cantidadCred   = isset($_POST['cantidad']) ? (int)$_POST['cantidad'] : null;
 const PRECIO_CREDENCIAL = 15;
 
@@ -128,27 +130,20 @@ if (!in_array($id_agrupacion, $userAgrups, true)) {
     exit;
 }
 
-// Credencial con cantidad ajustada: el usuario define cuántas comprar. Se fija el
-// override (compromisos_credenciales_2026) → el compromiso pasa a valer
-// cantidad × 15 Bs, y el monto del pago se calcula desde ahí (autoridad server).
-if ($conceptoCanon === 'credencial' && $cantidadCred !== null) {
-    if ($cantidadCred < 1) { sendJson(['error' => 'Cantidad de credenciales inválida'], 400); exit; }
-    try {
-        $sb->upsert('compromisos_credenciales_2026', [
-            'id_compromiso'   => $id_referencia,
-            'id_agrupacion'   => $id_agrupacion,
-            'cantidad'        => $cantidadCred,
-            'precio_unitario' => PRECIO_CREDENCIAL,
-            'origen'          => 'manual',
-            'updated_at'      => date('c'),
-        ], 'id_agrupacion');
-    } catch (RuntimeException $e) {
-        sendJson(['error' => 'No se pudo fijar la cantidad de credenciales: ' . $e->getMessage()], 500);
-        exit;
-    }
-    // El monto lo manda el frontend (cantidad × 15) pero el server lo recomputa
-    // para no confiar en el cliente.
-    $monto = $cantidadCred * PRECIO_CREDENCIAL;
+// Credencial: la CANTIDAD ya no la define el usuario.
+//
+// Antes, mandar `cantidad` fijaba un override manual en compromisos_credenciales_2026
+// y el server recomputaba `monto = cantidad × 15`. Eso tenía dos efectos no deseados:
+//   1. el total del compromiso cambiaba según lo que el usuario tipeara, y
+//   2. al forzar el monto, era IMPOSIBLE abonar a cuenta (siempre se pagaba el total).
+//
+// Ahora la cantidad la deriva la vista deudas_2026 desde el kárdex (1 credencial
+// por persona, deduplicada por CI dentro de la agrupación) y el `monto` recibido
+// se respeta tal cual: la validación de saldo de más abajo permite abonos
+// parciales hasta completar, igual que inscripción y pre-venta.
+if ($conceptoCanon === 'credencial' && $cantidadCred !== null && $cantidadCred < 1) {
+    sendJson(['error' => 'Cantidad de credenciales inválida'], 400);
+    exit;
 }
 
 // Validar saldo (no permitir pagar de más)
@@ -241,27 +236,18 @@ try {
     exit;
 }
 
-// Notificar a n8n para que avise a admins por WhatsApp
-$cfgFull = require __DIR__ . '/config.php';
-$n8nUrl = $cfgFull['webhooks']['pago_revision'] ?? '';
+// Notificar a n8n para que avise a admins por WhatsApp (plantilla YCloud).
+// ROBUSTEZ (el aviso a admins vale más que el PDF bonito):
+//   1) Se arma un payload base con el comprobante crudo ANTES de cualquier mpdf.
+//   2) register_shutdown_function garantiza que el curl salga aunque un fatal
+//      UNCATCHABLE (OOM / max_execution_time de mpdf) mate el request antes.
+//   3) enrich + PDF son best-effort en try/catch: un throw NO bloquea el aviso.
+//   4) timeout 6s (n8n responde "Workflow was started" en <1s; colchón para picos).
+$cfgFull   = require __DIR__ . '/config.php';
+$n8nUrl    = $cfgFull['webhooks']['pago_revision'] ?? '';
 $n8nSecret = $cfgFull['webhook_shared_secret'] ?? '';
 if ($n8nUrl) {
-    // Datos contextuales para enriquecer la notificación
-    $obra = '';
-    $agrupacion = '';
-    // Nombre de la agrupación desde instituciones (sirve para TODOS los conceptos:
-    // inscripción, pre-venta, credenciales). Antes solo se llenaba para inscripción.
-    $inst = $sb->selectOne('instituciones', 'nombre_agrupacion', ['id_agrupacion' => 'eq.' . $id_agrupacion]);
-    $agrupacion = (string)($inst['nombre_agrupacion'] ?? '');
-    if ($conceptoCanon === 'por_participante') {
-        $insRow = $sb->selectOne('registro_de_inscripcion_2026', 'nombre_de_la_obra,agrupacion', ['id_inscripcion' => 'eq.' . $id_referencia]);
-        $obra = (string)($insRow['nombre_de_la_obra'] ?? '');
-        if ($agrupacion === '') $agrupacion = (string)($insRow['agrupacion'] ?? '');
-    }
-    // PDF de revisión para el admin: hoja 1 con los datos del pago + el comprobante
-    // del usuario anexado (imagen embebida o PDF fusionado). Si falla, usa el comprobante crudo.
-    require_once __DIR__ . '/_lib/revision.php';
-    $revisionPdfUrl = revisionGenerarPdf($row, $agrupacion);
+    // Payload base GARANTIZADO (comprobante crudo como documento). Se enriquece abajo.
     $payload = [
         'secret'           => $n8nSecret,
         'id_pago'          => $id_pago,
@@ -275,24 +261,55 @@ if ($n8nUrl) {
         'nombre_pagador'   => $row['nombre_pagador'],
         'telefono_pagador' => $row['telefono_pagador'],
         'comprobante_url'  => $comprobante_url,
-        'revision_pdf_url' => $revisionPdfUrl ?: $comprobante_url,
-        'agrupacion'       => $agrupacion,
-        'nombre_obra'      => $obra,
+        'revision_pdf_url' => $comprobante_url,   // se sube al PDF bonito si se genera
+        'agrupacion'       => '',
+        'nombre_obra'      => '',
     ];
-    // Fire-and-forget, 2s timeout para no demorar la respuesta al usuario
-    $ch = curl_init($n8nUrl);
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 2,
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-    ]);
-    curl_exec($ch);
-    if (curl_errno($ch)) {
-        error_log('[pago-crear] n8n notify falló: ' . curl_error($ch));
+    $notifySent = false;
+    $fireNotify = function () use (&$payload, &$notifySent, $n8nUrl) {
+        if ($notifySent) return;   // idempotente: shutdown + camino normal no duplican
+        $notifySent = true;
+        $ch = curl_init($n8nUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 6,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        ]);
+        curl_exec($ch);
+        if (curl_errno($ch)) {
+            error_log('[pago-crear] n8n notify falló: ' . curl_error($ch));
+        }
+        curl_close($ch);
+    };
+    // Garantía anti-fatal: aunque mpdf reviente el request, el aviso sale al terminar.
+    register_shutdown_function($fireNotify);
+
+    // Enriquecer agrupación / obra (best-effort; un throw de selectOne NO bloquea el aviso).
+    try {
+        $inst = $sb->selectOne('instituciones', 'nombre_agrupacion', ['id_agrupacion' => 'eq.' . $id_agrupacion]);
+        $payload['agrupacion'] = (string)($inst['nombre_agrupacion'] ?? '');
+        if ($conceptoCanon === 'por_participante') {
+            $insRow = $sb->selectOne('registro_de_inscripcion_2026', 'nombre_de_la_obra,agrupacion', ['id_inscripcion' => 'eq.' . $id_referencia]);
+            $payload['nombre_obra'] = (string)($insRow['nombre_de_la_obra'] ?? '');
+            if ($payload['agrupacion'] === '') $payload['agrupacion'] = (string)($insRow['agrupacion'] ?? '');
+        }
+    } catch (\Throwable $e) {
+        error_log('[pago-crear] enrich notify falló (se notifica igual): ' . $e->getMessage());
     }
-    curl_close($ch);
+
+    // PDF de revisión (datos + comprobante anexado). Best-effort: si sale, mejora el documento.
+    try {
+        require_once __DIR__ . '/_lib/revision.php';
+        $revisionPdfUrl = revisionGenerarPdf($row, $payload['agrupacion']);
+        if ($revisionPdfUrl) $payload['revision_pdf_url'] = $revisionPdfUrl;
+    } catch (\Throwable $e) {
+        error_log('[pago-crear] revision pdf falló (se notifica igual): ' . $e->getMessage());
+    }
+
+    // Camino normal. Si un fatal ya lo disparó por shutdown, esto es no-op.
+    $fireNotify();
 }
 
 sendJson([

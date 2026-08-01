@@ -13,3 +13,13 @@ export const MEMBRESIA_VIDEOS = {
   /** Precio regular si la compra después del festival. */
   precioRegular: 50,
 } as const;
+
+// Membresía "Paquete Completo" 2026 (en Bs).
+// Da acceso a TODOS los videos del festival 2026 (no solo los de sus bailes).
+// Mismo modelo que la de Videos: reserva en el kárdex (40) o compra después (80).
+export const MEMBRESIA_PAQUETE = {
+  /** Precio promocional/anticipado si reservó el Paquete en el kárdex. */
+  precioReserva: 40,
+  /** Precio regular si lo compra después. */
+  precioRegular: 80,
+} as const;

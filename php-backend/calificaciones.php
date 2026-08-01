@@ -15,7 +15,9 @@ if (!in_array($year, ['2023', '2024', '2025', '2026'], true)) {
     exit;
 }
 
-$filter = buildContextFilter($user);
+// id_contacto solo existe en registro_de_inscripcion_2026+ (mismo scope que inscripciones.php),
+// si no, agrupaciones ligadas al representante solo por id_contacto quedan sin calificaciones.
+$filter = buildContextFilter($user, (int)$year >= 2026);
 if (!$filter) { sendJson([$year => []]); exit; }
 
 $insc = supabase()->selectRaw(

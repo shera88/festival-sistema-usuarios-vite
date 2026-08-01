@@ -57,4 +57,10 @@ $_SESSION['user_data'] = [
 // desde el primer render post-login, sin esperar a la rehidratación de me.php.
 $_SESSION['user_data']['es_admin'] = esAdminPagos((string)($_SESSION['user_data']['id_contacto'] ?? ''));
 
-sendJson(['user' => $_SESSION['user_data']]);
+// Super admin (supervisión) también desde el primer render: sin esto, la opción
+// "Supervisar usuario" no aparecía hasta que me.php rehidratara la sesión.
+$resp = $_SESSION['user_data'];
+$resp['es_super_admin'] = esSuperAdmin((string)($resp['id_contacto'] ?? ''));
+$resp['impersonando'] = false;
+
+sendJson(['user' => $resp]);

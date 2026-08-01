@@ -94,7 +94,11 @@ function resolveUserAgrupaciones(array $user): array
             if ($aid !== '' && $aid !== null) $set[$aid] = true;
         }
     }
-    return array_keys($set);
+    // strval en las claves: PHP castea a int las claves que son strings numéricos
+    // (ej. id_agrupacion "23743504" → int 23743504). Sin esto, un in_array(...,
+    // strict) contra un id_agrupacion string devuelve false → 403 en agrupaciones
+    // de puros dígitos. Devolvemos siempre strings.
+    return array_map('strval', array_keys($set));
 }
 
 function quoteIfNeeded(string $value): string

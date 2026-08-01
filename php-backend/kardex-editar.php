@@ -62,6 +62,24 @@ foreach ($ALLOWED as $field) {
     }
 }
 
+// Bailes (jsonb array de {id_inscripcion, nombre_de_la_obra}) + bailes_ids (jsonb
+// array de id_inscripcion, derivado). Se manejan aparte del whitelist de strings.
+if (array_key_exists('bailes', $patchIn)) {
+    $raw = is_array($patchIn['bailes']) ? $patchIn['bailes'] : [];
+    $bailes = [];
+    $ids = [];
+    foreach ($raw as $item) {
+        if (!is_array($item) || empty($item['id_inscripcion'])) continue;
+        $bailes[] = [
+            'id_inscripcion'    => (string)$item['id_inscripcion'],
+            'nombre_de_la_obra' => (string)($item['nombre_de_la_obra'] ?? ''),
+        ];
+        $ids[] = (string)$item['id_inscripcion'];
+    }
+    $patch['bailes']     = $bailes;
+    $patch['bailes_ids'] = $ids;
+}
+
 if (count($patch) === 0) {
     sendJson(['error' => 'Nada para actualizar'], 400);
     exit;
@@ -74,13 +92,18 @@ if (!$row) {
     exit;
 }
 $id_agrupacion = (string)($row['id_agrupacion'] ?? '');
-$userAgrups = parseIdCsv($user['id_agrupacion'] ?? '');
-if (!in_array($id_agrupacion, $userAgrups, true)) {
+// Set REAL de agrupaciones (primaria + TODAS las de sus inscripciones): un
+// representante/director/coreógrafo edita todo lo de SUS agrupaciones, no solo
+// la primaria del contacto. Ver context.php::resolveUserAgrupaciones.
+$userAgrups = resolveUserAgrupaciones($user);
+// Admins / super-admin editan CUALQUIER agrupación (igual que multimedia-*).
+$esAdmin = sesionEsAdmin();
+if (!$esAdmin && !in_array($id_agrupacion, $userAgrups, true)) {
     sendJson(['error' => 'No autorizado'], 403);
     exit;
 }
 
-if (credCerrada($sb, $id_agrupacion, 2026)) {
+if (!$esAdmin && credCerrada($sb, $id_agrupacion, 2026)) {
     sendJson(['error' => 'Agrupación cerrada. Solicite habilitar.'], 423);
     exit;
 }

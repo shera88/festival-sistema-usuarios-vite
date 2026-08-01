@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, Lock } from 'lucide-react';
 import type { KardexRow as KRow, Year } from '@/types/domain';
-import { KardexRow } from './KardexRow';
+import { KardexObraGroups } from './KardexObraGroups';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { kardexApi } from '@/lib/api/kardex';
 import { webpProxy } from '@/lib/utils/img';
@@ -43,6 +43,8 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
   const [logoFailed, setLogoFailed] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [loadingClose, setLoadingClose] = useState(false);
+  const [confirmReopenOpen, setConfirmReopenOpen] = useState(false);
+  const [loadingReopen, setLoadingReopen] = useState(false);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoMsg, setInfoMsg] = useState<{ title: string; body: string } | null>(null);
@@ -50,11 +52,18 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
   const initials = initialsOf(agrupacion);
   const showImg = !!logo && !logoFailed;
 
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
+  // El super admin hace todo: edita/rota/verifica/elimina en cualquier
+  // agrupación, incluso si está cerrada (el backend aplica el mismo bypass).
+  const isSuperAdmin = !!user?.es_super_admin;
+  // canManage: representante/coreógrafo/director y staff de kárdex (puede_editar).
+  // Los logins de kárdex BAILARIN (puede_editar=false) son solo lectura.
+  const canManage = puedeEditar || isSuperAdmin;
   const cerrada = (meta?.estado_credenciales ?? '').toLowerCase() === 'completo';
   const isCurrentYear = year === '2026';
-  const canEdit = puedeEditar && isCurrentYear && !cerrada;
-  const canClose = puedeEditar && isCurrentYear && !cerrada && !!meta?.id_agrupacion;
+  const canEdit = isCurrentYear && ((puedeEditar && !cerrada) || isSuperAdmin);
+  const canClose = canManage && isCurrentYear && !cerrada && !!meta?.id_agrupacion;
+  const canReopen = canManage && isCurrentYear && cerrada && !!meta?.id_agrupacion;
 
   const sortedRows = useMemo(
     () =>
@@ -90,15 +99,36 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
     }
   }
 
+  async function handleReabrir() {
+    if (!meta?.id_agrupacion) return;
+    setLoadingReopen(true);
+    setErrMsg(null);
+    try {
+      await kardexApi.cerrarAgrupacion(meta.id_agrupacion, 'incompleto');
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['inscripciones'] }),
+        qc.invalidateQueries({ queryKey: ['kardex'] }),
+      ]);
+      setConfirmReopenOpen(false);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al reabrir agrupación';
+      setErrMsg(msg);
+    } finally {
+      setLoadingReopen(false);
+    }
+  }
+
   return (
     <article
       className={`overflow-hidden rounded-xl border transition anim-fade-in-up ${
         open
-          ? 'border-glass-border'
-          : 'border-glass-border hover:border-text-25'
+          ? 'border-white/10'
+          : 'border-white/10 hover:border-text-25'
       }`}
       style={{
-        background: 'linear-gradient(135deg, var(--bg-card) 0%, rgba(0,0,0,0.2) 100%)',
+        // Navy elevado sólido (no se camufla con el fondo base).
+        background: 'linear-gradient(135deg, var(--bg-card-h) 0%, var(--bg-card) 100%)',
+        boxShadow: '0 8px 24px -14px rgba(0,0,0,0.6)',
       }}
     >
       <div
@@ -153,7 +183,7 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
             {agrupacion}
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-[11px] text-text-45">
-            <span>{rows.length} integrante{rows.length > 1 ? 's' : ''}</span>
+            <span>{rows.length} integrante{rows.length !== 1 ? 's' : ''}</span>
             {cerrada && (
               <span className="ml-1 inline-flex items-center gap-1 rounded-md border border-cyan/40 bg-cyan/10 px-1.5 py-px text-[9px] font-semibold uppercase text-cyan" style={{ letterSpacing: '0.5px' }}>
                 <Lock className="h-2.5 w-2.5" />
@@ -163,15 +193,19 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
           </div>
         </div>
 
-        {(canClose || cerrada) && isCurrentYear && (
+        {canManage && (canClose || cerrada) && isCurrentYear && (
           <button
             type="button"
             role="switch"
             aria-checked={cerrada}
-            aria-label={cerrada ? 'Agrupación cerrada' : 'Marcar agrupación completa'}
+            aria-label={cerrada ? 'Reabrir agrupación' : 'Marcar agrupación completa'}
             onClick={(e) => {
               e.stopPropagation();
               if (cerrada) {
+                if (canReopen) {
+                  setConfirmReopenOpen(true);
+                  return;
+                }
                 setInfoMsg({
                   title: 'Agrupación cerrada',
                   body: 'Esta agrupación ya está marcada como completa. Contacte al administrador para habilitar cambios.',
@@ -189,7 +223,7 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
               }
               setConfirmOpen(true);
             }}
-            title={cerrada ? 'Cerrada — contacte admin' : 'Marcar agrupación completa'}
+            title={cerrada ? 'Reabrir agrupación' : 'Marcar agrupación completa'}
             className="relative h-[20px] w-9 shrink-0 cursor-pointer rounded-full border transition"
             style={{
               background: cerrada ? 'var(--cyan)' : 'rgba(255,255,255,0.08)',
@@ -211,18 +245,14 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
       </div>
 
       {open && (
-        <div className="border-t border-glass-border anim-fade-in">
-          {sortedRows.map((r, i) => (
-            <KardexRow
-              key={r.id_kardex ?? i}
-              row={r}
-              canDelete={canEdit}
-              canEdit={canEdit}
-              isCurrentYear={isCurrentYear}
-              locked={cerrada}
-            />
-          ))}
-
+        <div className="border-t border-white/10 anim-fade-in">
+          <KardexObraGroups
+            rows={sortedRows}
+            canEdit={canEdit}
+            canManage={canManage}
+            isCurrentYear={isCurrentYear}
+            locked={cerrada && !isSuperAdmin}
+          />
         </div>
       )}
 
@@ -236,18 +266,37 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
       />
 
       <ConfirmDialog
+        open={confirmReopenOpen}
+        variant="primary"
+        title="¿Reabrir la agrupación?"
+        message={
+          <>
+            <p>Podrá volver a agregar o editar integrantes.</p>
+            <p className="mt-2 text-text-45">
+              Cuando termine los cambios, vuelva a marcar la agrupación como completa.
+            </p>
+            {errMsg && <p className="mt-2 text-[12px] text-red-400">{errMsg}</p>}
+          </>
+        }
+        confirmText="Sí, reabrir"
+        cancelText="Cancelar"
+        loading={loadingReopen}
+        onConfirm={handleReabrir}
+        onClose={() => {
+          if (!loadingReopen) {
+            setConfirmReopenOpen(false);
+            setErrMsg(null);
+          }
+        }}
+      />
+
+      <ConfirmDialog
         open={confirmOpen}
         variant="primary"
         title="¿Marcar agrupación como completa?"
         message={
           <>
             <p>¿Está seguro que ya están todos sus bailarines y personal?</p>
-            <p className="mt-2 text-text-45">
-              <strong className="text-text-65">Una vez confirmado, la agrupación quedará bloqueada</strong> y no podrá añadir ni eliminar personas hasta que el administrador habilite los cambios.
-            </p>
-            <p className="mt-2 font-mono text-cyan">
-              {verificadosCount}/{rows.length} integrantes verificados
-            </p>
             {errMsg && <p className="mt-2 text-[12px] text-red-400">{errMsg}</p>}
           </>
         }

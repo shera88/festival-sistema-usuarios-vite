@@ -56,13 +56,39 @@ if (count($idsInsc) > 0) {
     }
 }
 
+// Estado de pago por inscripción (solo 2026, batch — misma fuente de verdad que
+// el tab Pagos: vista `deudas_2026`, concepto 'por_participante' con
+// id_referencia = id_inscripcion. saldo = GREATEST(monto_total −
+// pagado_verificado, 0): el saldo solo baja con pagos estado 'verificado').
+// habilitado = saldo <= 0.01. Las agrupaciones con convenio NO tienen compromiso
+// por_participante (la vista las excluye) → sin dato → el frontend no muestra chip.
+$pagoMap = [];
+if ((int)$year >= 2026 && count($idsInsc) > 0) {
+    $list = implode(',', array_map(fn($id) => '"' . rawurlencode((string)$id) . '"', $idsInsc));
+    $deudaQs = 'select=id_referencia,saldo&concepto=eq.por_participante&id_referencia=in.(' . $list . ')';
+    foreach ($sb->selectRaw('deudas_2026', $deudaQs) as $d) {
+        $iid = (string)($d['id_referencia'] ?? '');
+        if ($iid === '') continue;
+        $saldo = (float)($d['saldo'] ?? 0);
+        $pagoMap[$iid] = [
+            'saldo'  => $saldo,
+            'estado' => $saldo <= 0.01 ? 'habilitado' : 'pendiente',
+        ];
+    }
+}
+
 foreach ($rows as &$r) {
     $idA = (string)($r['id_agrupacion'] ?? '');
     $idI = (string)($r['id_inscripcion'] ?? '');
+    // `informe` es una nota interna del CRM (agente/precios) — NO debe llegar al
+    // portal del participante. Se remueve de la respuesta (select=* la traía).
+    unset($r['informe']);
     $r['estado_credenciales'] = $credMap[$idA] ?? 'incompleto';
     $r['multimedia_confirmado'] = $mmConfirmadoMap[$idI] ?? false;
     $r['audio_url_multimedia'] = $mmAudioMap[$idI] ?? null;
     $r['video_led_url_multimedia'] = $mmVideoMap[$idI] ?? null;
+    $r['saldo_pago'] = isset($pagoMap[$idI]) ? $pagoMap[$idI]['saldo'] : null;
+    $r['estado_pago'] = isset($pagoMap[$idI]) ? $pagoMap[$idI]['estado'] : null;
 }
 unset($r);
 

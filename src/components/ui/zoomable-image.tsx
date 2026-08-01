@@ -3,6 +3,10 @@ import { useRef, useCallback, useState, useEffect, type CSSProperties } from "re
 type ZoomableImageProps = {
   src: string;
   srcSetWebp?: string;
+  /** Versión en alta resolución para el lightbox. Útil cuando `src` es una
+   * miniatura (ej. proxy a 96px): la ampliación se vería borrosa sin esto.
+   * Si se omite, el lightbox usa `src`. */
+  zoomSrc?: string;
   alt: string;
   className?: string;
   /** Clase aplicada al `<button>` trigger. Útil cuando el contenedor padre
@@ -28,6 +32,7 @@ const BTN_STEP = 0.4;
 export function ZoomableImage({
   src,
   srcSetWebp,
+  zoomSrc,
   alt,
   className,
   triggerClassName,
@@ -184,9 +189,10 @@ export function ZoomableImage({
               willChange: "transform",
             }}
           >
-            {srcSetWebp && <source srcSet={srcSetWebp} type="image/webp" />}
+            {/* Con zoomSrc el <source> de la miniatura ganaría por precedencia, así que se omite. */}
+            {srcSetWebp && !zoomSrc && <source srcSet={srcSetWebp} type="image/webp" />}
             <img
-              src={src}
+              src={zoomSrc ?? src}
               alt={alt}
               draggable={false}
               className="max-h-[92vh] max-w-[96vw] rounded-2xl object-contain shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]"

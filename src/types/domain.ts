@@ -22,6 +22,12 @@ export interface User {
   puede_editar?: boolean;
   /** True si el id_contacto está en admin_usuarios.activo (resuelto on-demand en me.php). */
   es_admin?: boolean;
+  /** True si el usuario REAL es super admin (admin_usuarios.super_admin) → puede supervisar. */
+  es_super_admin?: boolean;
+  /** True si la sesión está supervisando a otra persona (impersonar.php). */
+  impersonando?: boolean;
+  /** Nombre del usuario real mientras supervisa (banner "Supervisando como…"). */
+  real_user_nombre?: string | null;
 }
 
 export interface SearchResult {
@@ -73,6 +79,11 @@ export interface Inscripcion {
   multimedia_confirmado?: boolean | null;
   audio_url_multimedia?: string | null;
   video_led_url_multimedia?: string | null;
+  /** Saldo del compromiso por_participante de esta obra (vista deudas_2026,
+   *  solo pagos verificados). null = sin compromiso (p.ej. convenio) o año pasado. */
+  saldo_pago?: number | null;
+  /** 'habilitado' (saldo <= 0) | 'pendiente' (debe) | null (sin dato). Solo 2026. */
+  estado_pago?: 'habilitado' | 'pendiente' | null;
 }
 
 export interface MultimediaArchivo {
@@ -115,6 +126,15 @@ export interface KardexRow {
   enlace_del_credencial: string | null;
   enlace_del_certificado: string | null;
   verificado?: boolean | null;
+  /** Bailes/obras de la agrupación en los que participa (jsonb `bailes`). */
+  bailes?: { id_inscripcion: string; nombre_de_la_obra: string }[] | null;
+  /** Lista de id_inscripcion de esos bailes (jsonb `bailes_ids`). */
+  bailes_ids?: string[] | null;
+  /** Membresías (para etiqueta junto al nombre). reserva = marcó en el kárdex; pagada = ya pagó. */
+  membresia?: boolean | null;
+  membresia_pagada?: boolean | null;
+  membresia_paquete?: boolean | null;
+  membresia_paquete_pagada?: boolean | null;
 }
 
 export interface Nota {
@@ -159,15 +179,24 @@ export interface VideoItem {
   bloqueado?: boolean;
 }
 
-/** Estado de la Membresía de Videos de la persona logueada (para gating de 2026). */
+/** Estado de las membresías de la persona logueada (para gating de videos 2026). */
 export interface MembresiaEstado {
   id_kardex: string | null;
-  /** Reservó la membresía en el kárdex (marcó el check) → precio 20. */
+  /** Reservó la membresía de Videos en el kárdex → precio 20. */
   reservo: boolean;
-  /** Ya pagó → sus videos 2026 quedan desbloqueados. */
+  /** Pagó la membresía de Videos → SUS videos 2026 desbloqueados. */
   pagada: boolean;
+  /** Reservó el Paquete Completo en el kárdex → precio 40. */
+  paquete_reservo: boolean;
+  /** Pagó el Paquete Completo → TODOS los videos 2026 desbloqueados. */
+  paquete_pagada: boolean;
   /** La persona tiene al menos una fila de kárdex. */
   tiene_kardex: boolean;
+  /** Puede comprar la membresía (ya no requiere kárdex). */
+  puede_comprar?: boolean;
+  /** Identidad de sesión que ancla la membresía (id_contacto o id_kardex). */
+  owner_id?: string | null;
+  origen?: string | null;
 }
 
 export interface VideosResponse {

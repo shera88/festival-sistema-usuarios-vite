@@ -209,7 +209,7 @@ export function Step2Obra({ onBack, onSubmit, submitting, idContacto }: Props) {
           name="subdivision"
           render={({ field }) => (
             <ButtonGroup
-              options={SUBDIVISIONES.map((s) => ({ value: s.value, label: s.label, hint: s.hint }))}
+              options={SUBDIVISIONES.map((s) => ({ value: s.value, label: s.label, hint: s.hint, disabled: s.disabled }))}
               value={field.value}
               onChange={(v) => {
                 field.onChange(v);
