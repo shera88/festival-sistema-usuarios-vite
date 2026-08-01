@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video, Download } from 'lucide-react';
+import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video, Download, AlertTriangle } from 'lucide-react';
 import { InscripcionPagosPanel } from '@/routes/tabs/PagosTab';
 import type { Inscripcion, Nota } from '@/types/domain';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +18,8 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { generoDeModalidad, GENERO_LABEL } from '@/lib/schemas/inscripcion';
 import { mediaBaseName, mediaDownloadUrl } from '@/lib/utils/mediaName';
 import { extFromUrl, sanitizeFilename } from '@/lib/utils/descargarArchivo';
+import { useDuracionAudio } from '@/hooks/useDuracionAudio';
+import { evaluarExcesoAudio } from '@/lib/duracion-audio';
 
 interface Props {
   insc: Inscripcion;
@@ -148,6 +150,12 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const audioUrl = insc.audio_url_multimedia || appsheetAudio(insc.musica);
   const vimeoId = extractVimeoId(insc.url_video);
 
+  // Aviso de tiempo: se mide el audio y se compara con el máximo que la
+  // convocatoria da a esa subdivisión. Mientras no haya medida —o si el archivo
+  // no se pudo leer— no se muestra nada, para no alarmar sin fundamento.
+  const duracionAudioSeg = useDuracionAudio(audioUrl);
+  const excesoAudio = evaluarExcesoAudio(duracionAudioSeg, insc.subdivision);
+
   // Nombre dinámico para descargar audio/video: "01.- Danzarte - The Black Panter - Martes"
   // (Orden - Agrupación - Obra - Día). Omite orden/día si faltan.
   const mediaBase = mediaBaseName(insc);
@@ -267,6 +275,20 @@ export function InscripcionCard({ insc, notas, year }: Props) {
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'currentColor' }} />
             <span className="hidden sm:inline">{pagoChip.text}</span>
             <span className="sm:hidden">{pagoChip.text === 'Habilitado' ? 'Habilitado' : 'Pendiente'}</span>
+          </span>
+        )}
+
+        {/* El audio se pasa del tiempo que la convocatoria da a esta subdivisión.
+            Se avisa acá, sin desplegar la obra, para que no pase inadvertido. */}
+        {excesoAudio && (
+          <span
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-red-400/50 px-2.5 py-1 text-[10px] font-bold uppercase leading-none text-red-400"
+            style={{ letterSpacing: '0.5px', background: 'rgba(239,68,68,0.12)' }}
+            title={`Su audio dura ${excesoAudio.duracionTexto} y el máximo para ${excesoAudio.subdivisionTexto} es ${excesoAudio.limiteTexto}. Se pasa por ${excesoAudio.excesoTexto}.`}
+          >
+            <AlertTriangle className="h-3 w-3" strokeWidth={2.4} />
+            <span className="hidden sm:inline">Audio excede {excesoAudio.limiteTexto}</span>
+            <span className="sm:hidden">Audio largo</span>
           </span>
         )}
 
@@ -439,6 +461,31 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                     src={audioUrl}
                     downloadName={year === '2026' ? mediaBase : undefined}
                   />
+                  {/* Detalle del aviso: acá sí hay espacio para decir cuánto se
+                      pasa y qué corresponde hacer. */}
+                  {excesoAudio && (
+                    <div
+                      className="mt-2 flex items-start gap-2 rounded-xl border border-red-400/40 p-3 text-[12px] leading-relaxed"
+                      style={{ background: 'rgba(239,68,68,0.06)' }}
+                      role="status"
+                    >
+                      <AlertTriangle className="mt-px h-4 w-4 shrink-0 text-red-400" strokeWidth={2.2} />
+                      <div className="text-text-90">
+                        <strong className="text-red-400">
+                          Su audio dura {excesoAudio.duracionTexto} y se pasa por {excesoAudio.excesoTexto}
+                          {' '}del límite.
+                        </strong>{' '}
+                        La convocatoria permite hasta{' '}
+                        <strong className="text-text-white">{excesoAudio.limiteTexto}</strong> para{' '}
+                        {excesoAudio.subdivisionTexto}.
+                        <span className="mt-1 block text-text-45">
+                          Recorte la pista y vuelva a subirla{mmEnabled && mmConfirmado
+                            ? '. Como ya confirmó su multimedia, solicite al administrador que le habilite la carga.'
+                            : ' con el botón de subir multimedia.'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {mmEnabled && (

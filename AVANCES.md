@@ -11,7 +11,7 @@
 
 | Dev | Branch | Inicio (UTC) | Archivos | Issue |
 |---|---|---|---|---|
-| _(vacío)_ | | | | |
+| shera88 (+ Claude) | `feature/aviso-audio-excede-limite` | 2026-08-01T10:45Z | `src/components/cards/InscripcionCard.tsx`, `src/lib/duracion-audio.ts`, `src/hooks/useDuracionAudio.ts` | — |
 
 ## HISTORIAL
 
