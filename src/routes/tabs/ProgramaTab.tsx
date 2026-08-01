@@ -385,6 +385,21 @@ export function ProgramaTab() {
         paginado.add(data.pageNumber);
       };
 
+      // Duración de cada baile, al lado de la hora. En el de ensayos no se pone:
+      // ahí el turno es de 8 min para todos y la cifra se repetiría en cada fila
+      // (ya está dicha en el subtítulo).
+      const conDur = !esEnsayo;
+      const CABECERA = conDur
+        ? ['Hora', 'Dur.', 'N', 'Agrupacion', 'Obra', 'Categoria', 'Genero']
+        : ['Hora', 'N', 'Agrupacion', 'Obra', 'Categoria', 'Genero'];
+      // Los 174 mm útiles se reparten distinto según lleve o no la columna Dur.:
+      // el ancho sale de Hora, N, Categoria y Genero, que iban sobradas.
+      // Agrupacion (46) y Obra (42) conservan el suyo para no forzar más saltos
+      // de línea en los nombres largos.
+      const COLS = conDur
+        ? { 0: { cellWidth: 17, halign: 'center' }, 1: { cellWidth: 12, halign: 'center' }, 2: { cellWidth: 7, halign: 'center' }, 3: { cellWidth: 46 }, 4: { cellWidth: 42 }, 5: { cellWidth: 25 }, 6: { cellWidth: 25 } }
+        : { 0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 9, halign: 'center' }, 2: { cellWidth: 46 }, 3: { cellWidth: 42 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } };
+
       // Bloques MENOR y MAYOR en el MISMO PDF, cada uno con su cabecera de color.
       let y = padT + 11;
       for (const blq of ['MENOR', 'MAYOR'] as const) {
@@ -397,23 +412,25 @@ export function ProgramaTab() {
           margin: { top: padT, bottom: padB, left: padL, right: padR },
           willDrawPage: onPage,
           head: [
-            [{ content: 'BLOQUE ' + blq, colSpan: 6, styles: { fillColor: color, textColor: 255, fontStyle: 'bold', fontSize: 9.5, halign: 'left' } }],
-            ['Hora', 'N', 'Agrupacion', 'Obra', 'Categoria', 'Genero'],
+            [{ content: 'BLOQUE ' + blq, colSpan: CABECERA.length, styles: { fillColor: color, textColor: 255, fontStyle: 'bold', fontSize: 9.5, halign: 'left' } }],
+            CABECERA,
           ],
-          body: rb.map((r) => [
-            r.hora,
-            String(r.n).padStart(2, '0'),
-            r.nombre_agrupacion || r.agrupacion || '',
-            r.obra || '',
-            capFirst(r.categoria),
-            capFirst(r.genero),
-          ]),
+          body: rb.map((r) => {
+            const fila = [
+              r.hora,
+              String(r.n).padStart(2, '0'),
+              r.nombre_agrupacion || r.agrupacion || '',
+              r.obra || '',
+              capFirst(r.categoria),
+              capFirst(r.genero),
+            ];
+            if (conDur) fila.splice(1, 0, r.dur);
+            return fila;
+          }),
           styles: { fontSize: 7.5, cellPadding: 1.4, overflow: 'linebreak', valign: 'middle', lineColor: [224, 221, 228], lineWidth: 0.2, textColor: [40, 38, 45] },
           headStyles: { fillColor: color, textColor: 255, fontSize: 7.5, halign: 'left', fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [246, 244, 250] },
-          // Hora pasó a 12 h con AM/PM ('08:00 AM'), así que necesita 20 mm en vez de 16;
-          // los 4 mm salen de Agrupacion y Obra. Total sin cambios: 174 mm = ancho útil.
-          columnStyles: { 0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 9, halign: 'center' }, 2: { cellWidth: 46 }, 3: { cellWidth: 42 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } },
+          columnStyles: COLS,
         });
         y = auto.lastAutoTable.finalY + 6;
       }
