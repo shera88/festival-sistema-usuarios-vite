@@ -474,10 +474,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                         <strong className="text-red-400">
                           Su audio dura {excesoAudio.duracionTexto} y se pasa por {excesoAudio.excesoTexto}
                           {' '}del límite.
-                        </strong>{' '}
-                        La convocatoria permite hasta{' '}
-                        <strong className="text-text-white">{excesoAudio.limiteTexto}</strong> para{' '}
-                        {excesoAudio.subdivisionTexto}.
+                        </strong>
                         <span className="mt-1 block text-text-45">
                           Recorte la pista y vuelva a subirla{mmEnabled && mmConfirmado
                             ? '. Como ya confirmó su multimedia, solicite al administrador que le habilite la carga.'

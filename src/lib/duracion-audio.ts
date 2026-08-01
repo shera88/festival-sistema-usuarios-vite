@@ -119,6 +119,12 @@ export function medirDuracionAudio(url: string): Promise<number | null> {
     // Red lenta o archivo inalcanzable: se abandona en silencio.
     const temporizador = setTimeout(() => terminar(null), 20_000);
 
+    // MISMO modo que el reproductor (AudioPlayer usa crossOrigin="anonymous").
+    // No es opcional: R2 solo devuelve Access-Control-Allow-Origin cuando la
+    // petición lleva Origin. Si acá se pidiera sin crossOrigin, la respuesta
+    // quedaría cacheada SIN cabeceras CORS y el reproductor —que sí las exige—
+    // reutilizaría esa entrada y no podría cargar el audio.
+    audio.crossOrigin = 'anonymous';
     audio.preload = 'metadata';
     audio.onloadedmetadata = () => {
       const d = audio?.duration ?? NaN;
