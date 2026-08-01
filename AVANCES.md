@@ -11,9 +11,17 @@
 
 | Dev | Branch | Inicio (UTC) | Archivos | Issue |
 |---|---|---|---|---|
-| shera88 (+ Claude) | `feature/programa-horarios-admin` | 2026-08-01T05:50Z | `src/routes/tabs/ProgramaTab.tsx` | — |
+| _(vacío)_ | | | | |
 
 ## HISTORIAL
+
+### 2026-08-01
+
+- **shera88 (+ Claude)** — `feature/programa-horarios-admin` — horarios del admin, duración en el PDF y rehabilitar multimedia
+  - Tocó: `src/routes/tabs/ProgramaTab.tsx`, `src/components/cards/InscripcionCard.tsx`, `src/lib/api/multimedia.ts`, `php-backend/_lib/auth.php`, `php-backend/inscripcion-revertir-multimedia.php`, `vite.config.ts`, `.env.production`
+  - Resultado: el programa y sus PDF siguen la hora que fija el admin en la app de jurados; el PDF lleva la duración de cada baile; el super admin puede rehabilitar la carga de multimedia ya confirmada, también mientras supervisa a otra persona
+  - Siguiente: —
+  - PR: #2
 
 ### 2026-05-12
 
