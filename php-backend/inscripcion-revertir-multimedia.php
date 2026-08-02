@@ -6,9 +6,9 @@
  * reemplazo y el borrado de audio/video de esa inscripción. Es la contraparte de
  * inscripcion-confirmar-multimedia.php.
  *
- * SOLO super admin. También vale mientras supervisa a otra persona: ahí la
- * sesión activa es la del supervisado, pero quien opera sigue siendo él (ver
- * sesionEsSuperAdmin() en _lib/auth.php).
+ * La hace la misma agrupación: mismo scope que confirmar (editor autorizado de la
+ * inscripción — agrupación/encargado/director/coreógrafo, o admin). NO requiere
+ * super admin.
  *
  * No borra la fila de inscripcion_multimedia_estado: deja `confirmado = false` y
  * conserva fecha_confirmacion / confirmado_por como traza de quién la había
@@ -24,13 +24,7 @@ require __DIR__ . '/_lib/context.php';
 handlePreflight();
 requireMethod('POST');
 
-// Sesión válida; el permiso fino lo decide sesionEsSuperAdmin() más abajo.
-requireAuth();
-
-if (!sesionEsSuperAdmin()) {
-    sendJson(['error' => 'Solo un super administrador puede habilitar de nuevo la carga.'], 403);
-    exit;
-}
+$user = requireEditor();
 
 $body = jsonBody();
 
@@ -48,11 +42,17 @@ if ($year < 2023 || $year > 2099) {
 $sb = supabase();
 $insc = $sb->selectOne(
     'registro_de_inscripcion_2026',
-    'id_inscripcion',
+    'id_inscripcion,id_agrupacion',
     ['id_inscripcion' => "eq.$id_inscripcion"]
 );
 if (!$insc) {
     sendJson(['error' => 'Inscripción no encontrada'], 404);
+    exit;
+}
+
+// Mismo scope que confirmar: agrupación/encargado/director/coreógrafo (o admin).
+if (!usuarioAutorizadoInscripcion($user, $id_inscripcion)) {
+    sendJson(['error' => 'No autorizado'], 403);
     exit;
 }
 

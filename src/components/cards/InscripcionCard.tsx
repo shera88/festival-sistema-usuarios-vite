@@ -70,13 +70,9 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const [revertOpen, setRevertOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const { puedeEditar, user } = useAuth();
+  const { puedeEditar } = useAuth();
   const qc = useQueryClient();
   const mmConfirmado = !!insc.multimedia_confirmado;
-  // El super administrador puede deshacer la confirmación. `es_super_admin` es
-  // del usuario REAL, así que sigue siendo cierto mientras supervisa a otra
-  // persona — que es justamente cuando hace falta habilitarle la carga.
-  const puedeRehabilitarMM = mmConfirmado && !!user?.es_super_admin;
 
   async function handleConfirmarMM() {
     setConfirming(true);
@@ -117,30 +113,20 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   }
 
   /** Interruptor de multimedia confirmada. Sin confirmar, pide confirmación; ya
-   *  confirmada, el super administrador puede volver a habilitar la carga y el
-   *  resto recibe el aviso de siempre. */
+   *  confirmada, pide confirmación para QUITARLA y volver a habilitar la carga.
+   *  Ambas acciones las hace la misma agrupación (no requiere administrador). */
   function handleToggleMM() {
     if (!mmConfirmado) {
       setConfirmOpen(true);
       return;
     }
-    if (puedeRehabilitarMM) {
-      setRevertOpen(true);
-      return;
-    }
-    setInfoMsg({
-      title: 'Multimedia confirmada',
-      body: 'Esta multimedia ya está confirmada. Contacte al administrador para revertir.',
-    });
-    setInfoOpen(true);
+    setRevertOpen(true);
   }
 
   /** Texto del interruptor según lo que hará al tocarlo. */
   const mmToggleLabel = !mmConfirmado
     ? 'Marcar audio/video como listos'
-    : puedeRehabilitarMM
-      ? 'Habilitar de nuevo la carga (super administrador)'
-      : 'Multimedia confirmada (bloqueado)';
+    : 'Quitar la confirmación para volver a subir';
 
   const promedio = calcularPromedioFinal(notas);
   const agrupacionName = insc.agrupacion || '?';
@@ -325,7 +311,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
 
         {/* También al super administrador, aunque supervise a alguien de solo
             lectura: es quien puede levantar el bloqueo. */}
-        {mmEnabled && (puedeEditar || puedeRehabilitarMM) && (
+        {mmEnabled && puedeEditar && (
           <button
             type="button"
             role="switch"
@@ -477,7 +463,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
                         </strong>
                         <span className="mt-1 block text-text-45">
                           Recorte la pista y vuelva a subirla{mmEnabled && mmConfirmado
-                            ? '. Como ya confirmó su multimedia, solicite al administrador que le habilite la carga.'
+                            ? '. Como ya confirmó su multimedia, quite la confirmación con el interruptor para volver a habilitar la carga.'
                             : ' con el botón de subir multimedia.'}
                         </span>
                       </div>
@@ -650,7 +636,8 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           <>
             <p>Confirma que esta es la versión final del audio (y video si corresponde).</p>
             <p className="mt-2 text-text-45">
-              <strong className="text-text-65">Una vez confirmado, no se podrán reemplazar ni eliminar los archivos</strong> hasta que el administrador revierta.
+              Mientras esté confirmada no se podrán reemplazar ni eliminar los archivos.
+              Puede quitar la confirmación cuando quiera con el mismo interruptor.
             </p>
             <p className="mt-2 text-[12px] text-text-65">
               Si aún no subió el audio, el sistema rechazará la confirmación.
@@ -666,17 +653,17 @@ export function InscripcionCard({ insc, notas, year }: Props) {
         }}
       />
 
-      {/* Solo lo ve el super administrador: deshace la confirmación para que la
-          agrupación pueda volver a subir su música o su video. */}
+      {/* Deshace la confirmación para volver a subir la música o el video. Lo hace
+          la misma agrupación (no requiere administrador). */}
       <ConfirmDialog
         open={revertOpen}
         variant="primary"
-        title="¿Habilitar de nuevo la carga?"
+        title="¿Quitar la confirmación?"
         message={
           <>
             <p>
               La multimedia de <strong className="text-text-90">{insc.nombre_de_la_obra || 'esta obra'}</strong> quedará
-              sin confirmar, de modo que se puedan reemplazar o eliminar el audio y el video.
+              sin confirmar, de modo que pueda reemplazar o eliminar el audio y el video.
             </p>
             <p className="mt-2 text-text-45">
               Los archivos que ya subió <strong className="text-text-65">no se borran</strong>; solo se levanta el bloqueo.
@@ -686,7 +673,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
             </p>
           </>
         }
-        confirmText="Sí, habilitar"
+        confirmText="Sí, quitar"
         cancelText="Cancelar"
         loading={reverting}
         onConfirm={handleRevertirMM}

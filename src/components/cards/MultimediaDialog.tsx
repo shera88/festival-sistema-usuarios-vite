@@ -242,7 +242,7 @@ export function MultimediaDialog({ open, inscripcion, onClose }: Props) {
             {confirmado && (
               <div className="mb-4 flex items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/10 px-3 py-2 text-[11px] text-cyan">
                 <Lock className="h-4 w-4 shrink-0" />
-                <span>Multimedia confirmada. No se permiten cambios.</span>
+                <span>Multimedia confirmada. Quite la confirmación con el interruptor de la tarjeta para volver a editar.</span>
               </div>
             )}
 
