@@ -3,6 +3,7 @@ import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClo
 import logoUrl from '@/assets/logo-danzarte.png';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol } from '@/lib/roles';
+import { INSCRIPCION_ABIERTA } from '@/lib/flags';
 
 interface Props {
   open: boolean;
@@ -44,7 +45,9 @@ export function AppSidebar({ open, onClose }: Props) {
         ...(user?.es_admin ? [{ to: '/admin/pagos', label: 'Admin Pagos', icon: ShieldCheck }] : []),
       ],
     },
-    ...(puedeEditar ? [{ label: 'Formularios', items: FORM_ITEMS }] : []),
+    ...(puedeEditar
+      ? [{ label: 'Formularios', items: FORM_ITEMS.filter((i) => INSCRIPCION_ABIERTA || i.to !== '/inscripcion') }]
+      : []),
   ];
 
   function prefetch(to: string) {

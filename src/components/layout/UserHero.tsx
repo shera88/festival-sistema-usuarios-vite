@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Loader2, Pencil, FilePlus, UserPlus, UserRoundSearch } from 'lucide-react';
 import type { User } from '@/types/domain';
 import { webpProxy } from '@/lib/utils/img';
+import { INSCRIPCION_ABIERTA } from '@/lib/flags';
 
 interface Props {
   user: User;
@@ -26,7 +27,7 @@ export function UserHero({ user }: Props) {
   // "Nuevo Kardex" solo para quienes gestionan (representante/director/coreógrafo
   // y staff de kárdex); los bailarines (solo lectura) no lo ven.
   const cta =
-    pathname.startsWith('/inscripciones')
+    pathname.startsWith('/inscripciones') && INSCRIPCION_ABIERTA
       ? { to: '/inscripcion', long: 'Nueva Inscripción', short: 'Inscribir', aria: 'Nueva inscripción', Icon: FilePlus }
       : pathname.startsWith('/kardex') && puedeEditar
         ? { to: '/kardex-form', long: 'Nuevo Kardex', short: 'Kardex', aria: 'Nuevo kardex', Icon: UserPlus }

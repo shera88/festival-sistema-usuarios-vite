@@ -88,9 +88,8 @@ export const multimediaApi = {
     api.post<MultimediaConfirmarRes>('/inscripcion-confirmar-multimedia.php', { id_inscripcion, year }),
 
   /**
-   * Deshace la confirmación y vuelve a habilitar la carga. Reservado al super
-   * administrador; el backend lo acepta también mientras supervisa a otra
-   * persona, que es justamente cuando hace falta.
+   * Deshace la confirmación y vuelve a habilitar la carga. La hace la misma
+   * agrupación (editor autorizado de la inscripción); no requiere administrador.
    */
   revertir: (id_inscripcion: string, year = 2026) =>
     api.post<MultimediaConfirmarRes>('/inscripcion-revertir-multimedia.php', { id_inscripcion, year }),

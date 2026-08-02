@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Menu, FileText, Users, FilePlus, X, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { INSCRIPCION_ABIERTA } from '@/lib/flags';
 
 const ITEMS = [
   {
@@ -130,7 +131,7 @@ export function NavMenu() {
           {puedeEditar && (
             <>
               {sectionHeader('Formularios')}
-              <div>{ITEMS.map(renderItem)}</div>
+              <div>{ITEMS.filter((i) => INSCRIPCION_ABIERTA || i.to !== '/inscripcion').map(renderItem)}</div>
             </>
           )}
           {esAdmin && (

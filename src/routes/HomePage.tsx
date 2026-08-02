@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { INSCRIPCION_ABIERTA } from '@/lib/flags';
 import { useInscripciones, useKardex, useCalificaciones, useVideos } from '@/hooks/queries';
 import type { Inscripcion, KardexRow, Nota, VideoItem } from '@/types/domain';
 
@@ -81,13 +82,15 @@ export function HomePage() {
   };
 
   const quickActions = [
-    {
-      to: '/inscripcion',
-      label: 'Inscribir Obra',
-      desc: 'Registrar una nueva obra al festival',
-      icon: FilePlus,
-      primary: true,
-    },
+    ...(INSCRIPCION_ABIERTA
+      ? [{
+          to: '/inscripcion',
+          label: 'Inscribir Obra',
+          desc: 'Registrar una nueva obra al festival',
+          icon: FilePlus,
+          primary: true,
+        }]
+      : []),
     {
       to: '/kardex-form',
       label: 'Registrar Integrante',
