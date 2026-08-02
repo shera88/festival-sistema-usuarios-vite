@@ -20,6 +20,7 @@ import { mediaBaseName, mediaDownloadUrl } from '@/lib/utils/mediaName';
 import { extFromUrl, sanitizeFilename } from '@/lib/utils/descargarArchivo';
 import { useDuracionAudio } from '@/hooks/useDuracionAudio';
 import { evaluarExcesoAudio } from '@/lib/duracion-audio';
+import { EDICION_INSCRIPCIONES_ABIERTA } from '@/lib/flags';
 
 interface Props {
   insc: Inscripcion;
@@ -160,7 +161,11 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const pagoChip =
     year === '2026'
       ? insc.estado_pago === 'habilitado'
-        ? { text: 'Habilitado', cls: 'border-green/50 text-green', bg: 'rgba(16,185,129,0.12)' }
+        // Solo "Habilitado" si el audio está dentro del tiempo permitido: con el
+        // audio fuera de tiempo no se muestra habilitado (el chip rojo de audio lo explica).
+        ? (excesoAudio
+            ? null
+            : { text: 'Habilitado', cls: 'border-green/50 text-green', bg: 'rgba(16,185,129,0.12)' })
         : insc.estado_pago === 'pendiente'
           ? { text: 'Pendiente de pago', cls: 'border-gold/50 text-gold', bg: 'rgba(232,208,152,0.12)' }
           : null
@@ -278,7 +283,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
           </span>
         )}
 
-        {puedeEditar && (
+        {puedeEditar && EDICION_INSCRIPCIONES_ABIERTA && (
           <button
             type="button"
             onClick={() => setEditOpen(true)}
