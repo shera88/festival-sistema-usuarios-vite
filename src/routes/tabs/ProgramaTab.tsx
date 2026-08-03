@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { webpProxy } from '@/lib/utils/img';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
 import { BloqueGroup, agruparPorBloque } from '@/components/shared/BloqueHeader';
+import { textoFechaEnsayo } from '@/lib/fechas-festival';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
@@ -485,9 +486,18 @@ export function ProgramaTab() {
       </div>
 
       {esEnsayo && (
-        <p className="text-[11px] text-text-45">
-          Ensayos desde las {hhmmAmPm(ensayoDe(horarios, diaSel))} · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+          <p className="text-[11px] text-text-45">
+            Ensayos desde las {hhmmAmPm(ensayoDe(horarios, diaSel))} · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
+          </p>
+          {/* Cada agrupación ensaya el día ANTERIOR al que se presenta, así que la
+              fecha del ensayo no coincide con la del día elegido y conviene decirla. */}
+          {textoFechaEnsayo(diaSel) && (
+            <p className="shrink-0 text-[11px] font-semibold text-text-90">
+              {textoFechaEnsayo(diaSel)}
+            </p>
+          )}
+        </div>
       )}
 
       <div className="flex flex-wrap gap-2 overflow-x-auto rounded-2xl border border-glass-border bg-glass-bg p-3 backdrop-blur-md no-scrollbar">
