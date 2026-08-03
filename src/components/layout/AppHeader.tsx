@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { authApi, type DirectorioPersona } from '@/lib/api/auth';
+import { inscripcionesVisibleParaRol } from '@/lib/roles';
 import type { SearchResult } from '@/types/domain';
 import { AppSidebar } from './AppSidebar';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
@@ -122,7 +123,7 @@ export function AppHeader() {
 
           <button
             type="button"
-            onClick={() => navigate('/inscripciones')}
+            onClick={() => navigate(inscripcionesVisibleParaRol(user) ? '/inscripciones' : '/kardex')}
             aria-label="Ir al inicio"
             className="flex items-center rounded-lg p-1 transition hover:bg-white/5"
           >
