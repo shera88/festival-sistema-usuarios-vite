@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { inscripcionesVisibleParaRol } from '@/lib/roles';
 import { useRealtime } from '@/hooks/useRealtime';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { UserHero } from '@/components/layout/UserHero';
@@ -49,6 +50,12 @@ export function DashboardPage() {
 
   const isFormPage = FORM_PATHS.has(location.pathname);
 
+  // Inscripciones es del staff de la agrupación (encargado, director, coreógrafo).
+  // Para un bailarín no existe: ni en el menú, ni escribiendo la dirección, ni como
+  // destino por defecto — su pantalla de entrada pasa a ser Kárdex.
+  const verInscripciones = inscripcionesVisibleParaRol(user);
+  const inicio = verInscripciones ? '/inscripciones' : '/kardex';
+
   return (
     <div className={`flex min-h-screen flex-col ${!isFormPage ? 'pb-14 lg:pb-0' : ''}`}>
       <AppHeader />
@@ -61,8 +68,11 @@ export function DashboardPage() {
       <main className="w-full flex-1 px-3 sm:px-6 lg:px-8">
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route index element={<Navigate to="/inscripciones" replace />} />
-            <Route path="inscripciones" element={<InscripcionesTab />} />
+            <Route index element={<Navigate to={inicio} replace />} />
+            <Route
+              path="inscripciones"
+              element={verInscripciones ? <InscripcionesTab /> : <Navigate to={inicio} replace />}
+            />
             <Route path="kardex" element={<KardexTab />} />
             <Route path="calificaciones" element={<CalificacionesTab />} />
             <Route path="programa" element={<ProgramaTab />} />
@@ -73,7 +83,7 @@ export function DashboardPage() {
             <Route path="kardex-form" element={<KardexFormPage />} />
             <Route path="solicitud" element={<SolicitudPage />} />
             <Route path="perfil" element={<PerfilPage />} />
-            <Route path="*" element={<Navigate to="/inscripciones" replace />} />
+            <Route path="*" element={<Navigate to={inicio} replace />} />
           </Routes>
         </Suspense>
       </main>

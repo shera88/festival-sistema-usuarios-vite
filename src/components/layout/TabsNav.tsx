@@ -1,13 +1,17 @@
 import { NavLink } from 'react-router-dom';
 import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { pagosVisibleParaRol } from '@/lib/roles';
+import { pagosVisibleParaRol, inscripcionesVisibleParaRol } from '@/lib/roles';
 
 export function TabsNav() {
   const { puedeEditar, user } = useAuth();
   // Bailarines/participantes (solo lectura) ven etiquetas personales.
   const TABS: { to: string; label: string; color: string; icon: LucideIcon }[] = [
-    { to: '/inscripciones', label: puedeEditar ? 'Inscripciones' : 'Mis Participaciones', color: 'var(--cyan)', icon: ClipboardList },
+    // Inscripciones solo para el staff de la agrupación (encargado, director o
+    // coreógrafo). Los bailarines no gestionan obras, así que no ven la sección.
+    ...(inscripcionesVisibleParaRol(user)
+      ? [{ to: '/inscripciones', label: 'Inscripciones', color: 'var(--cyan)', icon: ClipboardList }]
+      : []),
     { to: '/kardex', label: puedeEditar ? 'Kardex' : 'Mis Agrupaciones', color: 'var(--fuchsia)', icon: Users },
     { to: '/calificaciones', label: 'Calificaciones', color: 'var(--gold)', icon: Award },
     { to: '/programa', label: 'Programa', color: 'var(--purple)', icon: CalendarClock },
