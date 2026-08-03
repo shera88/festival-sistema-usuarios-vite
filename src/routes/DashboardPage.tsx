@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { inscripcionesVisibleParaRol } from '@/lib/roles';
+import { inscripcionesVisibleParaRol, kardexVisibleParaRol, rutaInicioParaRol } from '@/lib/roles';
 import { useRealtime } from '@/hooks/useRealtime';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { UserHero } from '@/components/layout/UserHero';
@@ -50,11 +50,12 @@ export function DashboardPage() {
 
   const isFormPage = FORM_PATHS.has(location.pathname);
 
-  // Inscripciones es del staff de la agrupación (encargado, director, coreógrafo).
-  // Para un bailarín no existe: ni en el menú, ni escribiendo la dirección, ni como
-  // destino por defecto — su pantalla de entrada pasa a ser Kárdex.
+  // Inscripciones y Kárdex son del staff de la agrupación (encargado, director,
+  // coreógrafo). Para un bailarín no existen: ni en el menú, ni escribiendo la
+  // dirección, ni como destino por defecto — entra directo a Calificaciones.
   const verInscripciones = inscripcionesVisibleParaRol(user);
-  const inicio = verInscripciones ? '/inscripciones' : '/kardex';
+  const verKardex = kardexVisibleParaRol(user);
+  const inicio = rutaInicioParaRol(user);
 
   return (
     <div className={`flex min-h-screen flex-col ${!isFormPage ? 'pb-14 lg:pb-0' : ''}`}>
@@ -73,14 +74,20 @@ export function DashboardPage() {
               path="inscripciones"
               element={verInscripciones ? <InscripcionesTab /> : <Navigate to={inicio} replace />}
             />
-            <Route path="kardex" element={<KardexTab />} />
+            <Route
+              path="kardex"
+              element={verKardex ? <KardexTab /> : <Navigate to={inicio} replace />}
+            />
             <Route path="calificaciones" element={<CalificacionesTab />} />
             <Route path="programa" element={<ProgramaTab />} />
             <Route path="videos" element={<VideosTab />} />
             <Route path="pagos" element={<PagosTab />} />
             <Route path="admin/pagos" element={<AdminPagosTab />} />
             <Route path="inscripcion" element={<InscripcionPage />} />
-            <Route path="kardex-form" element={<KardexFormPage />} />
+            <Route
+              path="kardex-form"
+              element={verKardex ? <KardexFormPage /> : <Navigate to={inicio} replace />}
+            />
             <Route path="solicitud" element={<SolicitudPage />} />
             <Route path="perfil" element={<PerfilPage />} />
             <Route path="*" element={<Navigate to={inicio} replace />} />
