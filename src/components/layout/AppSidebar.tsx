@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, type LucideIcon } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 import { useAuth } from '@/hooks/useAuth';
-import { pagosVisibleParaRol, inscripcionesVisibleParaRol } from '@/lib/roles';
+import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol } from '@/lib/roles';
 import { INSCRIPCION_ABIERTA } from '@/lib/flags';
 
 interface Props {
@@ -38,7 +38,8 @@ export function AppSidebar({ open, onClose }: Props) {
         ...(inscripcionesVisibleParaRol(user)
           ? [{ to: '/inscripciones', label: 'Inscripciones', icon: ClipboardList }]
           : []),
-        { to: '/kardex', label: puedeEditar ? 'Kardex' : 'Mis Agrupaciones', icon: Users },
+        // Kárdex solo para el staff de la agrupación. NO bailarines.
+        ...(kardexVisibleParaRol(user) ? [{ to: '/kardex', label: 'Kardex', icon: Users }] : []),
         { to: '/calificaciones', label: 'Calificaciones', icon: Award },
         { to: '/programa', label: 'Programa', icon: CalendarClock },
         { to: '/videos', label: 'Videos', icon: Video },
@@ -48,8 +49,17 @@ export function AppSidebar({ open, onClose }: Props) {
         ...(user?.es_admin ? [{ to: '/admin/pagos', label: 'Admin Pagos', icon: ShieldCheck }] : []),
       ],
     },
+    // Formularios: además del permiso de edición, el de Kárdex se filtra por rol
+    // —el bailarín no lo tiene— para no ofrecerle un enlace que va a rebotar.
     ...(puedeEditar
-      ? [{ label: 'Formularios', items: FORM_ITEMS.filter((i) => INSCRIPCION_ABIERTA || i.to !== '/inscripcion') }]
+      ? [{
+          label: 'Formularios',
+          items: FORM_ITEMS.filter(
+            (i) =>
+              (INSCRIPCION_ABIERTA || i.to !== '/inscripcion') &&
+              (i.to !== '/kardex-form' || kardexVisibleParaRol(user)),
+          ),
+        }]
       : []),
   ];
 

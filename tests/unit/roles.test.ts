@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { esStaffDeAgrupacion, pagosVisibleParaRol, inscripcionesVisibleParaRol } from '@/lib/roles';
+import {
+  esStaffDeAgrupacion,
+  pagosVisibleParaRol,
+  inscripcionesVisibleParaRol,
+  kardexVisibleParaRol,
+  rutaInicioParaRol,
+} from '@/lib/roles';
 
 /**
  * Secciones reservadas al staff de la agrupación. Los bailarines figuran en la
@@ -47,6 +53,39 @@ describe('acceso a Inscripciones', () => {
   it('usa el mismo criterio que Pagos', () => {
     for (const u of [encargado, director, coreografo, bailarin, null, undefined]) {
       expect(inscripcionesVisibleParaRol(u)).toBe(pagosVisibleParaRol(u));
+    }
+  });
+});
+
+describe('acceso a Kárdex', () => {
+  it('lo tienen encargado, director y coreógrafo', () => {
+    expect(kardexVisibleParaRol(encargado)).toBe(true);
+    expect(kardexVisibleParaRol(director)).toBe(true);
+    expect(kardexVisibleParaRol(coreografo)).toBe(true);
+  });
+
+  it('NO lo tiene el bailarín', () => {
+    expect(kardexVisibleParaRol(bailarin)).toBe(false);
+    expect(kardexVisibleParaRol(null)).toBe(false);
+  });
+});
+
+describe('sección de entrada según el rol', () => {
+  it('el staff entra en Inscripciones', () => {
+    expect(rutaInicioParaRol(encargado)).toBe('/inscripciones');
+    expect(rutaInicioParaRol(director)).toBe('/inscripciones');
+    expect(rutaInicioParaRol(coreografo)).toBe('/inscripciones');
+  });
+
+  it('el bailarín entra en Calificaciones, no en una sección que no puede ver', () => {
+    expect(rutaInicioParaRol(bailarin)).toBe('/calificaciones');
+  });
+
+  it('nunca manda a nadie a una sección que su rol tiene vedada', () => {
+    for (const u of [encargado, director, coreografo, bailarin, null, undefined]) {
+      const destino = rutaInicioParaRol(u);
+      if (destino === '/inscripciones') expect(inscripcionesVisibleParaRol(u)).toBe(true);
+      if (destino === '/kardex') expect(kardexVisibleParaRol(u)).toBe(true);
     }
   });
 });
