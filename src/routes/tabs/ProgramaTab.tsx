@@ -493,7 +493,7 @@ export function ProgramaTab() {
           {/* Cada agrupación ensaya el día ANTERIOR al que se presenta, así que la
               fecha del ensayo no coincide con la del día elegido y conviene decirla. */}
           {textoFechaEnsayo(diaSel) && (
-            <p className="shrink-0 text-[11px] font-semibold text-text-90">
+            <p className="shrink-0 text-[13px] font-bold text-text-white sm:text-[14px]">
               {textoFechaEnsayo(diaSel)}
             </p>
           )}
