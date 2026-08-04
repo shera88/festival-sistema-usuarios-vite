@@ -266,7 +266,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
 
         {/* Fila de acciones. En móvil ocupa su propia línea alineada a la
             derecha; desde `sm` queda pegada al bloque de texto como antes. */}
-        <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
 
         {/* Estado de pago del baile: pill destacado junto a los botones de la
             derecha. En móvil el texto largo se abrevia para no desbordar. */}

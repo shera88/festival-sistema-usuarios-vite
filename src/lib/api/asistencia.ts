@@ -6,6 +6,7 @@ export interface Asistencia {
   agrupacion: string | null;
   obra: string | null;
   dia_obra: string | null;
+  orden: string | null;
   persona_nombre: string | null;
   persona_rol: string | null;
   marcada_at: string;
@@ -59,12 +60,21 @@ export async function marcarAsistencia(
 }
 
 /** Lista de asistencias 2026 (lectura pública por RLS). Mapa por inscripción + panel en vivo. */
-export async function listarAsistencias(): Promise<Asistencia[]> {
-  const { data, error } = await supabase
+async function fetchAsistencias(cols: string) {
+  return supabase
     .from('asistencia_2026')
-    .select('id_inscripcion,id_agrupacion,agrupacion,obra,dia_obra,persona_nombre,persona_rol,marcada_at')
+    .select(cols)
     .eq('ano', 2026)
     .order('marcada_at', { ascending: false });
+}
+
+export async function listarAsistencias(): Promise<Asistencia[]> {
+  const COLS = 'id_inscripcion,id_agrupacion,agrupacion,obra,dia_obra,orden,persona_nombre,persona_rol,marcada_at';
+  let { data, error } = await fetchAsistencias(COLS);
+  // Resiliencia: si la migración 010 (columna orden) aún no corrió, reintenta sin ella.
+  if (error && /orden/i.test(error.message)) {
+    ({ data, error } = await fetchAsistencias(COLS.replace(',orden', '')));
+  }
   if (error) throw new Error(error.message);
-  return (data ?? []) as Asistencia[];
+  return (data ?? []) as unknown as Asistencia[];
 }
