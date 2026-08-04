@@ -80,8 +80,8 @@ export function AsistenciaQRModal({ open, onClose, payload, obra, agrupacion }: 
         </div>
 
         <p className="mt-4 rounded-xl border border-gold/25 bg-gold/[0.06] px-3 py-2.5 text-center text-[12px] leading-relaxed text-gold">
-          Mostrá este QR al personal del festival. Cuando lo escaneen, tu asistencia
-          queda registrada con la hora exacta.
+          Muestre este código QR al personal del festival. Al escanearlo, su
+          asistencia quedará registrada con la hora exacta.
         </p>
       </div>
     </div>,

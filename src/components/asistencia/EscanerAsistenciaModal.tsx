@@ -153,7 +153,7 @@ export function EscanerAsistenciaModal({ open, onClose }: Props) {
               </div>
             )}
             <p className="mt-3 text-center text-[11px] text-text-45">
-              Apuntá la cámara al QR del representante. Se registra al instante.
+              Apunte la cámara al código QR del representante. El registro es inmediato.
             </p>
           </div>
 

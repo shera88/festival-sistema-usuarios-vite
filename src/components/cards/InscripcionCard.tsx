@@ -372,7 +372,7 @@ export function InscripcionCard({ insc, notas, year }: Props) {
             type="button"
             onClick={() => setQrOpen(true)}
             aria-label="Marcar asistencia"
-            title="Marcar asistencia (mostrar QR al staff)"
+            title="Marcar asistencia (mostrar el QR al personal del festival)"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] font-bold uppercase leading-none text-cyan transition hover:bg-cyan/20"
             style={{ letterSpacing: '0.5px' }}
           >
