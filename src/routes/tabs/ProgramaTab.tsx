@@ -16,15 +16,36 @@ import { textoFechaEnsayo } from '@/lib/fechas-festival';
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
 
-// Días del sorteo + horario de inicio (según la convocatoria).
-const DIAS = ['MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const;
+// Días del sorteo + horario de inicio (según la convocatoria). Sábado y domingo
+// son las finales (inicio 10:00); su programa se publica aparte.
+const DIAS = ['MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'] as const;
 type Dia = (typeof DIAS)[number];
 const DIA_LABEL: Record<Dia, string> = {
-  MARTES: 'Martes', MIERCOLES: 'Miércoles', JUEVES: 'Jueves', VIERNES: 'Viernes',
+  MARTES: 'Martes', MIERCOLES: 'Miércoles', JUEVES: 'Jueves', VIERNES: 'Viernes', SABADO: 'Sábado', DOMINGO: 'Domingo',
 };
 const HORA_INICIO: Record<Dia, string> = {
-  MARTES: '19:00', MIERCOLES: '19:00', JUEVES: '19:00', VIERNES: '15:00',
+  MARTES: '19:00', MIERCOLES: '19:00', JUEVES: '19:00', VIERNES: '15:00', SABADO: '10:00', DOMINGO: '10:00',
 };
+
+// Apertura oficial "Danzarte · Nuestra Esencia" (30 min) al inicio de estos días.
+const APERTURA_DIAS = new Set<Dia>(['MARTES', 'MIERCOLES', 'SABADO']);
+const APERTURA_DUR = '30:00';
+// Logo de la agrupación/institución DANZARTE (instituciones.enlace_del_logo,
+// id_agrupacion e9b8cbeb) para la tarjeta de apertura.
+const APERTURA_LOGO = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/inscripciones/danzarte/1780750553226-cbc88b13-e3f8-4cf5-8fba-114a51cd2839.webp';
+const APERTURA_COREOGRAFO = 'YACU SERRANO';
+// Color navy de marca para la cabecera "APERTURA" en el PDF.
+const APERTURA_RGB: [number, number, number] = [26, 16, 64];
+const esApertura = (r: { id_inscripcion: string | number }) => String(r.id_inscripcion).startsWith('apertura-');
+function aperturaActo(dia: Dia): ActoRPC {
+  return {
+    id_inscripcion: `apertura-${dia}`, id_agrupacion: null,
+    nombre_agrupacion: 'APERTURA · DANZARTE', agrupacion: 'DANZARTE',
+    obra: 'NUESTRA ESENCIA', ciudad: null, subdivision: null, modalidad: 'Apertura',
+    dia, bloque: null, logo_url: APERTURA_LOGO, orden: 0, duracion: APERTURA_DUR,
+    categoria: null, genero: null, coreografo: APERTURA_COREOGRAFO, coreografo_foto: null,
+  };
+}
 // Duración por subdivisión (fallback si la fila no trae `duracion` de la DB).
 const DUR_SUBDIV: Record<string, string> = {
   SOLO: '2:30', DUO: '3:30', 'DÚO': '3:30', 'GRUPO PEQUEÑO': '5:00', 'GRUPO CHICO': '5:00', 'GRUPO GRANDE': '6:30',
@@ -35,12 +56,15 @@ const BUFFER_SEG = 90; // colchón entre bailes (cambio de escenario)
 const HORA_INICIO_ENSAYO = '08:00';
 const ENSAYO_SEG = 8 * 60;
 const PUENTE_ENSAYO_SEG = 60;
+// El ensayo del viernes (que ocurre el jueves) va POR ORDEN DE LLEGADA: no se
+// muestra programa, solo un aviso.
+const ENSAYO_ORDEN_LLEGADA = new Set<string>(['VIERNES']);
 // Color de encabezado por día — cada programa se distingue por color.
 const DIA_ACCENT: Record<Dia, string> = {
-  MARTES: '#7C3AED', MIERCOLES: '#0891B2', JUEVES: '#CA8A04', VIERNES: '#DB2777',
+  MARTES: '#7C3AED', MIERCOLES: '#0891B2', JUEVES: '#CA8A04', VIERNES: '#DB2777', SABADO: '#059669', DOMINGO: '#EA580C',
 };
 const DIA_RGB: Record<Dia, [number, number, number]> = {
-  MARTES: [124, 58, 237], MIERCOLES: [8, 145, 178], JUEVES: [202, 138, 4], VIERNES: [219, 39, 119],
+  MARTES: [124, 58, 237], MIERCOLES: [8, 145, 178], JUEVES: [202, 138, 4], VIERNES: [219, 39, 119], SABADO: [5, 150, 105], DOMINGO: [234, 88, 12],
 };
 // Colores de cabecera por bloque en el PDF (menor vs mayor bien diferenciados).
 const BLOQUE_RGB: Record<'MENOR' | 'MAYOR', [number, number, number]> = {
@@ -264,14 +288,20 @@ function armarDia(
   const delDia = actos.filter((a) => String(a.dia || '').toUpperCase() === dia);
   const ord = (blq: string) =>
     delDia.filter((a) => String(a.bloque || '').toUpperCase() === blq).sort((x, y) => (x.orden ?? 0) - (y.orden ?? 0));
-  const seq = [...ord('MENOR'), ...ord('MAYOR')];
+  // Ensayo por orden de llegada (viernes): sin programa (se muestra un aviso).
+  if (esEnsayo && ENSAYO_ORDEN_LLEGADA.has(dia)) return [];
+  const base = [...ord('MENOR'), ...ord('MAYOR')];
+  // Apertura oficial (30 min) al inicio, solo en la presentación de los días definidos.
+  const seq = (!esEnsayo && APERTURA_DIAS.has(dia)) ? [aperturaActo(dia), ...base] : base;
   if (!seq.length) return [];
   let cur = hhmmSeg(esEnsayo ? ensayoDe(horarios, dia) : inicioDe(horarios, dia));
-  return seq.map((a, i) => {
+  let realN = 0;
+  return seq.map((a) => {
+    const n = esApertura(a) ? 0 : ++realN; // la apertura va como 00, el resto 01, 02…
     const hora = segHHMM(cur);
     const dur = esEnsayo ? '8:00' : a.duracion || DUR_SUBDIV[String(a.subdivision || '').toUpperCase().trim()] || '5:00';
     cur += esEnsayo ? ENSAYO_SEG + PUENTE_ENSAYO_SEG : durSeg(dur) + BUFFER_SEG;
-    return { ...a, n: i + 1, hora, dur, mio: a.id_agrupacion ? misAgr.has(String(a.id_agrupacion)) : false };
+    return { ...a, n, hora, dur, mio: a.id_agrupacion ? misAgr.has(String(a.id_agrupacion)) : false };
   });
 }
 
@@ -318,6 +348,7 @@ export function ProgramaTab() {
 
   // Día seleccionado (botones rápidos). Arranca en el primer día que tenga programa.
   const [diaSel, setDiaSel] = useState<Dia>('MARTES');
+  const ordenLlegada = esEnsayo && ENSAYO_ORDEN_LLEGADA.has(diaSel);
   const initRef = useRef(false);
   useEffect(() => {
     if (!initRef.current && diasConProg.length) {
@@ -401,39 +432,43 @@ export function ProgramaTab() {
         ? { 0: { cellWidth: 17, halign: 'center' }, 1: { cellWidth: 12, halign: 'center' }, 2: { cellWidth: 7, halign: 'center' }, 3: { cellWidth: 46 }, 4: { cellWidth: 42 }, 5: { cellWidth: 25 }, 6: { cellWidth: 25 } }
         : { 0: { cellWidth: 20, halign: 'center' }, 1: { cellWidth: 9, halign: 'center' }, 2: { cellWidth: 46 }, 3: { cellWidth: 42 }, 4: { cellWidth: 28 }, 5: { cellWidth: 29 } };
 
-      // Bloques MENOR y MAYOR en el MISMO PDF, cada uno con su cabecera de color.
+      const filaDe = (r: Fila) => {
+        const fila = [
+          r.hora,
+          String(r.n).padStart(2, '0'),
+          r.nombre_agrupacion || r.agrupacion || '',
+          r.obra || '',
+          capFirst(r.categoria),
+          capFirst(r.genero),
+        ];
+        if (conDur) fila.splice(1, 0, r.dur);
+        return fila;
+      };
+      // Una sección de tabla con su cabecera de color (apertura / bloque menor / bloque mayor).
       let y = padT + 11;
-      for (const blq of ['MENOR', 'MAYOR'] as const) {
-        const rb = rows.filter((r) => String(r.bloque || '').toUpperCase() === blq);
-        if (!rb.length) continue;
-        const color = BLOQUE_RGB[blq];
+      const seccion = (titulo: string, color: [number, number, number], rb: Fila[]) => {
+        if (!rb.length) return;
         auto.autoTable({
           startY: y,
           rowPageBreak: 'avoid',
           margin: { top: padT, bottom: padB, left: padL, right: padR },
           willDrawPage: onPage,
           head: [
-            [{ content: 'BLOQUE ' + blq, colSpan: CABECERA.length, styles: { fillColor: color, textColor: 255, fontStyle: 'bold', fontSize: 9.5, halign: 'left' } }],
+            [{ content: titulo, colSpan: CABECERA.length, styles: { fillColor: color, textColor: 255, fontStyle: 'bold', fontSize: 9.5, halign: 'left' } }],
             CABECERA,
           ],
-          body: rb.map((r) => {
-            const fila = [
-              r.hora,
-              String(r.n).padStart(2, '0'),
-              r.nombre_agrupacion || r.agrupacion || '',
-              r.obra || '',
-              capFirst(r.categoria),
-              capFirst(r.genero),
-            ];
-            if (conDur) fila.splice(1, 0, r.dur);
-            return fila;
-          }),
+          body: rb.map(filaDe),
           styles: { fontSize: 7.5, cellPadding: 1.4, overflow: 'linebreak', valign: 'middle', lineColor: [224, 221, 228], lineWidth: 0.2, textColor: [40, 38, 45] },
           headStyles: { fillColor: color, textColor: 255, fontSize: 7.5, halign: 'left', fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [246, 244, 250] },
           columnStyles: COLS,
         });
         y = auto.lastAutoTable.finalY + 6;
+      };
+      // Apertura oficial (orden 00) primero, luego bloques MENOR y MAYOR.
+      seccion('APERTURA', APERTURA_RGB, rows.filter(esApertura));
+      for (const blq of ['MENOR', 'MAYOR'] as const) {
+        seccion('BLOQUE ' + blq, BLOQUE_RGB[blq], rows.filter((r) => !esApertura(r) && String(r.bloque || '').toUpperCase() === blq));
       }
 
       const base = ((esEnsayo ? 'ensayos-' : 'programa-') + DIA_LABEL[diaSel] + '-2026').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -472,7 +507,7 @@ export function ProgramaTab() {
             <button
               key={m}
               type="button"
-              onClick={() => setMode(m)}
+              onClick={() => { setMode(m); if (m === 'ensayo' && (diaSel === 'SABADO' || diaSel === 'DOMINGO')) setDiaSel('MARTES'); }}
               className={
                 active
                   ? 'rounded-xl bg-[linear-gradient(135deg,var(--cyan),var(--fuchsia))] px-2 py-2 text-[13px] font-semibold text-white shadow'
@@ -485,7 +520,7 @@ export function ProgramaTab() {
         })}
       </div>
 
-      {esEnsayo && (
+      {esEnsayo && !ordenLlegada && (
         <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
           <p className="text-[11px] text-text-45">
             Ensayos desde las {hhmmAmPm(ensayoDe(horarios, diaSel))} · 8 min por agrupación · 1 min entre agrupaciones · mismo orden que la presentación.
@@ -501,7 +536,7 @@ export function ProgramaTab() {
       )}
 
       <div className="flex flex-wrap gap-2 overflow-x-auto rounded-2xl border border-glass-border bg-glass-bg p-3 backdrop-blur-md no-scrollbar">
-        {DIAS.map((d) => {
+        {(esEnsayo ? DIAS.filter((d) => d !== 'SABADO' && d !== 'DOMINGO') : DIAS).map((d) => {
           const has = !!porDia[d];
           const active = d === diaSel;
           return (
@@ -523,26 +558,43 @@ export function ProgramaTab() {
 
       <StatsCards stats={stats} />
 
+      {ordenLlegada && (
+        <div className="rounded-2xl border border-gold/30 bg-gold/5 p-6 text-center backdrop-blur-md">
+          <p className="text-[15px] font-bold text-text-white">Ensayos por orden de llegada</p>
+          <p className="mx-auto mt-1.5 max-w-md text-[12.5px] text-text-45">
+            Los ensayos del viernes se realizan el jueves y son <b className="text-text-90">por orden de llegada</b> de
+            las agrupaciones — no hay un programa ni un horario fijo.
+          </p>
+        </div>
+      )}
+
       {q.isLoading && <LoadingSkeleton rows={3} />}
 
-      {!q.isLoading && diasConProg.length === 0 && (
+      {!q.isLoading && !ordenLlegada && diasConProg.length === 0 && (
         <EmptyState>El orden de presentación todavía no está publicado.</EmptyState>
       )}
 
-      {!q.isLoading && diasConProg.length > 0 && !porDia[diaSel] && (
+      {!q.isLoading && !ordenLlegada && diasConProg.length > 0 && !porDia[diaSel] && (
         <EmptyState>El programa de {DIA_LABEL[diaSel]} todavía no está publicado.</EmptyState>
       )}
 
       <div className="space-y-4">
         {(porDia[diaSel] ? [diaSel] : []).map((dia) => {
           const rows = porDia[dia]!;
+          // La apertura (orden 00) va SIEMPRE al inicio, sobre los bloques.
+          // `agruparPorBloque` manda lo sin-bloque al final, así que la sacamos aparte.
+          const aperturas = rows.filter(esApertura);
+          const resto = rows.filter((r) => !esApertura(r));
           return (
             <DayGroup key={dia} label={DIA_LABEL[dia]} count={`${rows.length} ${esEnsayo ? 'ensayos' : 'actos'} · inicio ${hhmmAmPm(esEnsayo ? ensayoDe(horarios, dia) : inicioDe(horarios, dia))}`} accent={DIA_ACCENT[dia]} defaultOpen>
               <div className="space-y-2">
+                {aperturas.map((r) => (
+                  <ActoRow key={r.id_inscripcion} r={r} esEnsayo={esEnsayo} />
+                ))}
                 {/* Separado en BLOQUE MENOR / BLOQUE MAYOR, igual que el PDF.
                     Las filas ya vienen ordenadas menor→mayor y por orden de
                     sorteo, así que agrupar no altera la secuencia. */}
-                {agruparPorBloque(rows, (r) => ({ bloque: r.bloque, division: null })).map((g) =>
+                {agruparPorBloque(resto, (r) => ({ bloque: r.bloque, division: null })).map((g) =>
                   g.bloque ? (
                     <BloqueGroup key={g.bloque} bloque={g.bloque} cantidad={g.items.length}>
                       {g.items.map((r) => (

@@ -36,9 +36,13 @@ export function VideosTab() {
 
   async function handleUnlock(tipo: 'videos' | 'paquete' = 'videos') {
     if (unlocking) return;
+    // Blindaje: si esto se invoca desde un onClick sin envolver, `tipo` llegaría
+    // como el evento de React (no serializable → "circular structure to JSON").
+    // Normalizamos: solo 'paquete' es válido; cualquier otra cosa cae a 'videos'.
+    const tipoSeguro: 'videos' | 'paquete' = tipo === 'paquete' ? 'paquete' : 'videos';
     setUnlocking(true);
     try {
-      const { pay_url } = await dataApi.membresiaCheckout(tipo);
+      const { pay_url } = await dataApi.membresiaCheckout(tipoSeguro);
       window.location.href = pay_url;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo iniciar el pago.');
@@ -270,7 +274,7 @@ export function VideosTab() {
         onClose={() => setActive(null)}
         preview={active?.bloqueado ?? false}
         unlockPrice={unlockPrice}
-        onUnlock={handleUnlock}
+        onUnlock={() => handleUnlock('videos')}
         unlocking={unlocking}
       />
     </div>
