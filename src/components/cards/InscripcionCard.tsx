@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video, Download, AlertTriangle } from 'lucide-react';
+import { ChevronDown, Play, Upload, CheckCircle2, Pencil, Video, Download, AlertTriangle, QrCode } from 'lucide-react';
 import { InscripcionPagosPanel } from '@/routes/tabs/PagosTab';
 import type { Inscripcion, Nota } from '@/types/domain';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +21,9 @@ import { extFromUrl, sanitizeFilename } from '@/lib/utils/descargarArchivo';
 import { useDuracionAudio } from '@/hooks/useDuracionAudio';
 import { evaluarExcesoAudio } from '@/lib/duracion-audio';
 import { EDICION_INSCRIPCIONES_ABIERTA } from '@/lib/flags';
+import { useAsistencias } from '@/hooks/useAsistencias';
+import { AsistenciaQRModal } from '@/components/asistencia/AsistenciaQRModal';
+import { buildQrPayload } from '@/lib/api/asistencia';
 
 interface Props {
   insc: Inscripcion;
@@ -71,7 +74,21 @@ export function InscripcionCard({ insc, notas, year }: Props) {
   const [revertOpen, setRevertOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const { puedeEditar } = useAuth();
+  const { puedeEditar, user } = useAuth();
+  const [qrOpen, setQrOpen] = useState(false);
+  const asisQ = useAsistencias();
+  const asistencia = (asisQ.data ?? []).find((a) => a.id_inscripcion === insc.id_inscripcion) ?? null;
+  const asisHora = asistencia
+    ? new Date(asistencia.marcada_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' })
+    : '';
+  const miRol = user?.es_representante
+    ? 'representante'
+    : user?.es_coreografo
+      ? 'coreografo'
+      : user?.es_director
+        ? 'director'
+        : 'representante';
+  const qrPayload = buildQrPayload({ i: insc.id_inscripcion, n: user?.nombre_y_apellido ?? undefined, r: miRol });
   const qc = useQueryClient();
   const mmConfirmado = !!insc.multimedia_confirmado;
 
@@ -335,6 +352,33 @@ export function InscripcionCard({ insc, notas, year }: Props) {
               className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow transition-all"
               style={{ left: mmConfirmado ? 'calc(100% - 16px)' : '2px' }}
             />
+          </button>
+        )}
+
+        {/* Asistencia: si ya la registró el super-admin (al escanear), se ve la hora;
+            si no, botón que abre el QR para que el staff lo escanee. */}
+        {asistencia ? (
+          <span
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-[#10B981]/40 px-2.5 py-1 text-[10px] font-bold uppercase leading-none text-[#10B981]"
+            style={{ letterSpacing: '0.5px', background: 'rgba(16,185,129,0.12)' }}
+            title={`Asistencia registrada a las ${asisHora}`}
+          >
+            <CheckCircle2 className="h-3 w-3" strokeWidth={2.4} />
+            <span className="hidden sm:inline">Presente · {asisHora}</span>
+            <span className="sm:hidden">{asisHora}</span>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            aria-label="Marcar asistencia"
+            title="Marcar asistencia (mostrar QR al staff)"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-cyan/40 bg-cyan/10 px-2.5 py-1 text-[10px] font-bold uppercase leading-none text-cyan transition hover:bg-cyan/20"
+            style={{ letterSpacing: '0.5px' }}
+          >
+            <QrCode className="h-3 w-3" strokeWidth={2.4} />
+            <span className="hidden sm:inline">Marcar asistencia</span>
+            <span className="sm:hidden">Asistencia</span>
           </button>
         )}
 
@@ -622,6 +666,14 @@ export function InscripcionCard({ insc, notas, year }: Props) {
         />
       )}
       <MultimediaDialog open={mmOpen} inscripcion={insc} onClose={() => setMmOpen(false)} />
+
+      <AsistenciaQRModal
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        payload={qrPayload}
+        obra={insc.nombre_de_la_obra}
+        agrupacion={insc.agrupacion}
+      />
 
       <EditarInscripcionModal
         inscripcion={editOpen ? insc : null}

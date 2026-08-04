@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Menu, RefreshCw, ChevronDown, LogOut, User, Eye, X, Loader2, Search, UserRoundSearch } from 'lucide-react';
+import { Menu, RefreshCw, ChevronDown, LogOut, User, Eye, X, Loader2, Search, UserRoundSearch, ScanLine } from 'lucide-react';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +8,7 @@ import { rutaInicioParaRol } from '@/lib/roles';
 import type { SearchResult } from '@/types/domain';
 import { AppSidebar } from './AppSidebar';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { EscanerAsistenciaModal } from '@/components/asistencia/EscanerAsistenciaModal';
 import { webpProxy } from '@/lib/utils/img';
 import logoUrl from '@/assets/logo-danzarte.png';
 
@@ -20,6 +21,7 @@ export function AppHeader() {
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [supervisarOpen, setSupervisarOpen] = useState(false);
+  const [escanerOpen, setEscanerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
@@ -148,6 +150,20 @@ export function AppHeader() {
             <RefreshCw className={`h-5 w-5 ${syncing ? 'animate-spin' : ''}`} />
           </button>
 
+          {/* Super-admin: escanear el QR de asistencia de los representantes.
+              Al escanear se registra la asistencia (hora del escaneo). */}
+          {user?.es_super_admin && (
+            <button
+              type="button"
+              onClick={() => setEscanerOpen(true)}
+              aria-label="Escanear QR de asistencia"
+              title="Escanear QR de asistencia"
+              className="rounded-xl border border-transparent p-2 text-text-45 transition hover:border-white/10 hover:bg-white/5 hover:text-cyan"
+            >
+              <ScanLine className="h-5 w-5" />
+            </button>
+          )}
+
           {/* Móvil: cambiar de usuario desde el topbar. En PC el ícono está
               junto al lápiz del nombre (UserHero). */}
           {user?.es_super_admin && (
@@ -275,6 +291,7 @@ export function AppHeader() {
       </nav>
 
       {supervisarOpen && <SupervisarModal onClose={() => setSupervisarOpen(false)} />}
+      <EscanerAsistenciaModal open={escanerOpen} onClose={() => setEscanerOpen(false)} />
 
       <ConfirmDialog
         open={logoutConfirmOpen}

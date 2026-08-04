@@ -10,6 +10,7 @@ const WATCHED_TABLES = [
   'instituciones',
   'coreografos',
   'pagos_2026',
+  'asistencia_2026',
 ];
 
 const INVALIDATIONS: Record<string, string[][]> = {
@@ -20,6 +21,7 @@ const INVALIDATIONS: Record<string, string[][]> = {
   instituciones: [['mis-agrupaciones'], ['agrupaciones']],
   coreografos: [['coreografos']],
   pagos_2026: [['pagos-resumen'], ['pagos-historial'], ['pagos-anos']],
+  asistencia_2026: [['asistencias']],
 };
 
 export function useRealtime() {
