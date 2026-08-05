@@ -13,7 +13,6 @@ import { ZoomableImage } from '@/components/ui/zoomable-image';
 import { BloqueGroup, agruparPorBloque, normalizarBloque, type Bloque } from '@/components/shared/BloqueHeader';
 import { textoFechaEnsayo } from '@/lib/fechas-festival';
 import { finalistasPorDia, ordenarPrograma, CUPO_FINAL, type DiaFinal } from '@/lib/utils/finals';
-import { fmtScore } from '@/lib/utils/scoring';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
@@ -382,10 +381,8 @@ function FinalObraRow({ o, pos, mio }: { o: RankingObra; pos: number; mio: boole
         </div>
         <div className="truncate text-[11px] text-text-45">{o.obra ? `"${o.obra}"` : 'Sin obra'}</div>
       </div>
-      <div className="shrink-0 text-right">
-        <div className="text-[16px] font-bold text-gold tabular-nums">{fmtScore(o.nota_final)}</div>
-        <div className="text-[9px] text-text-45">{o.jurados} jurado{o.jurados === 1 ? '' : 's'}</div>
-      </div>
+      {/* La nota NO se muestra en la final: el programa sólo se va armando; los
+          puntajes quedan como sorpresa para la premiación. */}
     </div>
   );
 }
