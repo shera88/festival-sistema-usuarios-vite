@@ -36,3 +36,42 @@ export function clasificacionDe(
     ? 'Domingo'
     : 'Sábado';
 }
+
+/* ─────────────────────────── Cupos de la final ───────────────────────────
+   La final tiene un tope de CUPO_FINAL obras POR DÍA (Sábado y Domingo cada
+   uno). Superar el corte (≥75 / ≥80) es NECESARIO pero no suficiente: si el día
+   ya llenó su cupo, las obras que quedan por debajo de la 100.ª mejor nota NO
+   entran, aunque pasen el corte. El programa es FLEXIBLE — se recalcula con cada
+   refresco del ranking, así que una obra puede caer fuera cuando llegan notas
+   más altas. Mantener este número alineado con la app de jurados. */
+export const CUPO_FINAL = 100;
+
+export type DiaFinal = 'Sábado' | 'Domingo';
+
+type ObraFinalizable = {
+  nota_final: number | null;
+  modalidad: string | null;
+  genero: string | null;
+  categoria: string | null;
+};
+
+/**
+ * Reparte las obras en las finales de Sábado y Domingo, ya recortadas al cupo.
+ * Para cada día: toma las que pasan el corte, las ordena por nota (mejor primero)
+ * y se queda con las primeras CUPO_FINAL. El resto queda afuera (cupo lleno).
+ */
+export function finalistasPorDia<T extends ObraFinalizable>(
+  obras: T[],
+  cupo = CUPO_FINAL,
+): Record<DiaFinal, T[]> {
+  const buckets: Record<DiaFinal, T[]> = { Sábado: [], Domingo: [] };
+  for (const o of obras) {
+    const dia = clasificacionDe(o.nota_final, o.modalidad, o.genero, o.categoria);
+    if (dia) buckets[dia].push(o);
+  }
+  const porNota = (a: T, b: T) => (b.nota_final ?? -1) - (a.nota_final ?? -1);
+  return {
+    Sábado: [...buckets.Sábado].sort(porNota).slice(0, cupo),
+    Domingo: [...buckets.Domingo].sort(porNota).slice(0, cupo),
+  };
+}

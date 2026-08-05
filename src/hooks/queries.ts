@@ -21,6 +21,10 @@ export type RankingObra = {
   // respaldo: si la inscripción no trae bloque, se deriva de ella.
   bloque: string | null;
   division: string | null;
+  // Agregado por sql/programa_publico.sql (v2): tamaño de la agrupación
+  // (SOLO / DÚO / GRUPO…) para subdividir el programa de la final. Opcional:
+  // hasta correr esa migración, `ranking_publico` no lo trae y queda undefined.
+  subdivision?: string | null;
 };
 
 /**

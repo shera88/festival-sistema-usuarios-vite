@@ -1,17 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileDown, ChevronDown } from 'lucide-react';
+import { FileDown, ChevronDown, Trophy } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingSkeleton } from '@/components/shared/LoadingSkeleton';
 import { StatsCards } from '@/components/shared/StatsCards';
 import { DayGroup } from '@/components/shared/DayGroup';
 import { supabase } from '@/lib/supabase/client';
-import { useInscripciones } from '@/hooks/queries';
+import { useInscripciones, useRankingPublico, type RankingObra } from '@/hooks/queries';
 import { useAuth } from '@/hooks/useAuth';
 import { webpProxy } from '@/lib/utils/img';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
-import { BloqueGroup, agruparPorBloque } from '@/components/shared/BloqueHeader';
+import { BloqueGroup, agruparPorBloque, normalizarBloque, type Bloque } from '@/components/shared/BloqueHeader';
 import { textoFechaEnsayo } from '@/lib/fechas-festival';
+import { finalistasPorDia, CUPO_FINAL, type DiaFinal } from '@/lib/utils/finals';
+import { fmtScore } from '@/lib/utils/scoring';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
@@ -305,6 +307,138 @@ function armarDia(
   });
 }
 
+/* ─────────────────────── Programa de las FINALES (Sáb/Dom) ───────────────────────
+   A diferencia de las clasificatorias (Martes–Viernes, con orden sorteado), la
+   final NO tiene un orden fijo todavía: se ARMA SOLA con las mejores notas. Cada
+   día toma sus 100 mejores (CUPO_FINAL) que pasan el corte y las organiza por
+   bloque → división · modalidad · subdivisión. Es EN VIVO: mientras el jurado
+   califica, la lista se recalcula y una obra puede entrar o quedar afuera si el
+   cupo se llena con notas más altas. */
+/** Una tarjeta por grupo: (bloque + división · modalidad · subdivisión), igual que
+ *  la app de jurados. El bloque NO separa en secciones grandes; es sólo el badge de
+ *  cada tarjeta. Se ordenan menor→mayor y, dentro, por la mejor nota del grupo. */
+function agruparFinal(items: RankingObra[]): Array<{ bloque: Bloque | null; label: string; items: RankingObra[] }> {
+  const map = new Map<string, { bloque: Bloque | null; label: string; items: RankingObra[] }>();
+  for (const o of items) {
+    const bloque = normalizarBloque(o.bloque, o.division);
+    const label = [o.division, o.modalidad, o.subdivision].filter(Boolean).map((s) => String(s)).join(' · ') || 'General';
+    const key = `${bloque ?? 'SIN'}|${label}`;
+    let g = map.get(key);
+    if (!g) { g = { bloque, label, items: [] }; map.set(key, g); }
+    g.items.push(o);
+  }
+  const rank = (b: Bloque | null) => (b === 'MENOR' ? 0 : b === 'MAYOR' ? 1 : 2);
+  const best = (g: { items: RankingObra[] }) => g.items[0]?.nota_final ?? -1; // items ya vienen por nota desc
+  return [...map.values()].sort((a, b) => rank(a.bloque) - rank(b.bloque) || best(b) - best(a));
+}
+
+function GrupoFinalCard({ bloque, label, count, children }: { bloque: Bloque | null; label: string; count: number; children: React.ReactNode }) {
+  const mayor = bloque === 'MAYOR';
+  return (
+    <div
+      className={`overflow-hidden rounded-xl border ${mayor ? 'border-fuchsia/25' : bloque ? 'border-cyan/25' : 'border-glass-border'} bg-glass-bg`}
+      style={{ borderLeftWidth: 3, borderLeftColor: mayor ? 'var(--fuchsia)' : bloque ? 'var(--cyan)' : undefined }}
+    >
+      <div className={`flex items-center gap-2 border-b border-glass-border px-3 py-2 ${mayor ? 'bg-fuchsia/8' : bloque ? 'bg-cyan/8' : ''}`}>
+        {bloque && (
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${mayor ? 'bg-fuchsia/20 text-fuchsia' : 'bg-cyan/20 text-cyan'}`} style={{ letterSpacing: '0.5px' }}>
+            {bloque.toLowerCase()}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-[11px] font-bold uppercase tracking-wide text-text-90">{label}</span>
+        <span className="shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] tabular-nums text-text-45">{count}</span>
+      </div>
+      <div className="divide-y divide-glass-border">{children}</div>
+    </div>
+  );
+}
+
+function FinalObraRow({ o, pos, mio }: { o: RankingObra; pos: number; mio: boolean }) {
+  const nombre = o.agrupacion || 'Agrupación';
+  return (
+    <div className={`flex items-center gap-3 px-3 py-2.5 ${mio ? 'bg-fuchsia/10' : ''}`}>
+      <div className="w-6 shrink-0 text-center text-[13px] font-bold text-gold tabular-nums">{pos}</div>
+      {o.enlace_del_logo ? (
+        <img src={webpProxy(o.enlace_del_logo, 80) ?? undefined} alt="" loading="lazy"
+          className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+      ) : (
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/5 text-[11px] font-bold text-text-45 ring-1 ring-white/10">
+          {initials(nombre)}
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[13px] font-semibold uppercase text-text-white" style={{ letterSpacing: '0.3px' }}>
+            {nombre}
+          </span>
+          {mio && (
+            <span className="shrink-0 rounded-md border border-fuchsia/40 bg-fuchsia/10 px-1.5 py-px text-[9px] font-bold uppercase text-fuchsia" style={{ letterSpacing: '0.5px' }}>
+              Tu participación
+            </span>
+          )}
+        </div>
+        <div className="truncate text-[11px] text-text-45">{o.obra ? `"${o.obra}"` : 'Sin obra'}</div>
+      </div>
+      <div className="shrink-0 text-right">
+        <div className="text-[16px] font-bold text-gold tabular-nums">{fmtScore(o.nota_final)}</div>
+        <div className="text-[9px] text-text-45">{o.jurados} jurado{o.jurados === 1 ? '' : 's'}</div>
+      </div>
+    </div>
+  );
+}
+
+function FinalDia({ dia, enabled, misNombres }: { dia: DiaFinal; enabled: boolean; misNombres: Set<string> }) {
+  const q = useRankingPublico(enabled);
+  const finalistas = useMemo(() => finalistasPorDia(q.data ?? [])[dia], [q.data, dia]);
+  // Organización del programa: una tarjeta por grupo (bloque + división · modalidad
+  // · subdivisión), igual que la app de jurados. Menor antes que mayor; dentro, mejor nota primero.
+  const grupos = useMemo(() => agruparFinal(finalistas), [finalistas]);
+  // Posición secuencial en el orden en que se despliega (1, 2, 3…), como el admin.
+  const posDe = useMemo(() => {
+    const m = new Map<string, number>();
+    let i = 0;
+    for (const g of grupos) for (const o of g.items) m.set(o.id_inscripcion, ++i);
+    return m;
+  }, [grupos]);
+
+  if (q.isLoading) return <LoadingSkeleton rows={4} />;
+  if (finalistas.length === 0) {
+    return (
+      <EmptyState>
+        Todavía no hay clasificados para la final del {dia.toLowerCase()}. Aparecerán aquí las obras que pasan el corte,
+        a medida que el jurado califica.
+      </EmptyState>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-2xl border border-gold/25 bg-gold/5 px-4 py-3 backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
+          <Trophy className="h-5 w-5 shrink-0 text-gold" />
+          <div>
+            <div className="text-[13px] font-bold text-text-white">Final · {dia}</div>
+            <div className="text-[11px] text-text-45">Se arma en vivo con las mejores notas · se actualiza al calificar</div>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-[15px] font-bold text-gold tabular-nums">{finalistas.length}<span className="text-[11px] text-text-45">/{CUPO_FINAL}</span></div>
+          <div className="text-[9px] uppercase text-text-45" style={{ letterSpacing: '0.5px' }}>Cupos</div>
+        </div>
+      </div>
+
+      {grupos.map((g) => (
+        <GrupoFinalCard key={`${g.bloque}|${g.label}`} bloque={g.bloque} label={g.label} count={g.items.length}>
+          {g.items.map((o) => (
+            <FinalObraRow key={o.id_inscripcion} o={o} pos={posDe.get(o.id_inscripcion) ?? 0}
+              mio={misNombres.has((o.agrupacion || '').toUpperCase().trim())} />
+          ))}
+        </GrupoFinalCard>
+      ))}
+    </div>
+  );
+}
+
 export function ProgramaTab() {
   const { user } = useAuth();
   const q = useQuery({ queryKey: ['programa', '2026'], queryFn: fetchPrograma, enabled: !!user, staleTime: 30_000 });
@@ -325,6 +459,22 @@ export function ProgramaTab() {
     if (user?.id_agrupacion) s.add(String(user.id_agrupacion));
     return s;
   }, [inscQ.data, user]);
+
+  // El ranking público (INNER join con notas → solo obras ya calificadas) alimenta
+  // el programa de las FINALES (Sábado/Domingo), que se arma solo con las mejores
+  // notas. Es en vivo (polling ~8 s), así que la final se recompone al calificar.
+  const rankingQ = useRankingPublico(!!user);
+  const finalPorDia = useMemo(() => finalistasPorDia(rankingQ.data ?? []), [rankingQ.data]);
+  const finalCount: Record<Dia, number> = {
+    MARTES: 0, MIERCOLES: 0, JUEVES: 0, VIERNES: 0,
+    SABADO: finalPorDia['Sábado'].length, DOMINGO: finalPorDia['Domingo'].length,
+  };
+  // Nombres de agrupación propios (el ranking no trae id_agrupacion, se matchea por nombre).
+  const misNombres = useMemo(() => {
+    const s = new Set<string>();
+    for (const i of inscQ.data?.['2026'] ?? []) if (i.agrupacion) s.add(String(i.agrupacion).toUpperCase().trim());
+    return s;
+  }, [inscQ.data]);
 
   // Por día: menor luego mayor, ordenados; hora acumulada (inicio + duración + buffer).
   const porDia = useMemo(() => {
@@ -349,6 +499,8 @@ export function ProgramaTab() {
   // Día seleccionado (botones rápidos). Arranca en el primer día que tenga programa.
   const [diaSel, setDiaSel] = useState<Dia>('MARTES');
   const ordenLlegada = esEnsayo && ENSAYO_ORDEN_LLEGADA.has(diaSel);
+  // Sábado/Domingo en presentación = programa de la FINAL (se arma solo con las notas).
+  const esFinalDia = !esEnsayo && (diaSel === 'SABADO' || diaSel === 'DOMINGO');
   const initRef = useRef(false);
   useEffect(() => {
     if (!initRef.current && diasConProg.length) {
@@ -537,7 +689,9 @@ export function ProgramaTab() {
 
       <div className="flex flex-wrap gap-2 overflow-x-auto rounded-2xl border border-glass-border bg-glass-bg p-3 backdrop-blur-md no-scrollbar">
         {(esEnsayo ? DIAS.filter((d) => d !== 'SABADO' && d !== 'DOMINGO') : DIAS).map((d) => {
-          const has = !!porDia[d];
+          // Sáb/Dom (presentación) cuentan por finalistas; el resto por actos con orden.
+          const cnt = !esEnsayo && (d === 'SABADO' || d === 'DOMINGO') ? finalCount[d] : (porDia[d]?.length ?? 0);
+          const has = cnt > 0;
           const active = d === diaSel;
           return (
             <button
@@ -550,7 +704,7 @@ export function ProgramaTab() {
               style={active ? { background: DIA_ACCENT[d] } : undefined}
             >
               {DIA_LABEL[d]}
-              {has && !active && <span className="ml-1.5 text-[11px] text-text-45">{porDia[d]!.length}</span>}
+              {has && !active && <span className="ml-1.5 text-[11px] text-text-45">{cnt}</span>}
             </button>
           );
         })}
@@ -568,16 +722,21 @@ export function ProgramaTab() {
         </div>
       )}
 
-      {q.isLoading && <LoadingSkeleton rows={3} />}
+      {esFinalDia && (
+        <FinalDia dia={diaSel === 'SABADO' ? 'Sábado' : 'Domingo'} enabled={!!user} misNombres={misNombres} />
+      )}
 
-      {!q.isLoading && !ordenLlegada && diasConProg.length === 0 && (
+      {!esFinalDia && q.isLoading && <LoadingSkeleton rows={3} />}
+
+      {!esFinalDia && !q.isLoading && !ordenLlegada && diasConProg.length === 0 && (
         <EmptyState>El orden de presentación todavía no está publicado.</EmptyState>
       )}
 
-      {!q.isLoading && !ordenLlegada && diasConProg.length > 0 && !porDia[diaSel] && (
+      {!esFinalDia && !q.isLoading && !ordenLlegada && diasConProg.length > 0 && !porDia[diaSel] && (
         <EmptyState>El programa de {DIA_LABEL[diaSel]} todavía no está publicado.</EmptyState>
       )}
 
+      {!esFinalDia && (
       <div className="space-y-4">
         {(porDia[diaSel] ? [diaSel] : []).map((dia) => {
           const rows = porDia[dia]!;
@@ -614,6 +773,7 @@ export function ProgramaTab() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
