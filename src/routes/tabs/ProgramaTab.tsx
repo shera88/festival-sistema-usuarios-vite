@@ -12,7 +12,7 @@ import { webpProxy } from '@/lib/utils/img';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
 import { BloqueGroup, agruparPorBloque, normalizarBloque, type Bloque } from '@/components/shared/BloqueHeader';
 import { textoFechaEnsayo } from '@/lib/fechas-festival';
-import { finalistasPorDia, CUPO_FINAL, type DiaFinal } from '@/lib/utils/finals';
+import { finalistasPorDia, ordenarPrograma, CUPO_FINAL, type DiaFinal } from '@/lib/utils/finals';
 import { fmtScore } from '@/lib/utils/scoring';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
@@ -316,20 +316,23 @@ function armarDia(
    cupo se llena con notas más altas. */
 /** Una tarjeta por grupo: (bloque + división · modalidad · subdivisión), igual que
  *  la app de jurados. El bloque NO separa en secciones grandes; es sólo el badge de
- *  cada tarjeta. Se ordenan menor→mayor y, dentro, por la mejor nota del grupo. */
-function agruparFinal(items: RankingObra[]): Array<{ bloque: Bloque | null; label: string; items: RankingObra[] }> {
-  const map = new Map<string, { bloque: Bloque | null; label: string; items: RankingObra[] }>();
+ *  cada tarjeta. La lista YA viene ordenada con el preset del programa (gemelo de
+ *  jurados), así que acá sólo se agrupan los consecutivos que comparten grupo — el
+ *  orden de las tarjetas queda EXACTAMENTE igual que en jurados. */
+function agruparConsecutivo(items: RankingObra[]): Array<{ bloque: Bloque | null; label: string; items: RankingObra[] }> {
+  const grupos: Array<{ bloque: Bloque | null; label: string; items: RankingObra[] }> = [];
+  let cur: { bloque: Bloque | null; label: string; items: RankingObra[]; key: string } | null = null;
   for (const o of items) {
     const bloque = normalizarBloque(o.bloque, o.division);
     const label = [o.division, o.modalidad, o.subdivision].filter(Boolean).map((s) => String(s)).join(' · ') || 'General';
     const key = `${bloque ?? 'SIN'}|${label}`;
-    let g = map.get(key);
-    if (!g) { g = { bloque, label, items: [] }; map.set(key, g); }
-    g.items.push(o);
+    if (!cur || cur.key !== key) {
+      cur = { bloque, label, items: [], key };
+      grupos.push({ bloque, label, items: cur.items });
+    }
+    cur.items.push(o);
   }
-  const rank = (b: Bloque | null) => (b === 'MENOR' ? 0 : b === 'MAYOR' ? 1 : 2);
-  const best = (g: { items: RankingObra[] }) => g.items[0]?.nota_final ?? -1; // items ya vienen por nota desc
-  return [...map.values()].sort((a, b) => rank(a.bloque) - rank(b.bloque) || best(b) - best(a));
+  return grupos;
 }
 
 function GrupoFinalCard({ bloque, label, count, children }: { bloque: Bloque | null; label: string; count: number; children: React.ReactNode }) {
@@ -389,17 +392,17 @@ function FinalObraRow({ o, pos, mio }: { o: RankingObra; pos: number; mio: boole
 
 function FinalDia({ dia, enabled, misNombres }: { dia: DiaFinal; enabled: boolean; misNombres: Set<string> }) {
   const q = useRankingPublico(enabled);
-  const finalistas = useMemo(() => finalistasPorDia(q.data ?? [])[dia], [q.data, dia]);
-  // Organización del programa: una tarjeta por grupo (bloque + división · modalidad
-  // · subdivisión), igual que la app de jurados. Menor antes que mayor; dentro, mejor nota primero.
-  const grupos = useMemo(() => agruparFinal(finalistas), [finalistas]);
+  // 1) Quiénes entran: las 100 mejores notas del día (cupo). 2) En qué orden se
+  // muestran: el preset del programa (bloque → división → modalidad → subdivisión),
+  // EXACTAMENTE como la app de jurados — no por nota.
+  const finalistas = useMemo(() => ordenarPrograma(finalistasPorDia(q.data ?? [])[dia]), [q.data, dia]);
+  const grupos = useMemo(() => agruparConsecutivo(finalistas), [finalistas]);
   // Posición secuencial en el orden en que se despliega (1, 2, 3…), como el admin.
   const posDe = useMemo(() => {
     const m = new Map<string, number>();
-    let i = 0;
-    for (const g of grupos) for (const o of g.items) m.set(o.id_inscripcion, ++i);
+    finalistas.forEach((o, i) => m.set(o.id_inscripcion, i + 1));
     return m;
-  }, [grupos]);
+  }, [finalistas]);
 
   if (q.isLoading) return <LoadingSkeleton rows={4} />;
   if (finalistas.length === 0) {

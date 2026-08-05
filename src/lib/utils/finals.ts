@@ -59,6 +59,9 @@ type ObraFinalizable = {
  * Reparte las obras en las finales de Sábado y Domingo, ya recortadas al cupo.
  * Para cada día: toma las que pasan el corte, las ordena por nota (mejor primero)
  * y se queda con las primeras CUPO_FINAL. El resto queda afuera (cupo lleno).
+ *
+ * OJO: acá el orden es por NOTA sólo para ELEGIR quién entra (las 100 mejores).
+ * El orden en que se MUESTRA el programa es otro — ver `ordenarPrograma`.
  */
 export function finalistasPorDia<T extends ObraFinalizable>(
   obras: T[],
@@ -74,4 +77,58 @@ export function finalistasPorDia<T extends ObraFinalizable>(
     Sábado: [...buckets.Sábado].sort(porNota).slice(0, cupo),
     Domingo: [...buckets.Domingo].sort(porNota).slice(0, cupo),
   };
+}
+
+/* ─────────────────── Orden canónico del programa (gemelo de jurados) ───────────────────
+   EXACTAMENTE el mismo que la app de jurados (app-jurados .../presets.ts, PRESET_DEFAULT):
+   bloque → división → modalidad → subdivisión, y a igualdad de todo, por nombre de obra.
+   Los arrays fijos y la forma canónica (FOLKLORE→FOLCLORE, índice 999 para lo no listado)
+   son idénticos, así que el portal muestra la final en el MISMO orden que jurados. Si cambia
+   uno, cambian los dos. */
+const ORD_PROGRAMA: Record<'bloque' | 'division' | 'subdivision' | 'modalidad', string[]> = {
+  bloque: ['MENOR', 'MAYOR'],
+  division: ['PRE INFANTIL', 'INFANTIL', 'PRE JUVENIL', 'JUVENIL', 'MAYORES', 'ADULTOS'],
+  subdivision: ['SOLO', 'DUO', 'GRUPO PEQUEÑO', 'GRUPO GRANDE'],
+  modalidad: [
+    // académico
+    'JAZZ DANCE - CONTEMPORÁNEO', 'BAILES TROPICALES', 'BALLET CLÁSICO Y NEOCLÁSICO',
+    'DANZA ÁRABE O DANZAS DE LA INDIA', 'MODALIDAD LIBRE',
+    // urbano
+    'DANZA URBANA LIBRE', 'COMERCIAL DANCE', 'HIP HOP',
+    // folklore
+    'FOLKLORE DEL CHACO', 'FOLKLORE DE LOS VALLES', 'FOLKLORE ORIENTAL DE PROYECCION',
+    'FOLKLORE ORIENTAL TRADICIONAL', 'FOLKLORE POPULAR SAYA CAPORAL', 'FOLKLORE ANDINO',
+    'FOLKLORE LATINOAMERICANO', 'FOLKLORE ANDINO TINKU',
+  ],
+};
+
+const canonProg = (s: string) => s.replace(/^FOLKLORE\b/, 'FOLCLORE');
+
+function rangoProg(key: keyof typeof ORD_PROGRAMA, val: string | null | undefined): number {
+  const u = canonProg((val ?? '').toString().toUpperCase());
+  const i = ORD_PROGRAMA[key].findIndex((x) => canonProg(x) === u);
+  return i < 0 ? 999 : i;
+}
+
+type ObraOrdenable = {
+  bloque: string | null;
+  division: string | null;
+  modalidad: string | null;
+  subdivision?: string | null;
+  obra: string | null;
+};
+
+/** Comparador del programa: bloque → división → modalidad → subdivisión → obra. */
+export function cmpPrograma(a: ObraOrdenable, b: ObraOrdenable): number {
+  for (const key of ['bloque', 'division', 'modalidad', 'subdivision'] as const) {
+    const ra = rangoProg(key, a[key]);
+    const rb = rangoProg(key, b[key]);
+    if (ra !== rb) return ra - rb;
+  }
+  return (a.obra ?? '').localeCompare(b.obra ?? '', 'es');
+}
+
+/** Ordena una lista de obras con el orden canónico del programa (gemelo de jurados). */
+export function ordenarPrograma<T extends ObraOrdenable>(obras: T[]): T[] {
+  return [...obras].sort(cmpPrograma);
 }
