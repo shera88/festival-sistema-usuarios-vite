@@ -75,12 +75,16 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
   );
 
   // Vistas de la tarjeta: por obra (default), participantes únicos y carnets
-  // repetidos. Las dos últimas son ayudas de gestión para que el encargado vea
-  // la cantidad real de gente y corrija los carnets mal cargados.
+  // repetidos. Las dos últimas son herramientas de gestión SOLO para super admin:
+  // sirven para detectar carnets mal cargados y confirmar quién cuenta como
+  // credencial aparte (afecta el cobro). El resto de los usuarios ve el kárdex
+  // igual que siempre, agrupado por obra.
   const [vista, setVista] = useState<VistaKardex>('obra');
   const resumen = useMemo(() => analizarKardex(rows), [rows]);
   const totalUnicos = resumen.unicos;
   const totalConflictos = resumen.grupos.length;
+  const vistasGestion = isSuperAdmin;
+  const vistaEfectiva: VistaKardex = vistasGestion ? vista : 'obra';
 
   const verificadosCount = useMemo(
     () => rows.filter((r) => r.verificado).length,
@@ -193,10 +197,10 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-text-45">
             <span>{rows.length} integrante{rows.length !== 1 ? 's' : ''}</span>
-            {totalUnicos !== rows.length && (
+            {vistasGestion && totalUnicos !== rows.length && (
               <span className="text-cyan">· {totalUnicos} persona{totalUnicos !== 1 ? 's' : ''}</span>
             )}
-            {totalConflictos > 0 && (
+            {vistasGestion && totalConflictos > 0 && (
               <span
                 className="ml-1 inline-flex items-center gap-1 rounded-md border border-red-400/40 bg-red-400/10 px-1.5 py-px text-[9px] font-semibold uppercase text-red-400"
                 style={{ letterSpacing: '0.5px' }}
@@ -268,7 +272,8 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
 
       {open && (
         <div className="border-t border-white/10 anim-fade-in">
-          {/* Conmutador de vista: por obra · participantes únicos · carnets repetidos. */}
+          {/* Conmutador de vista (solo super admin): por obra · únicos · carnets repetidos. */}
+          {vistasGestion && (
           <div className="flex flex-wrap items-center gap-2 px-3 pt-3 sm:px-4">
             <button
               type="button"
@@ -316,13 +321,14 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
               </button>
             )}
           </div>
-          {vista === 'unicos' && (
+          )}
+          {vistasGestion && vista === 'unicos' && (
             <p className="px-3 pt-2 text-[11px] leading-relaxed text-text-45 sm:px-4">
               Cada persona aparece una sola vez, aunque baile en varias obras. Úselo para
               confirmar que están todos sus bailarines cargados.
             </p>
           )}
-          {vista === 'conflictos' && (
+          {vistasGestion && vista === 'conflictos' && (
             <p className="px-3 pt-2 text-[11px] leading-relaxed text-text-45 sm:px-4">
               Estos registros comparten número de carnet. Como cada persona se identifica por
               su nombre y su carnet, mientras el número esté repetido la cantidad de
@@ -335,7 +341,7 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
             canManage={canManage}
             isCurrentYear={isCurrentYear}
             locked={cerrada && !isSuperAdmin}
-            vista={vista}
+            vista={vistaEfectiva}
           />
         </div>
       )}
