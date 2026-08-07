@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, Music2, Users, AlertCircle } from 'lucide-react';
+import { ChevronDown, Music2, Users, AlertCircle, IdCard, CopyX, UserCheck, UserPlus, Loader2 } from 'lucide-react';
 import type { KardexRow as KRow } from '@/types/domain';
 import { KardexRow } from './KardexRow';
+import { useQueryClient } from '@tanstack/react-query';
+import { kardexApi } from '@/lib/api/kardex';
+import { analizarKardex, clavePersona } from '@/lib/kardex-duplicados';
+
+/** Qué se está mirando dentro de la tarjeta de una agrupación. */
+export type VistaKardex = 'obra' | 'unicos' | 'conflictos';
 
 interface Props {
   rows: KRow[];
@@ -10,12 +16,22 @@ interface Props {
   canManage?: boolean;
   isCurrentYear?: boolean;
   locked?: boolean;
+  /**
+   * 'obra'       → agrupado por obra/baile (comportamiento de siempre).
+   * 'unicos'     → una sola lista con las personas únicas, sin repetir a quien
+   *                baila en varias obras.
+   * 'conflictos' → solo los carnets repetidos, agrupados para corregirlos.
+   */
+  vista?: VistaKardex;
 }
 
 /** Orden canónico de cargos dentro de cada obra (resto va al final, alfabético). */
 const CARGO_ORDER = ['BAILARIN', 'COREOGRAFO', 'DIRECTOR', 'STAFF'];
 
 const NONE = '__sin_baile__';
+const TODOS = '__todos__';
+const PREFIJO_CARNET = 'ci-';
+const PREFIJO_REPETIDA = 'dup-';
 
 function normCargo(c: string | null | undefined): string {
   return (c ?? '')
@@ -70,8 +86,32 @@ function groupByCargo(rows: KRow[]): CargoGroup[] {
  * Quienes no tienen bailes asignados (staff, dirección, etc.) caen en el grupo
  * "Sin baile asignado".
  */
-export function KardexObraGroups({ rows, canEdit, canManage, isCurrentYear, locked }: Props) {
+export function KardexObraGroups({ rows, canEdit, canManage, isCurrentYear, locked, vista = 'obra' }: Props) {
   const buckets = useMemo<ObraBucket[]>(() => {
+    // Modo "participantes únicos": una sola sección con cada persona una vez.
+    if (vista === 'unicos') {
+      const vistos = new Map<string, KRow>();
+      for (const r of rows) {
+        const k = clavePersona(r);
+        if (!vistos.has(k)) vistos.set(k, r);
+      }
+      const unicos = [...vistos.values()];
+      if (unicos.length === 0) return [];
+      return [{ id: TODOS, label: 'Participantes únicos', rows: unicos }];
+    }
+
+    // Modo "carnets repetidos": una sección por conflicto, para corregirlos.
+    if (vista === 'conflictos') {
+      return analizarKardex(rows).grupos.map((g) => ({
+        id: g.id,
+        label:
+          g.tipo === 'mismo-carnet'
+            ? `Carnet ${g.ci} · ${g.personas} personas distintas`
+            : `${g.rows[0]?.nombre_y_apellido ?? 'Sin nombre'} · cargada ${g.rows.length} veces`,
+        rows: g.rows,
+      }));
+    }
+
     const m = new Map<string, ObraBucket>();
     for (const r of rows) {
       const bailes = Array.isArray(r.bailes) ? r.bailes : [];
@@ -95,7 +135,15 @@ export function KardexObraGroups({ rows, canEdit, canManage, isCurrentYear, lock
       if (b.id === NONE) return -1;
       return a.label.localeCompare(b.label);
     });
-  }, [rows]);
+  }, [rows, vista]);
+
+  if (vista === 'conflictos' && buckets.length === 0) {
+    return (
+      <div className="p-4 text-center text-[12px] text-text-45">
+        No hay carnets repetidos: cada persona tiene su propio número.
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2.5 p-2 sm:p-3">
@@ -103,13 +151,78 @@ export function KardexObraGroups({ rows, canEdit, canManage, isCurrentYear, lock
         <ObraSection
           key={obra.id}
           obra={obra}
-          defaultOpen={i === 0}
+          defaultOpen={vista === 'conflictos' ? true : i === 0}
           canEdit={canEdit}
           canManage={canManage}
           isCurrentYear={isCurrentYear}
           locked={locked}
         />
       ))}
+    </div>
+  );
+}
+
+/**
+ * Confirmación de "esta sí es otra persona" para un registro que comparte carnet.
+ * Mientras no se marque, el cobro de credenciales lo sigue contando junto con los
+ * demás que tienen ese mismo CI (comportamiento histórico).
+ */
+function MarcaPersonaDistinta({ row, disabled }: { row: KRow; disabled?: boolean }) {
+  const qc = useQueryClient();
+  const [marcada, setMarcada] = useState(!!row.persona_distinta);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = row.id_kardex ? String(row.id_kardex) : '';
+
+  async function alternar() {
+    if (!id || disabled || guardando) return;
+    const siguiente = !marcada;
+    setGuardando(true);
+    setError(null);
+    try {
+      await kardexApi.personaDistinta(id, siguiente);
+      setMarcada(siguiente);
+      // El total de credenciales se recalcula en el backend → refrescar pagos.
+      qc.invalidateQueries({ queryKey: ['pagos'] });
+      qc.invalidateQueries({ queryKey: ['kardex'] });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 py-1.5 pl-3 pr-3 sm:pl-4">
+      <button
+        type="button"
+        onClick={alternar}
+        disabled={disabled || guardando || !id}
+        aria-pressed={marcada}
+        title={
+          disabled
+            ? 'Reabra la agrupación para poder confirmarlo'
+            : marcada
+              ? 'Se está contando como una credencial aparte. Toque para deshacer.'
+              : 'Confirmar que es otra persona para que se cobre su credencial'
+        }
+        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-semibold uppercase transition disabled:opacity-40 ${
+          marcada
+            ? 'border-emerald-400/50 bg-emerald-400/15 text-emerald-400'
+            : 'border-white/15 text-text-45 hover:border-cyan/50 hover:text-cyan'
+        }`}
+        style={{ letterSpacing: '0.5px' }}
+      >
+        {guardando ? (
+          <Loader2 className="h-3 w-3 animate-spin" />
+        ) : marcada ? (
+          <UserCheck className="h-3 w-3" />
+        ) : (
+          <UserPlus className="h-3 w-3" />
+        )}
+        {marcada ? 'Cuenta como persona aparte' : 'Es otra persona'}
+      </button>
+      {error && <span className="text-[10px] text-red-400">{error}</span>}
     </div>
   );
 }
@@ -131,6 +244,10 @@ function ObraSection({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const isNone = obra.id === NONE;
+  const isTodos = obra.id === TODOS;
+  const isCarnet = obra.id.startsWith(PREFIJO_CARNET);
+  const isRepetida = obra.id.startsWith(PREFIJO_REPETIDA);
+  const isConflicto = isCarnet || isRepetida;
   const cargoGroups = useMemo(() => groupByCargo(obra.rows), [obra.rows]);
 
   const n = obra.rows.length;
@@ -140,7 +257,13 @@ function ObraSection({
       style={{
         // Borde izquierdo de acento (fucsia = obra, dorado = sin baile) + fondo
         // propio elevado para que la sección no se camufle con el card.
-        borderLeftColor: isNone ? 'rgba(232,208,152,0.75)' : 'rgba(217,70,239,0.75)',
+        borderLeftColor: isConflicto
+          ? 'rgba(248,113,113,0.85)'
+          : isTodos
+            ? 'rgba(0,229,255,0.75)'
+            : isNone
+              ? 'rgba(232,208,152,0.75)'
+              : 'rgba(217,70,239,0.75)',
         background: 'rgba(255,255,255,0.03)',
       }}
     >
@@ -163,14 +286,38 @@ function ObraSection({
           className={`flex flex-1 items-center gap-3 px-3 py-3 transition group-hover:brightness-125 sm:px-4 ${
             open ? 'border-b border-white/10' : ''
           }`}
-          style={{ background: isNone ? 'rgba(232,208,152,0.12)' : 'rgba(217,70,239,0.12)' }}
+          style={{
+            background: isConflicto
+              ? 'rgba(248,113,113,0.14)'
+              : isTodos
+                ? 'rgba(0,229,255,0.12)'
+                : isNone
+                  ? 'rgba(232,208,152,0.12)'
+                  : 'rgba(217,70,239,0.12)',
+          }}
         >
           <span
             className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
-              isNone ? 'bg-gold/15 text-gold' : 'bg-fuchsia/15 text-fuchsia'
+              isConflicto
+                ? 'bg-red-400/15 text-red-400'
+                : isTodos
+                  ? 'bg-cyan/15 text-cyan'
+                  : isNone
+                    ? 'bg-gold/15 text-gold'
+                    : 'bg-fuchsia/15 text-fuchsia'
             }`}
           >
-            {isNone ? <AlertCircle className="h-[18px] w-[18px]" /> : <Music2 className="h-[18px] w-[18px]" />}
+            {isCarnet ? (
+              <IdCard className="h-[18px] w-[18px]" />
+            ) : isRepetida ? (
+              <CopyX className="h-[18px] w-[18px]" />
+            ) : isTodos ? (
+              <Users className="h-[18px] w-[18px]" />
+            ) : isNone ? (
+              <AlertCircle className="h-[18px] w-[18px]" />
+            ) : (
+              <Music2 className="h-[18px] w-[18px]" />
+            )}
           </span>
           <div className="min-w-0 flex-1">
             <div
@@ -180,7 +327,13 @@ function ObraSection({
               {obra.label}
             </div>
             <div className="mt-0.5 truncate text-[10px] text-text-45">
-              {isNone ? 'Falta asignar baile' : 'Obra'} · {n} {n === 1 ? 'integrante' : 'integrantes'}
+              {isCarnet
+                ? `${n} registros comparten este carnet · corrija el CI de los que no correspondan`
+                : isRepetida
+                  ? `${n} registros iguales · elimine los sobrantes`
+                  : isTodos
+                    ? `${n} ${n === 1 ? 'persona' : 'personas'} · sin repetir`
+                    : `${isNone ? 'Falta asignar baile' : 'Obra'} · ${n} ${n === 1 ? 'integrante' : 'integrantes'}`}
             </div>
           </div>
           <span
@@ -219,15 +372,19 @@ function ObraSection({
                   pantalla dejaban el nombre del integrante en ~50px. */}
               <div className="ml-2 border-l border-white/10 sm:ml-8">
                 {cg.rows.map((r, i) => (
-                  <KardexRow
-                    key={`${obra.id}:${r.id_kardex ?? i}`}
-                    row={r}
-                    canDelete={canEdit}
-                    canEdit={canEdit}
-                    canManage={canManage}
-                    isCurrentYear={isCurrentYear}
-                    locked={locked}
-                  />
+                  <div key={`${obra.id}:${r.id_kardex ?? i}`}>
+                    <KardexRow
+                      row={r}
+                      canDelete={canEdit}
+                      canEdit={canEdit}
+                      canManage={canManage}
+                      isCurrentYear={isCurrentYear}
+                      locked={locked}
+                    />
+                    {/* Solo en el bloque de carnets compartidos: confirmar que es otra
+                        persona para que se contabilice como credencial aparte. */}
+                    {isCarnet && <MarcaPersonaDistinta row={r} disabled={!canEdit} />}
+                  </div>
                 ))}
               </div>
             </div>

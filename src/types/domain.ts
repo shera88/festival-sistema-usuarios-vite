@@ -126,6 +126,8 @@ export interface KardexRow {
   enlace_del_credencial: string | null;
   enlace_del_certificado: string | null;
   verificado?: boolean | null;
+  /** Confirmado a mano: es otra persona aunque comparta el CI. Cuenta aparte para credenciales. */
+  persona_distinta?: boolean | null;
   /** Bailes/obras de la agrupación en los que participa (jsonb `bailes`). */
   bailes?: { id_inscripcion: string; nombre_de_la_obra: string }[] | null;
   /** Lista de id_inscripcion de esos bailes (jsonb `bailes_ids`). */

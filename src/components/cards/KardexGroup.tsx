@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Lock } from 'lucide-react';
+import { ChevronDown, Lock, Users, IdCard, AlertTriangle } from 'lucide-react';
 import type { KardexRow as KRow, Year } from '@/types/domain';
-import { KardexObraGroups } from './KardexObraGroups';
+import { KardexObraGroups, type VistaKardex } from './KardexObraGroups';
+import { analizarKardex } from '@/lib/kardex-duplicados';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { kardexApi } from '@/lib/api/kardex';
 import { webpProxy } from '@/lib/utils/img';
@@ -72,6 +73,14 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
       ),
     [rows],
   );
+
+  // Vistas de la tarjeta: por obra (default), participantes únicos y carnets
+  // repetidos. Las dos últimas son ayudas de gestión para que el encargado vea
+  // la cantidad real de gente y corrija los carnets mal cargados.
+  const [vista, setVista] = useState<VistaKardex>('obra');
+  const resumen = useMemo(() => analizarKardex(rows), [rows]);
+  const totalUnicos = resumen.unicos;
+  const totalConflictos = resumen.grupos.length;
 
   const verificadosCount = useMemo(
     () => rows.filter((r) => r.verificado).length,
@@ -182,8 +191,21 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
           >
             {agrupacion}
           </div>
-          <div className="mt-0.5 flex items-center gap-2 text-[11px] text-text-45">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-text-45">
             <span>{rows.length} integrante{rows.length !== 1 ? 's' : ''}</span>
+            {totalUnicos !== rows.length && (
+              <span className="text-cyan">· {totalUnicos} persona{totalUnicos !== 1 ? 's' : ''}</span>
+            )}
+            {totalConflictos > 0 && (
+              <span
+                className="ml-1 inline-flex items-center gap-1 rounded-md border border-red-400/40 bg-red-400/10 px-1.5 py-px text-[9px] font-semibold uppercase text-red-400"
+                style={{ letterSpacing: '0.5px' }}
+                title="Hay registros que comparten número de carnet: la cantidad de participantes no es la real"
+              >
+                <AlertTriangle className="h-2.5 w-2.5" />
+                {totalConflictos} carnet{totalConflictos !== 1 ? 's' : ''} repetido{totalConflictos !== 1 ? 's' : ''}
+              </span>
+            )}
             {cerrada && (
               <span className="ml-1 inline-flex items-center gap-1 rounded-md border border-cyan/40 bg-cyan/10 px-1.5 py-px text-[9px] font-semibold uppercase text-cyan" style={{ letterSpacing: '0.5px' }}>
                 <Lock className="h-2.5 w-2.5" />
@@ -246,12 +268,74 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
 
       {open && (
         <div className="border-t border-white/10 anim-fade-in">
+          {/* Conmutador de vista: por obra · participantes únicos · carnets repetidos. */}
+          <div className="flex flex-wrap items-center gap-2 px-3 pt-3 sm:px-4">
+            <button
+              type="button"
+              onClick={() => setVista('obra')}
+              aria-pressed={vista === 'obra'}
+              className={`rounded-lg border px-3 py-1.5 text-[11px] font-semibold uppercase transition ${
+                vista === 'obra'
+                  ? 'border-fuchsia/50 bg-fuchsia/15 text-fuchsia'
+                  : 'border-white/10 text-text-45 hover:border-text-25 hover:text-text-white'
+              }`}
+              style={{ letterSpacing: '0.5px' }}
+            >
+              Por obra
+            </button>
+            <button
+              type="button"
+              onClick={() => setVista('unicos')}
+              aria-pressed={vista === 'unicos'}
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-semibold uppercase transition ${
+                vista === 'unicos'
+                  ? 'border-cyan/50 bg-cyan/15 text-cyan'
+                  : 'border-white/10 text-text-45 hover:border-text-25 hover:text-text-white'
+              }`}
+              style={{ letterSpacing: '0.5px' }}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Participantes únicos
+              <span className="rounded-md bg-white/10 px-1.5 py-px tabular-nums">{totalUnicos}</span>
+            </button>
+            {totalConflictos > 0 && (
+              <button
+                type="button"
+                onClick={() => setVista('conflictos')}
+                aria-pressed={vista === 'conflictos'}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11px] font-semibold uppercase transition ${
+                  vista === 'conflictos'
+                    ? 'border-red-400/60 bg-red-400/15 text-red-400'
+                    : 'border-red-400/30 text-red-400/80 hover:border-red-400/60 hover:text-red-400'
+                }`}
+                style={{ letterSpacing: '0.5px' }}
+              >
+                <IdCard className="h-3.5 w-3.5" />
+                Carnets repetidos
+                <span className="rounded-md bg-red-400/20 px-1.5 py-px tabular-nums">{totalConflictos}</span>
+              </button>
+            )}
+          </div>
+          {vista === 'unicos' && (
+            <p className="px-3 pt-2 text-[11px] leading-relaxed text-text-45 sm:px-4">
+              Cada persona aparece una sola vez, aunque baile en varias obras. Úselo para
+              confirmar que están todos sus bailarines cargados.
+            </p>
+          )}
+          {vista === 'conflictos' && (
+            <p className="px-3 pt-2 text-[11px] leading-relaxed text-text-45 sm:px-4">
+              Estos registros comparten número de carnet. Como cada persona se identifica por
+              su nombre y su carnet, mientras el número esté repetido la cantidad de
+              participantes no refleja la realidad. Corrija el carnet de cada uno con el lápiz.
+            </p>
+          )}
           <KardexObraGroups
             rows={sortedRows}
             canEdit={canEdit}
             canManage={canManage}
             isCurrentYear={isCurrentYear}
             locked={cerrada && !isSuperAdmin}
+            vista={vista}
           />
         </div>
       )}

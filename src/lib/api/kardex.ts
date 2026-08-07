@@ -67,6 +67,10 @@ export const kardexApi = {
   rotarFoto: (id_kardex: string, grados: 90 | 180 | 270) =>
     api.post<KardexFotoRes>('/kardex-rotar-foto.php', { id_kardex, grados }),
 
+  /** Marca/desmarca un registro como 'es otra persona' pese a compartir el CI. */
+  personaDistinta: (id_kardex: string, persona_distinta: boolean) =>
+    api.post<{ ok: true; id_kardex: string; persona_distinta: boolean }>('/kardex-persona-distinta.php', { id_kardex, persona_distinta }),
+
   /** Dispara la regeneración de la credencial PDF vía n8n (cuando no está creada). */
   regenerarCredencial: (id_kardex: string) =>
     api.post<{ ok: true; id_kardex: string; mensaje?: string }>('/kardex-regenerar-credencial.php', { id_kardex }),
