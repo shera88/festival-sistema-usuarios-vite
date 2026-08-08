@@ -63,9 +63,10 @@ export function clasificacionDe(
    refresco del ranking, así que una obra puede caer fuera cuando llegan notas
    más altas. Mantener este número alineado con la app de jurados. */
 export const CUPO_FINAL = 100; // (histórico; el vigente es CUPO_POR_DIA)
-/** Cupo POR DÍA de la final — espejo de public.finalistas_ronda (migración 055):
- * sábado 150 (techo de seguridad, hoy no recorta) · domingo máximo 120. */
-export const CUPO_POR_DIA: Record<'Sábado' | 'Domingo', number> = { 'Sábado': 150, Domingo: 120 };
+/** Cupo POR DÍA de la final — espejo de public.finalistas_ronda (migración 058):
+ * 100 por día, sábado y domingo. Con los datos del 8/8 no recorta a nadie
+ * (sábado 87 · domingo 100 justos). */
+export const CUPO_POR_DIA: Record<'Sábado' | 'Domingo', number> = { 'Sábado': 100, Domingo: 100 };
 
 export type DiaFinal = 'Sábado' | 'Domingo';
 
