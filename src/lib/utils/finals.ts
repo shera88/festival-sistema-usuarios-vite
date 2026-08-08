@@ -17,14 +17,30 @@ export function esDiaClasificatoria(dia: string | null): boolean {
   return d === 'MARTES' || d === 'MIERCOLES' || d === 'MIÉRCOLES' || d === 'JUEVES' || d === 'VIERNES';
 }
 
-/** Nota mínima para clasificar a la final, según categoría. */
-export const NOTA_MINIMA_FINAL_COLEGIOS = 75;
-export const NOTA_MINIMA_FINAL_RESTO = 80;
+/** Nota mínima para clasificar a la final — POR GÉNERO, espejo exacto de la app
+ * de jurados (`src/lib/corte-final.ts`) y de public.corte_final_v2 (migración
+ * 056): FOLCLORE 75 col/univ · 80 indep (regla original) — URBANO y ACADÉMICO
+ * 70 col/univ · 75 indep (regla nueva del 2026-08-08). */
+export const NOTA_MINIMA_FINAL_COLEGIOS = 75; // folclore
+export const NOTA_MINIMA_FINAL_RESTO = 80;    // folclore
+export const NOTA_MINIMA_URB_ACAD_COLEGIOS = 70;
+export const NOTA_MINIMA_URB_ACAD_RESTO = 75;
 
-export function notaMinimaFinal(categoria: string | null): number {
-  return /COLEGIO|UNIVERSID/.test((categoria ?? '').toUpperCase())
-    ? NOTA_MINIMA_FINAL_COLEGIOS
-    : NOTA_MINIMA_FINAL_RESTO;
+const esColUniFinal = (categoria: string | null | undefined) =>
+  /COLEGIO|UNIVERSID/.test((categoria ?? '').toUpperCase());
+const esFolcloreFinal = (modalidad?: string | null, genero?: string | null) =>
+  /FOLCLOR|FOLKLOR/.test(`${modalidad ?? ''} ${genero ?? ''}`.toUpperCase());
+
+/** Sin modalidad/género (llamadas viejas) asume FOLCLORE — el corte MÁS ALTO,
+ * así una llamada incompleta jamás infla clasificados por error. */
+export function notaMinimaFinal(
+  categoria: string | null,
+  modalidad?: string | null,
+  genero?: string | null,
+): number {
+  if (esFolcloreFinal(modalidad, genero) || (modalidad == null && genero == null))
+    return esColUniFinal(categoria) ? NOTA_MINIMA_FINAL_COLEGIOS : NOTA_MINIMA_FINAL_RESTO;
+  return esColUniFinal(categoria) ? NOTA_MINIMA_URB_ACAD_COLEGIOS : NOTA_MINIMA_URB_ACAD_RESTO;
 }
 
 export function clasificacionDe(
@@ -34,11 +50,9 @@ export function clasificacionDe(
   categoria: string | null,
 ): 'Sábado' | 'Domingo' | null {
   if (nota == null) return null;
-  const corte = notaMinimaFinal(categoria);
+  const corte = notaMinimaFinal(categoria, modalidad, genero);
   if (nota < corte) return null;
-  return /FOLCLOR|FOLKLOR/.test(`${modalidad ?? ''} ${genero ?? ''}`.toUpperCase())
-    ? 'Domingo'
-    : 'Sábado';
+  return esFolcloreFinal(modalidad, genero) ? 'Domingo' : 'Sábado';
 }
 
 /* ─────────────────────────── Cupos de la final ───────────────────────────
