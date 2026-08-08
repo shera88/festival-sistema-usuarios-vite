@@ -5,6 +5,10 @@ import type { Year, YearNotas } from '@/types/domain';
 
 /** Fila del ranking público en vivo (RPC anon `ranking_publico`, datos jurados). */
 export type RankingObra = {
+  // Programa del ADMIN (migración 054): posición en el show de su noche
+  // final y si integra la gala estelar de las 9 PM.
+  orden_final?: number | null;
+  estelar?: boolean | null;
   id_inscripcion: string;
   obra: string | null;
   agrupacion: string | null;
@@ -25,6 +29,11 @@ export type RankingObra = {
   // (SOLO / DÚO / GRUPO…) para subdividir el programa de la final. Opcional:
   // hasta correr esa migración, `ranking_publico` no lo trae y queda undefined.
   subdivision?: string | null;
+  // Día de la final asignado por el admin ('SABADO'/'DOMINGO', columna
+  // `dia_final` de registro_de_inscripcion_2026). Cuando viene no-nulo MANDA
+  // sobre la heurística por género (ver `diaFinalDe` en lib/utils/finals.ts).
+  // Opcional: hasta que el RPC lo exponga, queda undefined y se usa el respaldo.
+  dia_final?: string | null;
 };
 
 /**

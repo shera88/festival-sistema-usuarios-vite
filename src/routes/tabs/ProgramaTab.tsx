@@ -12,7 +12,7 @@ import { webpProxy } from '@/lib/utils/img';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
 import { BloqueGroup, agruparPorBloque, normalizarBloque, type Bloque } from '@/components/shared/BloqueHeader';
 import { textoFechaEnsayo } from '@/lib/fechas-festival';
-import { finalistasPorDia, ordenarPrograma, CUPO_FINAL, type DiaFinal } from '@/lib/utils/finals';
+import { finalistasPorDia, ordenarNoche, diaFinalDe, CUPO_FINAL, type DiaFinal } from '@/lib/utils/finals';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
@@ -318,13 +318,29 @@ function armarDia(
  *  cada tarjeta. La lista YA viene ordenada con el preset del programa (gemelo de
  *  jurados), así que acá sólo se agrupan los consecutivos que comparten grupo — el
  *  orden de las tarjetas queda EXACTAMENTE igual que en jurados. */
+// Género/área de la obra para las secciones de la GALA — gemelo del admin
+// (app-jurados programas-page generoEstelar): urbano / académico / folclore.
+function generoArea(o: RankingObra): string {
+  const u = `${o.genero ?? ''} ${o.modalidad ?? ''}`.toUpperCase();
+  if (/FOLCLOR|FOLKLOR/.test(u)) return 'FOLCLORE';
+  if (/URBAN|HIP\s*HOP|COMERCIAL/.test(u)) return 'URBANO';
+  return 'ACADEMICO';
+}
+
 function agruparConsecutivo(items: RankingObra[]): Array<{ bloque: Bloque | null; label: string; items: RankingObra[] }> {
   const grupos: Array<{ bloque: Bloque | null; label: string; items: RankingObra[] }> = [];
   let cur: { bloque: Bloque | null; label: string; items: RankingObra[]; key: string } | null = null;
   for (const o of items) {
     const bloque = normalizarBloque(o.bloque, o.division);
-    const label = [o.division, o.modalidad, o.subdivision].filter(Boolean).map((s) => String(s)).join(' · ') || 'General';
-    const key = `${bloque ?? 'SIN'}|${label}`;
+    // Las obras de la GALA ESTELAR forman sus propias secciones (por género),
+    // en el lugar de la noche donde el admin las clavó — igual que en jurados.
+    // Y como en el admin (finales), «grupo pequeño» y «grupo grande» se anuncian
+    // juntos bajo una sola cabecera GRUPO.
+    const subdiv = /^GRUPO\s/i.test(String(o.subdivision ?? '').trim()) ? 'GRUPO' : o.subdivision;
+    const label = o.estelar
+      ? `★ GALA ESTELAR · ${generoArea(o)}`
+      : [o.division, o.modalidad, subdiv].filter(Boolean).map((s) => String(s)).join(' · ') || 'General';
+    const key = o.estelar ? `EST|${generoArea(o)}` : `${bloque ?? 'SIN'}|${label}`;
     if (!cur || cur.key !== key) {
       cur = { bloque, label, items: [], key };
       grupos.push({ bloque, label, items: cur.items });
@@ -334,7 +350,7 @@ function agruparConsecutivo(items: RankingObra[]): Array<{ bloque: Bloque | null
   return grupos;
 }
 
-function GrupoFinalCard({ bloque, label, count, children }: { bloque: Bloque | null; label: string; count: number; children: React.ReactNode }) {
+function GrupoFinalCard({ bloque, label, count, children, horas }: { bloque: Bloque | null; label: string; count: number; children: React.ReactNode; horas?: string }) {
   const mayor = bloque === 'MAYOR';
   return (
     <div
@@ -348,6 +364,7 @@ function GrupoFinalCard({ bloque, label, count, children }: { bloque: Bloque | n
           </span>
         )}
         <span className="min-w-0 flex-1 truncate text-[11px] font-bold uppercase tracking-wide text-text-90">{label}</span>
+        {horas && <span className="hidden shrink-0 text-[10px] font-semibold tabular-nums text-text-45 sm:inline">{horas}</span>}
         <span className="shrink-0 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] tabular-nums text-text-45">{count}</span>
       </div>
       <div className="divide-y divide-glass-border">{children}</div>
@@ -355,10 +372,12 @@ function GrupoFinalCard({ bloque, label, count, children }: { bloque: Bloque | n
   );
 }
 
-function FinalObraRow({ o, pos, mio }: { o: RankingObra; pos: number; mio: boolean }) {
+function FinalObraRow({ o, pos, mio, hora }: { o: RankingObra; pos: number; mio: boolean; hora?: string }) {
   const nombre = o.agrupacion || 'Agrupación';
   return (
     <div className={`flex items-center gap-3 px-3 py-2.5 ${mio ? 'bg-fuchsia/10' : ''}`}>
+      {/* Hora estimada en que baila (cronograma del admin) */}
+      {hora && <div className="w-16 shrink-0 text-right text-[10px] font-semibold tabular-nums text-text-45">{hora}</div>}
       <div className="w-6 shrink-0 text-center text-[13px] font-bold text-gold tabular-nums">{pos}</div>
       {o.enlace_del_logo ? (
         <img src={webpProxy(o.enlace_del_logo, 80) ?? undefined} alt="" loading="lazy"
@@ -378,6 +397,12 @@ function FinalObraRow({ o, pos, mio }: { o: RankingObra; pos: number; mio: boole
               Tu participación
             </span>
           )}
+          {/* Gala estelar (bloque de TV de las 9 PM) — lo marca el admin de jurados. */}
+          {o.estelar && (
+            <span className="shrink-0 rounded-md border border-gold/50 bg-gold/10 px-1.5 py-px text-[9px] font-bold uppercase text-gold" style={{ letterSpacing: '0.5px' }}>
+              ★ Gala 9 PM
+            </span>
+          )}
         </div>
         <div className="truncate text-[11px] text-text-45">{o.obra ? `"${o.obra}"` : 'Sin obra'}</div>
       </div>
@@ -387,12 +412,56 @@ function FinalObraRow({ o, pos, mio }: { o: RankingObra; pos: number; mio: boole
   );
 }
 
-function FinalDia({ dia, enabled, misNombres }: { dia: DiaFinal; enabled: boolean; misNombres: Set<string> }) {
+function FinalDia({ dia, enabled, misNombres, horaInicio }: { dia: DiaFinal; enabled: boolean; misNombres: Set<string>; horaInicio: string }) {
   const q = useRankingPublico(enabled);
-  // 1) Quiénes entran: las 100 mejores notas del día (cupo). 2) En qué orden se
-  // muestran: el preset del programa (bloque → división → modalidad → subdivisión),
-  // EXACTAMENTE como la app de jurados — no por nota.
-  const finalistas = useMemo(() => ordenarPrograma(finalistasPorDia(q.data ?? [])[dia]), [q.data, dia]);
+  // GALA ESTELAR (sábado): si el admin fijó estrellas (columna estelar) mandan
+  // ellas; si está en automático (sin estrellas), se replica su regla exacta:
+  // top 5 por género (urbano/académico/folclore) entre los finalistas de AMBOS
+  // días, por nota. Así el portal muestra la gala aunque no esté fijada.
+  const galaIds = useMemo(() => {
+    const data = q.data ?? [];
+    const marcadas = data.filter((o) => o.estelar);
+    if (marcadas.length) return new Set(marcadas.map((o) => o.id_inscripcion));
+    const fins = data.filter((o) => diaFinalDe(o) != null);
+    const ids = new Set<string>();
+    for (const g of ['URBANO', 'ACADEMICO', 'FOLCLORE']) {
+      fins
+        .filter((o) => generoArea(o) === g)
+        .sort((a, b) => (b.nota_final ?? -1) - (a.nota_final ?? -1))
+        .slice(0, 5)
+        .forEach((o) => ids.add(o.id_inscripcion));
+    }
+    return ids;
+  }, [q.data]);
+
+  // Quiénes entran y en qué orden lo dice el PROGRAMA DEL ADMIN: dia_final
+  // decide la noche y orden_final la secuencia del show (gala estelar incluida).
+  // Sin recorte propio del cliente — el bracket del server es la verdad.
+  const finalistas = useMemo(
+    () => ordenarNoche(finalistasPorDia(q.data ?? [])[dia]) // cupo: solo el top 100 de la noche
+      .map((o) => (dia === 'Sábado' && galaIds.has(o.id_inscripcion) ? { ...o, estelar: true } : o)),
+    [q.data, dia, galaIds],
+  );
+
+  // Hora estimada por obra — GEMELO del cronograma del admin: duración por
+  // subdivisión + colchón de 90 s. La GALA está CLAVADA a las 9 PM (Red Uno):
+  // apertura de 40 min → sus obras arrancan 21:40; al salir se reanuda a las 23.
+  const { horaDe, finDe } = useMemo(() => {
+    const ini = new Map<string, string>();
+    const fin = new Map<string, string>();
+    let cur = hhmmSeg(horaInicio);
+    let enGala = false;
+    for (const o of finalistas) {
+      const esGala = !!o.estelar;
+      if (esGala && !enGala) { enGala = true; cur = 21 * 3600 + 40 * 60; }
+      if (!esGala && enGala) { enGala = false; cur = Math.max(cur, 23 * 3600); }
+      ini.set(o.id_inscripcion, segHHMM(cur));
+      const dur = DUR_SUBDIV[String(o.subdivision || '').toUpperCase().trim()] || '5:00';
+      fin.set(o.id_inscripcion, segHHMM(cur + durSeg(dur)));
+      cur += durSeg(dur) + BUFFER_SEG;
+    }
+    return { horaDe: ini, finDe: fin };
+  }, [finalistas, horaInicio]);
   const grupos = useMemo(() => agruparConsecutivo(finalistas), [finalistas]);
   // Posición secuencial en el orden en que se despliega (1, 2, 3…), como el admin.
   const posDe = useMemo(() => {
@@ -428,9 +497,11 @@ function FinalDia({ dia, enabled, misNombres }: { dia: DiaFinal; enabled: boolea
       </div>
 
       {grupos.map((g) => (
-        <GrupoFinalCard key={`${g.bloque}|${g.label}`} bloque={g.bloque} label={g.label} count={g.items.length}>
+        <GrupoFinalCard key={`${g.bloque}|${g.label}`} bloque={g.bloque} label={g.label} count={g.items.length}
+          horas={g.items.length ? `${horaDe.get(g.items[0].id_inscripcion) ?? ''} – ${finDe.get(g.items[g.items.length - 1].id_inscripcion) ?? ''}` : undefined}>
           {g.items.map((o) => (
             <FinalObraRow key={o.id_inscripcion} o={o} pos={posDe.get(o.id_inscripcion) ?? 0}
+              hora={horaDe.get(o.id_inscripcion)}
               mio={misNombres.has((o.agrupacion || '').toUpperCase().trim())} />
           ))}
         </GrupoFinalCard>
@@ -723,7 +794,8 @@ export function ProgramaTab() {
       )}
 
       {esFinalDia && (
-        <FinalDia dia={diaSel === 'SABADO' ? 'Sábado' : 'Domingo'} enabled={!!user} misNombres={misNombres} />
+        <FinalDia dia={diaSel === 'SABADO' ? 'Sábado' : 'Domingo'} enabled={!!user} misNombres={misNombres}
+          horaInicio={inicioDe(horarios, diaSel)} />
       )}
 
       {!esFinalDia && q.isLoading && <LoadingSkeleton rows={3} />}

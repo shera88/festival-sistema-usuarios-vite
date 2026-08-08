@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { SearchInput } from '@/components/filters/SearchInput';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -9,7 +9,7 @@ import { CalificacionCard } from '@/components/cards/CalificacionCard';
 import { useCalificaciones, useRankingPublico, useDetalleObra, type RankingObra, type NotaPublica } from '@/hooks/queries';
 import { dayOrderIndex } from '@/lib/utils/days';
 import { calcularPromedioFinal, fmtScore } from '@/lib/utils/scoring';
-import { clasificacionDe, esDiaClasificatoria } from '@/lib/utils/finals';
+import { CUPO_FINAL, diaFinalDe, esDiaClasificatoria, idsEnCupo, type DiaFinal } from '@/lib/utils/finals';
 import { webpProxy } from '@/lib/utils/img';
 import { useAuth } from '@/hooks/useAuth';
 import type { Nota } from '@/types/domain';
@@ -153,6 +153,8 @@ function LiveBadge({ fetching }: { fetching: boolean }) {
 
 function CalificacionesVivo({ enabled }: { enabled: boolean }) {
   const q = useRankingPublico(enabled);
+  // Ids dentro del cupo de 100 de su noche: solo ellas llevan chip «Final …».
+  const cupoIds = useMemo(() => idsEnCupo(q.data ?? []), [q.data]);
   // Solo Martes-Viernes; Sábado/Domingo (finales) no se muestran.
   const rows = useMemo(() => (q.data ?? []).filter((r) => esDiaClasificatoria(r.dia)), [q.data]);
 
@@ -215,6 +217,7 @@ function CalificacionesVivo({ enabled }: { enabled: boolean }) {
               o={o}
               lead={o.orden != null ? String(o.orden).padStart(2, '0') : '—'}
               showChip
+              enCupo={cupoIds.has(o.id_inscripcion)}
             />
           ))}
         </div>
@@ -239,7 +242,21 @@ function RankingVivo({ enabled }: { enabled: boolean }) {
   );
 
   const [dia, setDia] = useState<string | null>(null); // null = Global (todos los días)
-  const diaSel = dia && days.includes(dia) ? dia : null;
+  // Ids dentro del cupo de 100 de su noche: solo ellas llevan chip «Final …».
+  const cupoIds = useMemo(() => idsEnCupo(q.data ?? []), [q.data]);
+  // Pestañas de las FINALES: ranking de finalistas por nota. En Domingo, si se
+  // supera el cupo de 100, un separador marca el corte y las de abajo llevan la
+  // etiqueta «Baila sábado» (el equilibrio del festival las pasa a esa noche).
+  const esFinalTab = dia === 'FINAL_SABADO' || dia === 'FINAL_DOMINGO';
+  const diaSel = !esFinalTab && dia && days.includes(dia) ? dia : null;
+
+  const finalistas = useMemo(() => {
+    if (!esFinalTab) return [];
+    const objetivo: DiaFinal = dia === 'FINAL_SABADO' ? 'Sábado' : 'Domingo';
+    return (q.data ?? [])
+      .filter((o) => diaFinalDe(o) === objetivo)
+      .sort((a, b) => (b.nota_final ?? -1) - (a.nota_final ?? -1));
+  }, [esFinalTab, dia, q.data]);
 
   const ranked = useMemo(() => {
     const base = diaSel ? rows.filter((r) => (r.dia || '').toUpperCase() === diaSel) : rows;
@@ -267,18 +284,48 @@ function RankingVivo({ enabled }: { enabled: boolean }) {
               {d.charAt(0) + d.slice(1).toLowerCase()}
             </button>
           ))}
+          <button type="button" onClick={() => setDia('FINAL_SABADO')} className={pill(dia === 'FINAL_SABADO')}>
+            Final Sábado
+          </button>
+          <button type="button" onClick={() => setDia('FINAL_DOMINGO')} className={pill(dia === 'FINAL_DOMINGO')}>
+            Final Domingo
+          </button>
         </div>
         <LiveBadge fetching={q.isFetching} />
       </div>
 
-      {ranked.length === 0 ? (
+      {esFinalTab ? (
+        finalistas.length === 0 ? (
+          <EmptyState>Todavía no hay finalistas para esta noche.</EmptyState>
+        ) : (
+          // Finalistas por nota. Domingo con más de 100: separador del cupo y
+          // etiqueta «Baila sábado» en cada obra que quedó debajo del corte.
+          <div className="space-y-2">
+            {finalistas.map((o, i) => (
+              <Fragment key={o.id_inscripcion}>
+                {dia === 'FINAL_DOMINGO' && i === CUPO_FINAL && (
+                  <div className="flex items-center gap-3 py-1.5">
+                    <span className="h-px flex-1 bg-cyan/40" />
+                    <span className="rounded-full border border-cyan/40 bg-cyan/10 px-3 py-1 text-[10px] font-bold uppercase text-cyan" style={{ letterSpacing: '0.5px' }}>
+                      Cupo de {CUPO_FINAL} completo — las siguientes bailan el sábado
+                    </span>
+                    <span className="h-px flex-1 bg-cyan/40" />
+                  </div>
+                )}
+                <ObraRow o={o} lead={String(i + 1)} rank bailaSabado={dia === 'FINAL_DOMINGO' && i >= CUPO_FINAL} />
+              </Fragment>
+            ))}
+          </div>
+        )
+      ) : ranked.length === 0 ? (
         <EmptyState>El ranking todavía no tiene notas cargadas.</EmptyState>
       ) : (
         // Lista PLANA: los mejores de la noche ordenados por nota, sin separar
         // por bloque mayor/menor. La posición es la del ranking completo.
         <div className="space-y-2">
           {ranked.map((o, i) => (
-            <ObraRow key={o.id_inscripcion} o={o} lead={String(i + 1)} rank showChip />
+            <ObraRow key={o.id_inscripcion} o={o} lead={String(i + 1)} rank showChip
+              enCupo={cupoIds.has(o.id_inscripcion)} />
           ))}
         </div>
       )}
@@ -302,12 +349,17 @@ function FinalChip({ dia }: { dia: 'Sábado' | 'Domingo' }) {
   );
 }
 
-function ObraRow({ o, lead, rank, showChip }: { o: RankingObra; lead: string; rank?: boolean; showChip?: boolean }) {
+function ObraRow({ o, lead, rank, showChip, bailaSabado, enCupo = true }: { o: RankingObra; lead: string; rank?: boolean; showChip?: boolean; bailaSabado?: boolean; enCupo?: boolean }) {
   const [open, setOpen] = useState(false);
   const q = useDetalleObra(open ? o.id_inscripcion : null);
   const nombre = o.agrupacion || 'Agrupación';
   const obra = o.obra || 'Sin obra';
-  const clasi = showChip ? clasificacionDe(o.nota_final, o.modalidad, o.genero, o.categoria) : null;
+  // Chip de final: mismo helper que el programa — el `dia_final` del admin
+  // manda cuando viene; la heurística por género queda como respaldo.
+  // Si la obra quedó bajo el cupo del domingo, el chip se reemplaza por
+  // «Baila sábado» (esa es su noche real). Y SOLO dice «Final …» si la obra
+  // está DENTRO del cupo de 100 de su noche.
+  const clasi = showChip && !bailaSabado && enCupo ? diaFinalDe(o) : null;
   const medal = rank ? (lead === '1' ? 'text-gold' : lead === '2' ? 'text-text-90' : lead === '3' ? 'text-[#c98a4a]' : 'text-text-45') : '';
   const notas = q.data?.notas ?? [];
 
@@ -343,6 +395,11 @@ function ObraRow({ o, lead, rank, showChip }: { o: RankingObra; lead: string; ra
               {nombre}
             </span>
             {clasi && <FinalChip dia={clasi} />}
+            {bailaSabado && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-cyan/40 bg-cyan/10 px-1.5 py-px text-[9px] font-bold uppercase text-cyan" style={{ letterSpacing: '0.4px' }}>
+                Baila sábado
+              </span>
+            )}
           </div>
           <div className="truncate text-[11px] text-text-45">
             "{obra}"{o.categoria ? ` · ${o.categoria}` : ''}

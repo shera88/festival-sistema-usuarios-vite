@@ -2,6 +2,10 @@
  * Clasificación a la final (Sábado/Domingo) — misma regla que la app de jurados
  * (`finalDeCampos`): corte 75 para colegios/universidades, 80 para el resto;
  * si clasifica → Folklore va el Domingo, el resto el Sábado.
+ *
+ * OJO: esa regla por género es sólo el RESPALDO. Si el servidor ya trae el día
+ * asignado por el admin (`dia_final` de registro_de_inscripcion_2026), ese día
+ * manda — ver `diaFinalDe`.
  */
 /**
  * Días cuyas calificaciones son públicas en el portal: Martes a Viernes
@@ -53,7 +57,35 @@ type ObraFinalizable = {
   modalidad: string | null;
   genero: string | null;
   categoria: string | null;
+  // Día asignado por el admin (registro_de_inscripcion_2026.dia_final).
+  // Opcional: el RPC puede no traerlo todavía; en ese caso rige la heurística.
+  dia_final?: string | null;
 };
+
+/**
+ * Normaliza el `dia_final` que manda el servidor ('SABADO'/'DOMINGO', con o sin
+ * tilde, cualquier caja) al formato de la app. Cualquier otro valor → null.
+ */
+export function normalizarDiaFinal(dia: string | null | undefined): DiaFinal | null {
+  const d = (dia ?? '').trim().toUpperCase();
+  if (d === 'SABADO' || d === 'SÁBADO') return 'Sábado';
+  if (d === 'DOMINGO') return 'Domingo';
+  return null;
+}
+
+/**
+ * Día de la final de una obra, con la precedencia correcta:
+ * 1. El gate por nota/corte sigue vigente SIEMPRE — sin nota que clasifique no
+ *    hay final, tenga o no día asignado.
+ * 2. Si el servidor trae `dia_final` (asignado por el admin, p. ej. folclore
+ *    movido al Sábado), ese día MANDA.
+ * 3. Si no, respaldo: la heurística por género de `clasificacionDe`.
+ */
+export function diaFinalDe(o: ObraFinalizable): DiaFinal | null {
+  const heuristica = clasificacionDe(o.nota_final, o.modalidad, o.genero, o.categoria);
+  if (!heuristica) return null;
+  return normalizarDiaFinal(o.dia_final) ?? heuristica;
+}
 
 /**
  * Reparte las obras en las finales de Sábado y Domingo, ya recortadas al cupo.
@@ -69,7 +101,8 @@ export function finalistasPorDia<T extends ObraFinalizable>(
 ): Record<DiaFinal, T[]> {
   const buckets: Record<DiaFinal, T[]> = { Sábado: [], Domingo: [] };
   for (const o of obras) {
-    const dia = clasificacionDe(o.nota_final, o.modalidad, o.genero, o.categoria);
+    // `diaFinalDe`: el día del admin manda si viene; si no, heurística por género.
+    const dia = diaFinalDe(o);
     if (dia) buckets[dia].push(o);
   }
   const porNota = (a: T, b: T) => (b.nota_final ?? -1) - (a.nota_final ?? -1);
@@ -131,4 +164,29 @@ export function cmpPrograma(a: ObraOrdenable, b: ObraOrdenable): number {
 /** Ordena una lista de obras con el orden canónico del programa (gemelo de jurados). */
 export function ordenarPrograma<T extends ObraOrdenable>(obras: T[]): T[] {
   return [...obras].sort(cmpPrograma);
+}
+
+/* ─────────────────── Orden de la NOCHE según el ADMIN ───────────────────
+   Cuando la RPC trae `orden_final` (migración 054), el programa de la final se
+   muestra EXACTAMENTE en el orden que armó el admin de jurados (arrastres, gala
+   estelar incluida). Las obras sin orden_final van al final, con el preset
+   canónico como respaldo — así el portal nunca inventa un orden distinto. */
+export function ordenarNoche<T extends ObraOrdenable & { orden_final?: number | null }>(obras: T[]): T[] {
+  return [...obras].sort((a, b) => {
+    const oa = a.orden_final ?? Number.POSITIVE_INFINITY;
+    const ob = b.orden_final ?? Number.POSITIVE_INFINITY;
+    if (oa !== ob) return oa - ob;
+    return cmpPrograma(a, b);
+  });
+}
+
+/* Ids de las obras DENTRO del cupo de 100 de su noche. El chip «Final sábado /
+   Final domingo» solo se muestra para estas: estar clasificada pero fuera del
+   cupo no es estar en la final. */
+export function idsEnCupo<T extends ObraFinalizable & { id_inscripcion: string }>(
+  obras: T[],
+  cupo = CUPO_FINAL,
+): Set<string> {
+  const por = finalistasPorDia(obras, cupo);
+  return new Set([...por['Sábado'], ...por.Domingo].map((o) => o.id_inscripcion));
 }
