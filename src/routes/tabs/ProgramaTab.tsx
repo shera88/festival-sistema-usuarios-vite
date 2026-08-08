@@ -12,7 +12,7 @@ import { webpProxy } from '@/lib/utils/img';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
 import { BloqueGroup, agruparPorBloque, normalizarBloque, type Bloque } from '@/components/shared/BloqueHeader';
 import { textoFechaEnsayo } from '@/lib/fechas-festival';
-import { finalistasPorDia, ordenarNoche, diaFinalDe, CUPO_FINAL, type DiaFinal } from '@/lib/utils/finals';
+import { finalistasPorDia, ordenarNoche, diaFinalDe, CUPO_POR_DIA, type DiaFinal } from '@/lib/utils/finals';
 
 // Membrete oficial del festival (header + footer, medio en blanco) para los PDFs de programa/ensayos.
 const URL_MEMBRETE = 'https://supabase.imaginarte.cloud/storage/v1/object/public/uploads-2026/templates/membrete-programa.png';
@@ -339,7 +339,7 @@ function agruparConsecutivo(items: RankingObra[]): Array<{ bloque: Bloque | null
     const subdiv = /^GRUPO\s/i.test(String(o.subdivision ?? '').trim()) ? 'GRUPO' : o.subdivision;
     const label = o.estelar
       ? `★ GALA ESTELAR · ${generoArea(o)}`
-      : [o.division, o.modalidad, subdiv].filter(Boolean).map((s) => String(s)).join(' · ') || 'General';
+      : [o.division, o.categoria, o.modalidad, subdiv].filter(Boolean).map((s) => String(s)).join(' · ') || 'General';
     const key = o.estelar ? `EST|${generoArea(o)}` : `${bloque ?? 'SIN'}|${label}`;
     if (!cur || cur.key !== key) {
       cur = { bloque, label, items: [], key };
@@ -434,14 +434,44 @@ function FinalDia({ dia, enabled, misNombres, horaInicio }: { dia: DiaFinal; ena
     return ids;
   }, [q.data]);
 
-  // Quiénes entran y en qué orden lo dice el PROGRAMA DEL ADMIN: dia_final
-  // decide la noche y orden_final la secuencia del show (gala estelar incluida).
-  // Sin recorte propio del cliente — el bracket del server es la verdad.
-  const finalistas = useMemo(
-    () => ordenarNoche(finalistasPorDia(q.data ?? [])[dia]) // cupo: solo el top 100 de la noche
-      .map((o) => (dia === 'Sábado' && galaIds.has(o.id_inscripcion) ? { ...o, estelar: true } : o)),
-    [q.data, dia, galaIds],
-  );
+  // ARMADO DE LA NOCHE — gemelo EXACTO del admin de jurados (armarGruposNoche):
+  //  1. Las obras de la GALA salen del flujo regular.
+  //  2. El resto se ordena por orden_final (preset de respaldo) y se agrupa.
+  //  3. La GALA se inserta ENTERA en FRONTERA DE BLOQUE: antes del primer
+  //     bloque regular que arrancaría a las 21:00 o después (Red Uno, 9–11 PM).
+  //     Sub-bloques por género urbano → académico → folclore; adentro, el
+  //     orden del admin (orden_final).
+  const { grupos, finalistas } = useMemo(() => {
+    const base = finalistasPorDia(q.data ?? [])[dia]; // cupo: top 100 de la noche
+    if (dia !== 'Sábado') {
+      const fs = ordenarNoche(base);
+      return { grupos: agruparConsecutivo(fs), finalistas: fs };
+    }
+    const regulares = ordenarNoche(base.filter((o) => !galaIds.has(o.id_inscripcion)));
+    const ordenGen: Record<string, number> = { URBANO: 0, ACADEMICO: 1, FOLCLORE: 2 };
+    const gala = base
+      .filter((o) => galaIds.has(o.id_inscripcion))
+      .map((o) => ({ ...o, estelar: true }))
+      .sort((a, b) =>
+        (ordenGen[generoArea(a)] ?? 9) - (ordenGen[generoArea(b)] ?? 9) ||
+        (a.orden_final ?? Number.POSITIVE_INFINITY) - (b.orden_final ?? Number.POSITIVE_INFINITY) ||
+        String(a.obra ?? '').localeCompare(String(b.obra ?? ''), 'es'));
+    const gReg = agruparConsecutivo(regulares);
+    const gGala = agruparConsecutivo(gala);
+    // Punto de inserción del admin: antes del primer BLOQUE regular cuyo inicio
+    // caería a las 21:00 o después; si la noche termina antes, la gala cierra.
+    let cur = hhmmSeg(horaInicio);
+    let idx = gReg.length;
+    for (let i = 0; i < gReg.length; i++) {
+      if (cur >= 21 * 3600) { idx = i; break; }
+      for (const o of gReg[i].items) {
+        const dur = DUR_SUBDIV[String(o.subdivision || '').toUpperCase().trim()] || '5:00';
+        cur += durSeg(dur) + BUFFER_SEG;
+      }
+    }
+    const gs = [...gReg.slice(0, idx), ...gGala, ...gReg.slice(idx)];
+    return { grupos: gs, finalistas: gs.flatMap((g) => g.items) };
+  }, [q.data, dia, galaIds, horaInicio]);
 
   // Hora estimada por obra — GEMELO del cronograma del admin: duración por
   // subdivisión + colchón de 90 s. La GALA está CLAVADA a las 9 PM (Red Uno):
@@ -462,7 +492,6 @@ function FinalDia({ dia, enabled, misNombres, horaInicio }: { dia: DiaFinal; ena
     }
     return { horaDe: ini, finDe: fin };
   }, [finalistas, horaInicio]);
-  const grupos = useMemo(() => agruparConsecutivo(finalistas), [finalistas]);
   // Posición secuencial en el orden en que se despliega (1, 2, 3…), como el admin.
   const posDe = useMemo(() => {
     const m = new Map<string, number>();
@@ -491,7 +520,7 @@ function FinalDia({ dia, enabled, misNombres, horaInicio }: { dia: DiaFinal; ena
           </div>
         </div>
         <div className="shrink-0 text-right">
-          <div className="text-[15px] font-bold text-gold tabular-nums">{finalistas.length}<span className="text-[11px] text-text-45">/{CUPO_FINAL}</span></div>
+          <div className="text-[15px] font-bold text-gold tabular-nums">{finalistas.length}<span className="text-[11px] text-text-45">/{CUPO_POR_DIA[dia]}</span></div>
           <div className="text-[9px] uppercase text-text-45" style={{ letterSpacing: '0.5px' }}>Cupos</div>
         </div>
       </div>

@@ -9,7 +9,7 @@ import { CalificacionCard } from '@/components/cards/CalificacionCard';
 import { useCalificaciones, useRankingPublico, useDetalleObra, type RankingObra, type NotaPublica } from '@/hooks/queries';
 import { dayOrderIndex } from '@/lib/utils/days';
 import { calcularPromedioFinal, fmtScore } from '@/lib/utils/scoring';
-import { CUPO_FINAL, diaFinalDe, esDiaClasificatoria, idsEnCupo, type DiaFinal } from '@/lib/utils/finals';
+import { CUPO_POR_DIA, diaFinalDe, esDiaClasificatoria, idsEnCupo, type DiaFinal } from '@/lib/utils/finals';
 import { webpProxy } from '@/lib/utils/img';
 import { useAuth } from '@/hooks/useAuth';
 import type { Nota } from '@/types/domain';
@@ -303,16 +303,16 @@ function RankingVivo({ enabled }: { enabled: boolean }) {
           <div className="space-y-2">
             {finalistas.map((o, i) => (
               <Fragment key={o.id_inscripcion}>
-                {dia === 'FINAL_DOMINGO' && i === CUPO_FINAL && (
+                {dia === 'FINAL_DOMINGO' && i === CUPO_POR_DIA.Domingo && (
                   <div className="flex items-center gap-3 py-1.5">
                     <span className="h-px flex-1 bg-cyan/40" />
                     <span className="rounded-full border border-cyan/40 bg-cyan/10 px-3 py-1 text-[10px] font-bold uppercase text-cyan" style={{ letterSpacing: '0.5px' }}>
-                      Cupo de {CUPO_FINAL} completo — las siguientes bailan el sábado
+                      Cupo de {CUPO_POR_DIA.Domingo} completo — las siguientes bailan el sábado
                     </span>
                     <span className="h-px flex-1 bg-cyan/40" />
                   </div>
                 )}
-                <ObraRow o={o} lead={String(i + 1)} rank bailaSabado={dia === 'FINAL_DOMINGO' && i >= CUPO_FINAL} />
+                <ObraRow o={o} lead={String(i + 1)} rank bailaSabado={dia === 'FINAL_DOMINGO' && i >= CUPO_POR_DIA.Domingo} />
               </Fragment>
             ))}
           </div>

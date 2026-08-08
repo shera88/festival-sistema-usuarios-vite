@@ -48,7 +48,10 @@ export function clasificacionDe(
    entran, aunque pasen el corte. El programa es FLEXIBLE — se recalcula con cada
    refresco del ranking, así que una obra puede caer fuera cuando llegan notas
    más altas. Mantener este número alineado con la app de jurados. */
-export const CUPO_FINAL = 100;
+export const CUPO_FINAL = 100; // (histórico; el vigente es CUPO_POR_DIA)
+/** Cupo POR DÍA de la final — espejo de public.finalistas_ronda (migración 055):
+ * sábado 150 (techo de seguridad, hoy no recorta) · domingo máximo 120. */
+export const CUPO_POR_DIA: Record<'Sábado' | 'Domingo', number> = { 'Sábado': 150, Domingo: 120 };
 
 export type DiaFinal = 'Sábado' | 'Domingo';
 
@@ -97,7 +100,7 @@ export function diaFinalDe(o: ObraFinalizable): DiaFinal | null {
  */
 export function finalistasPorDia<T extends ObraFinalizable>(
   obras: T[],
-  cupo = CUPO_FINAL,
+  cupo?: number,
 ): Record<DiaFinal, T[]> {
   const buckets: Record<DiaFinal, T[]> = { Sábado: [], Domingo: [] };
   for (const o of obras) {
@@ -107,8 +110,8 @@ export function finalistasPorDia<T extends ObraFinalizable>(
   }
   const porNota = (a: T, b: T) => (b.nota_final ?? -1) - (a.nota_final ?? -1);
   return {
-    Sábado: [...buckets.Sábado].sort(porNota).slice(0, cupo),
-    Domingo: [...buckets.Domingo].sort(porNota).slice(0, cupo),
+    Sábado: [...buckets.Sábado].sort(porNota).slice(0, cupo ?? CUPO_POR_DIA['Sábado']),
+    Domingo: [...buckets.Domingo].sort(porNota).slice(0, cupo ?? CUPO_POR_DIA.Domingo),
   };
 }
 
@@ -185,7 +188,7 @@ export function ordenarNoche<T extends ObraOrdenable & { orden_final?: number | 
    cupo no es estar en la final. */
 export function idsEnCupo<T extends ObraFinalizable & { id_inscripcion: string }>(
   obras: T[],
-  cupo = CUPO_FINAL,
+  cupo?: number,
 ): Set<string> {
   const por = finalistasPorDia(obras, cupo);
   return new Set([...por['Sábado'], ...por.Domingo].map((o) => o.id_inscripcion));
