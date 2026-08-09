@@ -78,6 +78,9 @@ type ObraFinalizable = {
   // Día asignado por el admin (registro_de_inscripcion_2026.dia_final).
   // Opcional: el RPC puede no traerlo todavía; en ese caso rige la heurística.
   dia_final?: string | null;
+  // Número de la obra en el programa de esa noche, puesto por el admin.
+  // Es quien decide de verdad quién entra al cupo (ver finalistasPorDia).
+  orden_final?: number | null;
 };
 
 /**
@@ -123,10 +126,20 @@ export function finalistasPorDia<T extends ObraFinalizable>(
     const dia = diaFinalDe(o);
     if (dia) buckets[dia].push(o);
   }
-  const porNota = (a: T, b: T) => (b.nota_final ?? -1) - (a.nota_final ?? -1);
+  // MANDA EL PROGRAMA DEL ADMIN. Antes se ordenaba por nota y se cortaba al cupo,
+  // así que una obra agregada al final —con buena nota— se colaba dentro del cupo y
+  // empujaba fuera a dos que sí estaban en el programa. Ahora decide el número que
+  // les puso la organización (orden_final); la nota sólo desempata o cubre a las que
+  // todavía no tienen número asignado.
+  const porPrograma = (a: T, b: T) => {
+    const oa = a.orden_final ?? Number.POSITIVE_INFINITY;
+    const ob = b.orden_final ?? Number.POSITIVE_INFINITY;
+    if (oa !== ob) return oa - ob;
+    return (b.nota_final ?? -1) - (a.nota_final ?? -1);
+  };
   return {
-    Sábado: [...buckets.Sábado].sort(porNota).slice(0, cupo ?? CUPO_POR_DIA['Sábado']),
-    Domingo: [...buckets.Domingo].sort(porNota).slice(0, cupo ?? CUPO_POR_DIA.Domingo),
+    Sábado: [...buckets.Sábado].sort(porPrograma).slice(0, cupo ?? CUPO_POR_DIA['Sábado']),
+    Domingo: [...buckets.Domingo].sort(porPrograma).slice(0, cupo ?? CUPO_POR_DIA.Domingo),
   };
 }
 
