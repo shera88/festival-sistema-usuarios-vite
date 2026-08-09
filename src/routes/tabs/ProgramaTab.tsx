@@ -137,6 +137,34 @@ async function fetchHorarios(): Promise<Horarios> {
   return out;
 }
 
+/* ─────────────── Duración REAL del audio (RPC pública `reproductor_obras`) ───────────────
+   Misma fuente y misma aritmética que el cronograma del admin de jurados, para que
+   las horas coincidan. Los días preliminares ya la traen en `duracion` (la RPC del
+   sorteo lee la misma columna); esto es para la NOCHE FINAL, cuyo ranking no la trae.
+   Si la RPC falla o la obra no tiene audio medido, el mapa no la incluye y el
+   cálculo cae al respaldo por subdivisión: el comportamiento anterior, intacto. */
+type Duraciones = Map<string, string>;
+/** Mapa vacío estable: evita rearmar el cronograma en cada render mientras carga. */
+const SIN_DURACIONES: Duraciones = new Map<string, string>();
+
+const esMSS = (t: unknown) => (/^\d{1,3}:\d{2}$/.test(String(t ?? '').trim()) ? String(t).trim() : null);
+
+async function fetchDuraciones(): Promise<Duraciones> {
+  const out: Duraciones = new Map<string, string>();
+  try {
+    const r = await supabase.rpc('reproductor_obras', { p_ano: '2026' });
+    if (r.error) return out; // RPC caída → mapa vacío → respaldo por subdivisión
+    const filas = (r.data as Array<Record<string, unknown>> | null) ?? [];
+    for (const f of filas) {
+      // La clave puede llegar como número: sin String() el lookup falla en silencio.
+      const id = String(f.id_inscripcion ?? '').trim();
+      const d = esMSS(f.duracion);
+      if (id && d && durSeg(d) > 0) out.set(id, d);
+    }
+  } catch { /* red caída: se devuelve el mapa vacío */ }
+  return out;
+}
+
 /** Hora de inicio efectiva del día: la del administrador si la definió, si no el default. */
 const inicioDe = (h: Horarios, dia: Dia) => h[dia]?.inicio || HORA_INICIO[dia];
 const ensayoDe = (h: Horarios, dia: Dia) => h[dia]?.ensayo || HORA_INICIO_ENSAYO;
@@ -430,8 +458,8 @@ function FinalObraRow({ o, pos, mio, hora }: { o: RankingObra; pos: number; mio:
    Horas: duración por subdivisión + colchón de 90 s; el bloque estelar está
    CLAVADO a las 9 PM (apertura 40 min → sus obras arrancan 21:40; al salir se
    reanuda a las 23:00). */
-function armarNocheFinal(data: RankingObra[], dia: DiaFinal, horaInicio: string): {
-  grupos: GrupoFinal[]; finalistas: RankingObra[]; horaDe: Map<string, string>; finDe: Map<string, string>;
+function armarNocheFinal(data: RankingObra[], dia: DiaFinal, horaInicio: string, duraciones: Duraciones): {
+  grupos: GrupoFinal[]; finalistas: RankingObra[]; horaDe: Map<string, string>; finDe: Map<string, string>; durDe: Map<string, string>;
 } {
   const marcadas = data.filter((o) => o.estelar);
   const galaIds = new Set<string>(marcadas.map((o) => o.id_inscripcion));
@@ -449,38 +477,21 @@ function armarNocheFinal(data: RankingObra[], dia: DiaFinal, horaInicio: string)
   const base = finalistasPorDia(data)[dia]; // cupo: top 100 de la noche
   let grupos: GrupoFinal[];
   let finalistas: RankingObra[];
-  if (dia !== 'Sábado') {
-    finalistas = ordenarNoche(base);
-    grupos = agruparConsecutivo(finalistas);
-  } else {
-    const regulares = ordenarNoche(base.filter((o) => !galaIds.has(o.id_inscripcion)));
-    const ordenGen: Record<string, number> = { URBANO: 0, ACADEMICO: 1, FOLCLORE: 2 };
-    const gala = base
-      .filter((o) => galaIds.has(o.id_inscripcion))
-      .map((o) => ({ ...o, estelar: true }))
-      .sort((a, b) =>
-        (ordenGen[generoArea(a)] ?? 9) - (ordenGen[generoArea(b)] ?? 9) ||
-        (a.orden_final ?? Number.POSITIVE_INFINITY) - (b.orden_final ?? Number.POSITIVE_INFINITY) ||
-        String(a.obra ?? '').localeCompare(String(b.obra ?? ''), 'es'));
-    const gReg = agruparConsecutivo(regulares);
-    const gGala = agruparConsecutivo(gala);
-    // Punto de inserción del admin: antes del primer BLOQUE regular cuyo inicio
-    // caería a las 21:00 o después; si la noche termina antes, la gala cierra.
-    let cur = hhmmSeg(horaInicio);
-    let idx = gReg.length;
-    for (let i = 0; i < gReg.length; i++) {
-      if (cur >= 21 * 3600) { idx = i; break; }
-      for (const o of gReg[i].items) {
-        const dur = DUR_SUBDIV[String(o.subdivision || '').toUpperCase().trim()] || '5:00';
-        cur += durSeg(dur) + BUFFER_SEG;
-      }
-    }
-    grupos = [...gReg.slice(0, idx), ...gGala, ...gReg.slice(idx)];
-    finalistas = grupos.flatMap((g) => g.items);
-  }
+  // MANDA EL ORDEN GUARDADO por el admin (orden_final). La gala NO se reubica:
+  // su lugar en la noche es el que fijó la organización; sólo su HORA se clava a
+  // las 21:40, más abajo, tras los 40 min de apertura. Antes se la insertaba en
+  // el punto donde el reloj llegaba a las 21:00, lo que la adelantaba de puesto
+  // y no coincidía ni con la app de jurados ni con el reproductor.
+  const conEstelar = base.map((o) =>
+    galaIds.has(o.id_inscripcion) ? { ...o, estelar: true } : o);
+  finalistas = ordenarNoche(conEstelar);
+  grupos = agruparConsecutivo(finalistas);
 
   const horaDe = new Map<string, string>();
   const finDe = new Map<string, string>();
+  // Duración realmente usada por obra: la consume el PDF, así la cifra impresa
+  // no puede divergir de la hora calculada en pantalla.
+  const durDe = new Map<string, string>();
   let cur = hhmmSeg(horaInicio);
   let enGala = false;
   for (const o of finalistas) {
@@ -488,18 +499,19 @@ function armarNocheFinal(data: RankingObra[], dia: DiaFinal, horaInicio: string)
     if (esGala && !enGala) { enGala = true; cur = 21 * 3600 + 40 * 60; }
     if (!esGala && enGala) { enGala = false; cur = Math.max(cur, 23 * 3600); }
     horaDe.set(o.id_inscripcion, segHHMM(cur));
-    const dur = DUR_SUBDIV[String(o.subdivision || '').toUpperCase().trim()] || '5:00';
+    const dur = duraciones.get(String(o.id_inscripcion)) || DUR_SUBDIV[String(o.subdivision || '').toUpperCase().trim()] || '5:00';
+    durDe.set(o.id_inscripcion, dur);
     finDe.set(o.id_inscripcion, segHHMM(cur + durSeg(dur)));
     cur += durSeg(dur) + BUFFER_SEG;
   }
-  return { grupos, finalistas, horaDe, finDe };
+  return { grupos, finalistas, horaDe, finDe, durDe };
 }
 
-function FinalDia({ dia, enabled, misNombres, horaInicio }: { dia: DiaFinal; enabled: boolean; misNombres: Set<string>; horaInicio: string }) {
+function FinalDia({ dia, enabled, misNombres, horaInicio, duraciones }: { dia: DiaFinal; enabled: boolean; misNombres: Set<string>; horaInicio: string; duraciones: Duraciones }) {
   const q = useRankingPublico(enabled);
   const { grupos, finalistas, horaDe, finDe } = useMemo(
-    () => armarNocheFinal(q.data ?? [], dia, horaInicio),
-    [q.data, dia, horaInicio],
+    () => armarNocheFinal(q.data ?? [], dia, horaInicio, duraciones),
+    [q.data, dia, horaInicio, duraciones],
   );
   // Posición secuencial en el orden en que se despliega (1, 2, 3…), como el admin.
   const posDe = useMemo(() => {
@@ -559,6 +571,10 @@ export function ProgramaTab() {
   // sin necesidad de recargar la página.
   const horariosQ = useQuery({ queryKey: ['horarios', '2026'], queryFn: fetchHorarios, enabled: !!user, staleTime: 30_000 });
   const horarios = useMemo<Horarios>(() => horariosQ.data ?? {}, [horariosQ.data]);
+  // Duraciones reales del audio. Se refrescan también al generar el PDF, igual que
+  // los horarios, para que el papel no salga con horas distintas a la pantalla.
+  const duracionesQ = useQuery({ queryKey: ['duraciones-reproductor', '2026'], queryFn: fetchDuraciones, enabled: !!user, staleTime: 5 * 60_000 });
+  const duraciones = useMemo<Duraciones>(() => duracionesQ.data ?? SIN_DURACIONES, [duracionesQ.data]);
   const actos = useMemo(() => (q.data ?? []) as ActoRPC[], [q.data]);
   const [mode, setMode] = useState<'presentacion' | 'ensayo'>('presentacion');
   const esEnsayo = mode === 'ensayo';
@@ -631,6 +647,7 @@ export function ProgramaTab() {
       // cambió la hora de inicio en la app de jurados, el PDF ya sale con la nueva
       // aunque esta página lleve rato abierta.
       const frescos = (await horariosQ.refetch()).data ?? horarios;
+      const dursFrescas = (await duracionesQ.refetch()).data ?? duraciones;
 
       // FINAL (Sábado/Domingo): el PDF NO usa el sorteo (armarDia) — se arma con
       // el MISMO armado que la pantalla (ranking fresco + armarNocheFinal), así
@@ -643,7 +660,7 @@ export function ProgramaTab() {
       if (esFinalDia) {
         const rk = (await rankingQ.refetch()).data ?? rankingQ.data ?? [];
         const diaF: DiaFinal = diaSel === 'SABADO' ? 'Sábado' : 'Domingo';
-        const noche = armarNocheFinal(rk, diaF, inicioDe(frescos, diaSel));
+        const noche = armarNocheFinal(rk, diaF, inicioDe(frescos, diaSel), dursFrescas);
         if (!noche.finalistas.length) return;
         let pos = 0;
         const filaFinal = (o: RankingObra): Fila => ({
@@ -652,7 +669,7 @@ export function ProgramaTab() {
           subdivision: o.subdivision ?? null, logo_url: o.enlace_del_logo,
           duracion: null, coreografo: null, coreografo_foto: null,
           n: ++pos, hora: noche.horaDe.get(o.id_inscripcion) ?? '',
-          dur: DUR_SUBDIV[String(o.subdivision || '').toUpperCase().trim()] || '5:00',
+          dur: noche.durDe.get(o.id_inscripcion) || '5:00',
           mio: false,
         });
         seccionesFinal = noche.grupos.map((g) => ({
@@ -877,7 +894,7 @@ export function ProgramaTab() {
 
       {esFinalDia && (
         <FinalDia dia={diaSel === 'SABADO' ? 'Sábado' : 'Domingo'} enabled={!!user} misNombres={misNombres}
-          horaInicio={inicioDe(horarios, diaSel)} />
+          horaInicio={inicioDe(horarios, diaSel)} duraciones={duraciones} />
       )}
 
       {!esFinalDia && q.isLoading && <LoadingSkeleton rows={3} />}
