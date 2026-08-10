@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { SearchInput } from '@/components/filters/SearchInput';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -9,7 +9,7 @@ import { CalificacionCard } from '@/components/cards/CalificacionCard';
 import { useCalificaciones, useRankingPublico, useDetalleObra, type RankingObra, type NotaPublica } from '@/hooks/queries';
 import { dayOrderIndex } from '@/lib/utils/days';
 import { calcularPromedioFinal, fmtScore } from '@/lib/utils/scoring';
-import { CUPO_POR_DIA, diaFinalDe, esDiaClasificatoria, idsEnCupo, type DiaFinal } from '@/lib/utils/finals';
+import { diaFinalDe, esDiaClasificatoria, idsEnCupo } from '@/lib/utils/finals';
 import { webpProxy } from '@/lib/utils/img';
 import { useAuth } from '@/hooks/useAuth';
 import type { Nota } from '@/types/domain';
@@ -244,19 +244,10 @@ function RankingVivo({ enabled }: { enabled: boolean }) {
   const [dia, setDia] = useState<string | null>(null); // null = Global (todos los días)
   // Ids dentro del cupo de 100 de su noche: solo ellas llevan chip «Final …».
   const cupoIds = useMemo(() => idsEnCupo(q.data ?? []), [q.data]);
-  // Pestañas de las FINALES: ranking de finalistas por nota. En Domingo, si se
-  // supera el cupo de 100, un separador marca el corte y las de abajo llevan la
-  // etiqueta «Baila sábado» (el equilibrio del festival las pasa a esa noche).
-  const esFinalTab = dia === 'FINAL_SABADO' || dia === 'FINAL_DOMINGO';
-  const diaSel = !esFinalTab && dia && days.includes(dia) ? dia : null;
-
-  const finalistas = useMemo(() => {
-    if (!esFinalTab) return [];
-    const objetivo: DiaFinal = dia === 'FINAL_SABADO' ? 'Sábado' : 'Domingo';
-    return (q.data ?? [])
-      .filter((o) => diaFinalDe(o) === objetivo)
-      .sort((a, b) => (b.nota_final ?? -1) - (a.nota_final ?? -1));
-  }, [esFinalTab, dia, q.data]);
+  // Las pestañas «Final Sábado/Domingo» se quitaron a pedido de la organización
+  // (2026-08-10): el ranking del portal muestra SOLO Martes–Viernes; el programa
+  // de la final vive en la pestaña Programa.
+  const diaSel = dia && days.includes(dia) ? dia : null;
 
   const ranked = useMemo(() => {
     const base = diaSel ? rows.filter((r) => (r.dia || '').toUpperCase() === diaSel) : rows;
@@ -284,40 +275,11 @@ function RankingVivo({ enabled }: { enabled: boolean }) {
               {d.charAt(0) + d.slice(1).toLowerCase()}
             </button>
           ))}
-          <button type="button" onClick={() => setDia('FINAL_SABADO')} className={pill(dia === 'FINAL_SABADO')}>
-            Final Sábado
-          </button>
-          <button type="button" onClick={() => setDia('FINAL_DOMINGO')} className={pill(dia === 'FINAL_DOMINGO')}>
-            Final Domingo
-          </button>
         </div>
         <LiveBadge fetching={q.isFetching} />
       </div>
 
-      {esFinalTab ? (
-        finalistas.length === 0 ? (
-          <EmptyState>Todavía no hay finalistas para esta noche.</EmptyState>
-        ) : (
-          // Finalistas por nota. Domingo con más de 100: separador del cupo y
-          // etiqueta «Baila sábado» en cada obra que quedó debajo del corte.
-          <div className="space-y-2">
-            {finalistas.map((o, i) => (
-              <Fragment key={o.id_inscripcion}>
-                {dia === 'FINAL_DOMINGO' && i === CUPO_POR_DIA.Domingo && (
-                  <div className="flex items-center gap-3 py-1.5">
-                    <span className="h-px flex-1 bg-cyan/40" />
-                    <span className="rounded-full border border-cyan/40 bg-cyan/10 px-3 py-1 text-[10px] font-bold uppercase text-cyan" style={{ letterSpacing: '0.5px' }}>
-                      Cupo de {CUPO_POR_DIA.Domingo} completo — las siguientes bailan el sábado
-                    </span>
-                    <span className="h-px flex-1 bg-cyan/40" />
-                  </div>
-                )}
-                <ObraRow o={o} lead={String(i + 1)} rank bailaSabado={dia === 'FINAL_DOMINGO' && i >= CUPO_POR_DIA.Domingo} />
-              </Fragment>
-            ))}
-          </div>
-        )
-      ) : ranked.length === 0 ? (
+      {ranked.length === 0 ? (
         <EmptyState>El ranking todavía no tiene notas cargadas.</EmptyState>
       ) : (
         // Lista PLANA: los mejores de la noche ordenados por nota, sin separar
