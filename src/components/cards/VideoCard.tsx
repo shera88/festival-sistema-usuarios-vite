@@ -1,15 +1,18 @@
 import { Play, Lock } from 'lucide-react';
 import type { VideoItem } from '@/types/domain';
 import { extractVimeoId, vimeoThumbUrl, isDirectVideoUrl } from '@/lib/utils/vimeo';
+import { VideoThumb } from './VideoThumb';
 
 interface Props {
   video: VideoItem;
   onClick: () => void;
   /** Video 2026 sin membresía pagada: miniatura difuminada + candado + "Vista previa". */
   locked?: boolean;
+  /** Hay un video reproduciéndose: la miniatura no compite por el ancho de banda. */
+  pausado?: boolean;
 }
 
-export function VideoCard({ video, onClick, locked = false }: Props) {
+export function VideoCard({ video, onClick, locked = false, pausado = false }: Props) {
   const id = extractVimeoId(video.url_video);
   const directUrl = !id && isDirectVideoUrl(video.url_video) ? String(video.url_video) : null;
   const thumb = id ? vimeoThumbUrl(id) : null;
@@ -29,13 +32,11 @@ export function VideoCard({ video, onClick, locked = false }: Props) {
         {thumb ? (
           <img src={thumb} alt={obra} className={`h-full w-full object-cover transition ${dim}`} />
         ) : directUrl ? (
-          // Miniatura = un frame del mp4 (poster). #t=3 → muestra el segundo 3.
-          <video
-            src={`${directUrl}#t=3`}
-            preload="metadata"
-            muted
-            playsInline
-            tabIndex={-1}
+          // Miniatura perezosa: sólo pide el archivo cuando la tarjeta está por
+          // verse, y se calla mientras hay un video reproduciéndose.
+          <VideoThumb
+            src={directUrl}
+            pausado={pausado}
             className={`pointer-events-none h-full w-full object-cover transition ${dim}`}
           />
         ) : (

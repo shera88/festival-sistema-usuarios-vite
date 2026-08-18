@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Lock } from 'lucide-react';
+import { X, Lock, Download } from 'lucide-react';
 import type { VideoItem } from '@/types/domain';
 import { extractVimeoId, vimeoEmbedUrl, isDirectVideoUrl } from '@/lib/utils/vimeo';
 
@@ -101,7 +101,8 @@ export function VideoModal({ video, onClose, preview = false, unlockPrice, onUnl
                 controls
                 autoPlay
                 playsInline
-                controlsList="nodownload noplaybackrate"
+                preload="metadata"
+                controlsList="noplaybackrate"
                 onTimeUpdate={clampPreview}
                 onSeeking={clampPreview}
               />
@@ -127,8 +128,25 @@ export function VideoModal({ video, onClose, preview = false, unlockPrice, onUnl
           )}
         </div>
         <div className="border-t border-glass-border p-4">
-          <div className="text-text-45 text-xs">{video.agrupacion}</div>
-          <div className="text-text-90 font-semibold">{video.nombre_de_la_obra}</div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-text-45 text-xs">{video.agrupacion}</div>
+              <div className="text-text-90 font-semibold">{video.nombre_de_la_obra}</div>
+            </div>
+            {/* Descargar: sólo con el video desbloqueado. En vista previa no se
+                ofrece, porque daría el archivo completo sin haberlo comprado. */}
+            {directUrl && !preview && (
+              <a
+                href={directUrl}
+                download={`${(video.agrupacion || 'danzarte')} - ${(video.nombre_de_la_obra || 'video')}.mp4`}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-glass-border bg-white/5 px-3 py-1.5 text-xs font-semibold text-text-90 transition hover:bg-white/10"
+              >
+                <Download className="h-3.5 w-3.5" /> Descargar
+              </a>
+            )}
+          </div>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
             {video.categoria && (
               <span className="rounded border border-cyan/40 px-1.5 py-0.5 text-cyan uppercase">

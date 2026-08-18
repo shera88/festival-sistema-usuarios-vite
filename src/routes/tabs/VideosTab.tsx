@@ -18,11 +18,38 @@ function norm(s: string | null | undefined): string {
   return (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+/* Botones de filtro rápido por día.
+   Las noches FINALES (sábado y domingo) todavía no se publican, así que sus
+   botones no aparecen. Para mostrarlos cuando llegue el momento: poner
+   MOSTRAR_NOCHES_FINALES en true. No hay que tocar nada más. */
+const MOSTRAR_NOCHES_FINALES = false;
+const DIAS_CLASIFICATORIOS = ['MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const;
+const DIAS_FINALES = ['SABADO', 'DOMINGO'] as const;
+const DIAS_VISIBLES: readonly string[] = MOSTRAR_NOCHES_FINALES
+  ? [...DIAS_CLASIFICATORIOS, ...DIAS_FINALES]
+  : DIAS_CLASIFICATORIOS;
+
+/** Etiqueta bonita para el botón (los datos vienen sin tilde y en mayúsculas). */
+const ETIQUETA_DIA: Record<string, string> = {
+  MARTES: 'Martes',
+  MIERCOLES: 'Miércoles',
+  JUEVES: 'Jueves',
+  VIERNES: 'Viernes',
+  SABADO: 'Sábado',
+  DOMINGO: 'Domingo',
+};
+
+/** Normaliza el día de una obra a la forma sin tilde que usan las constantes. */
+function diaClave(d: string | null | undefined): string {
+  return (d ?? '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
 export function VideosTab() {
   const { user } = useAuth();
   const q = useVideos(!!user);
   const [active, setActive] = useState<VideoItem | null>(null);
   const [query, setQuery] = useState('');
+  const [dias, setDias] = useState<string[]>([]);
   const [unlocking, setUnlocking] = useState(false);
 
   const data = useMemo(() => q.data?.videos ?? {}, [q.data]);
@@ -66,19 +93,26 @@ export function VideosTab() {
 
   const byYearFiltered = useMemo(() => {
     const qn = norm(query.trim());
-    if (!qn) return byYearAll;
+    if (!qn && dias.length === 0) return byYearAll;
     return byYearAll
       .map((g) => ({
         year: g.year,
-        items: g.items.filter(
-          (v) =>
+        items: g.items.filter((v) => {
+          if (dias.length && !dias.includes(diaClave(v.dia))) return false;
+          if (!qn) return true;
+          return (
             norm(v.agrupacion).includes(qn) ||
             norm(v.nombre_de_la_obra).includes(qn) ||
-            norm(v.dia).includes(qn),
-        ),
+            norm(v.dia).includes(qn)
+          );
+        }),
       }))
       .filter((g) => g.items.length > 0);
-  }, [byYearAll, query]);
+  }, [byYearAll, query, dias]);
+
+
+  const alternarDia = (d: string) =>
+    setDias((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
 
   const totalFiltered = useMemo(
     () => byYearFiltered.reduce((sum, g) => sum + g.items.length, 0),
@@ -239,12 +273,49 @@ export function VideosTab() {
             <span className="ml-1 font-mono text-cyan">"{query}"</span>
           </p>
         )}
+
+        {/* Filtro rápido por día. Se pueden marcar varios a la vez. */}
+        {!q.isLoading && (
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+            {DIAS_VISIBLES.map((d) => {
+              const activo = dias.includes(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => alternarDia(d)}
+                  aria-pressed={activo}
+                  className={`rounded-full border px-3.5 py-1.5 text-[12px] font-semibold transition ${
+                    activo
+                      ? 'border-cyan bg-cyan/15 text-cyan shadow-[0_0_14px_rgba(0,229,255,0.20)]'
+                      : 'border-glass-border bg-white/5 text-text-65 hover:border-cyan/50 hover:text-text-white'
+                  }`}
+                >
+                  {ETIQUETA_DIA[d] ?? d}
+                </button>
+              );
+            })}
+            {dias.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setDias([])}
+                className="inline-flex items-center gap-1 rounded-full border border-glass-border bg-white/5 px-3 py-1.5 text-[12px] text-text-45 transition hover:text-text-white"
+              >
+                <X className="h-3 w-3" /> Todos
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {q.isLoading && <LoadingSkeleton rows={3} />}
       {!q.isLoading && byYearFiltered.length === 0 && (
         <EmptyState>
-          {query ? `Sin resultados para "${query}".` : 'Sin videos disponibles.'}
+          {query
+            ? `Sin resultados para "${query}".`
+            : dias.length
+              ? `Sin videos en ${dias.map((d) => ETIQUETA_DIA[d] ?? d).join(', ')}.`
+              : 'Sin videos disponibles.'}
         </EmptyState>
       )}
 
@@ -261,6 +332,9 @@ export function VideosTab() {
                   key={v.id_inscripcion}
                   video={v}
                   locked={v.bloqueado}
+                  /* Con el modal abierto las miniaturas dejan de descargar: todo
+                     el ancho de banda va al video que se está viendo. */
+                  pausado={active !== null}
                   onClick={() => setActive(v)}
                 />
               ))}
