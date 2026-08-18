@@ -44,6 +44,29 @@ function diaClave(d: string | null | undefined): string {
   return (d ?? '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
+/**
+ * Añade los videos de las NOCHES FINALES como entradas propias.
+ *
+ * Una obra que llegó a la final tiene DOS videos: el de la noche en que bailó
+ * (`url_video`) y el de la final (`url_video_final`), que es otra presentación.
+ * Mientras las finales no estén habilitadas esta función no agrega nada, así que
+ * esos videos no se ven aunque ya estén subidos.
+ */
+function conFinales(items: VideoItem[]): VideoItem[] {
+  if (!MOSTRAR_NOCHES_FINALES) return items;
+  const finales = items
+    .filter((v) => (v.url_video_final ?? '').trim() !== '' && (v.dia_final ?? '').trim() !== '')
+    .map((v) => ({
+      ...v,
+      // La entrada de la final se identifica por su propio día y orden.
+      id_inscripcion: `${v.id_inscripcion}-final`,
+      url_video: v.url_video_final as string,
+      dia: v.dia_final as string,
+      orden: v.orden_final ?? v.orden,
+    }));
+  return [...items, ...finales];
+}
+
 export function VideosTab() {
   const { user } = useAuth();
   const q = useVideos(!!user);
@@ -82,7 +105,7 @@ export function VideosTab() {
     return years
       .map((year) => ({
         year,
-        items: [...data[year]].sort((a, b) => {
+        items: [...conFinales(data[year])].sort((a, b) => {
           const d = dayOrderIndex((a.dia || '').toUpperCase()) - dayOrderIndex((b.dia || '').toUpperCase());
           if (d !== 0) return d;
           return (Number(a.orden) || 999) - (Number(b.orden) || 999);
@@ -244,7 +267,7 @@ export function VideosTab() {
       ) : null}
 
       <div
-        className="sticky top-[112px] z-20 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6"
+        className="sticky top-[81px] lg:top-[112px] z-20 -mx-4 px-4 py-2 sm:-mx-6 sm:px-6"  /* 81px = alto de la cabecera en móvil; en escritorio se suman las pestañas */
         style={{ background: 'var(--bg-base)' }}
       >
         <div className="group relative">

@@ -13,6 +13,13 @@ $user = requireAuth();
 
 $select = 'id_inscripcion,orden,dia,agrupacion,enlace_del_logo,nombre_de_la_obra,url_video,categoria,division,subdivision,modalidad,coreografo,director,bloque,genero';
 
+/* 2026 trae además el video de la NOCHE FINAL, que es otro distinto al de la
+   noche clasificatoria. `url_video_final` sólo existe en la tabla de 2026: si se
+   pidiera para 2023/2024 la consulta fallaría entera, por eso va en un select
+   aparte. El front decide si esos videos se muestran (hoy: no, hasta que la
+   organización lo habilite). */
+$select2026 = $select . ',url_video_final,dia_final,orden_final';
+
 $videos = [];
 
 // Historial ≤2025: scope de agrupación (sin id_contacto; las tablas viejas no lo tienen).
@@ -33,7 +40,7 @@ $membresia = estadoMembresia($user);
 //  - Membresía de Videos pagada → los videos de SU agrupación, desbloqueados.
 //  - Ninguna → los de su agrupación, bloqueados (upsell).
 if (!empty($membresia['paquete_pagada'])) {
-    $qs = "url_video=not.is.null&select=$select&order=dia.asc,orden.asc&limit=3000";
+    $qs = "url_video=not.is.null&select=$select2026&order=dia.asc,orden.asc&limit=3000";
     $rows = supabase()->selectRaw('registro_de_inscripcion_2026', $qs);
     if (count($rows) > 0) {
         foreach ($rows as &$r) { $r['bloqueado'] = false; }
@@ -43,7 +50,7 @@ if (!empty($membresia['paquete_pagada'])) {
 } else {
     $filter2026 = buildContextFilter($user, true);
     if ($filter2026) {
-        $qs = $filter2026 . "&url_video=not.is.null&select=$select&limit=300";
+        $qs = $filter2026 . "&url_video=not.is.null&select=$select2026&limit=300";
         $rows = supabase()->selectRaw('registro_de_inscripcion_2026', $qs);
         if (count($rows) > 0) {
             $bloqueado = !$membresia['pagada'];

@@ -179,6 +179,12 @@ export interface VideoItem {
   genero: string | null;
   /** Videos 2026: true si la membresía aún no está pagada (bloqueado). */
   bloqueado?: boolean;
+  /** Video de la NOCHE FINAL (sábado/domingo): es otro distinto al de la noche
+   *  clasificatoria. Sólo existe en 2026 y sólo se muestra cuando la
+   *  organización habilita las finales. */
+  url_video_final?: string | null;
+  dia_final?: string | null;
+  orden_final?: number | string | null;
 }
 
 /** Estado de las membresías de la persona logueada (para gating de videos 2026). */

@@ -20,6 +20,8 @@ with open(ROOT_DIR / ".credentials" / "deploy-credentials.json", encoding="utf-8
 REMOTE_BASE = "/festivaldanzarte.com/public_html/portal/api"
 PHP_DIR = ROOT_DIR / "php-backend"
 
+# Lista por defecto (la de la última tanda). Se puede pasar por argumento qué
+# subir, que es lo habitual:  python deploy-php-portal-api.py videos.php
 FILES = [
     "_lib/recibo.php",
     "_assets/logo-recibo-negro.png",
@@ -30,6 +32,8 @@ FILES = [
     "_assets/Inter-Light.ttf",
     "recibo-generar.php",
 ]
+if len(sys.argv) > 1:
+    FILES = sys.argv[1:]
 
 
 def connect():
