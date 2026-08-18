@@ -87,3 +87,9 @@ sql/
 
 # Grafo de conocimiento de graphify (se regenera; puede contener texto del código)
 graphify-out/
+
+# Miniaturas generadas (viven en R2, no en el repo)
+scripts/thumbs/salida/
+
+__pycache__/
+*.pyc

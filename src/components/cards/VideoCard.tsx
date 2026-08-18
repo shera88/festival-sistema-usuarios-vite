@@ -2,6 +2,7 @@ import { Play, Lock } from 'lucide-react';
 import type { VideoItem } from '@/types/domain';
 import { extractVimeoId, vimeoThumbUrl, isDirectVideoUrl } from '@/lib/utils/vimeo';
 import { VideoThumb } from './VideoThumb';
+import { urlMiniatura } from '@/lib/utils/miniatura';
 
 interface Props {
   video: VideoItem;
@@ -36,6 +37,7 @@ export function VideoCard({ video, onClick, locked = false, pausado = false }: P
           // verse, y se calla mientras hay un video reproduciéndose.
           <VideoThumb
             src={directUrl}
+            poster={urlMiniatura(directUrl, video.id_inscripcion)}
             pausado={pausado}
             className={`pointer-events-none h-full w-full object-cover transition ${dim}`}
           />

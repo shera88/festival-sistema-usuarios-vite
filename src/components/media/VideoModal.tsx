@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { descargarArchivo, nombreSeguro } from '@/lib/utils/descargarArchivo';
+import { toast } from 'sonner';
 import { X, Lock, Download } from 'lucide-react';
 import type { VideoItem } from '@/types/domain';
 import { extractVimeoId, vimeoEmbedUrl, isDirectVideoUrl } from '@/lib/utils/vimeo';
@@ -21,6 +23,8 @@ interface Props {
 export function VideoModal({ video, onClose, preview = false, unlockPrice, onUnlock, unlocking = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [previewEnded, setPreviewEnded] = useState(false);
+  // null = sin descarga en curso · 0..1 = avance · -1 = en curso sin tamaño conocido
+  const [avance, setAvance] = useState<number | null>(null);
 
   useEffect(() => {
     function onEsc(e: KeyboardEvent) {
@@ -136,15 +140,33 @@ export function VideoModal({ video, onClose, preview = false, unlockPrice, onUnl
             {/* Descargar: sólo con el video desbloqueado. En vista previa no se
                 ofrece, porque daría el archivo completo sin haberlo comprado. */}
             {directUrl && !preview && (
-              <a
-                href={directUrl}
-                download={`${(video.agrupacion || 'danzarte')} - ${(video.nombre_de_la_obra || 'video')}.mp4`}
-                target="_blank"
-                rel="noopener"
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-glass-border bg-white/5 px-3 py-1.5 text-xs font-semibold text-text-90 transition hover:bg-white/10"
+              <button
+                type="button"
+                disabled={avance !== null}
+                onClick={async () => {
+                  setAvance(-1);
+                  try {
+                    await descargarArchivo(
+                      directUrl,
+                      `${nombreSeguro(video.agrupacion, video.nombre_de_la_obra)}.mp4`,
+                      (p) => setAvance(p ?? -1),
+                    );
+                    toast.success('Video descargado.');
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : 'No se pudo descargar el video.');
+                  } finally {
+                    setAvance(null);
+                  }
+                }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-glass-border bg-white/5 px-3 py-1.5 text-xs font-semibold text-text-90 transition hover:bg-white/10 disabled:cursor-wait disabled:opacity-80"
               >
-                <Download className="h-3.5 w-3.5" /> Descargar
-              </a>
+                <Download className="h-3.5 w-3.5" />
+                {avance === null
+                  ? 'Descargar'
+                  : avance < 0
+                    ? 'Descargando…'
+                    : `${Math.round(avance * 100)}%`}
+              </button>
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">

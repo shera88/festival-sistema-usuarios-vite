@@ -13,13 +13,16 @@ import { useEffect, useRef, useState } from 'react';
  * suelta la fuente cuando se aleja. Además se puede congelar por completo
  * (`pausado`) mientras hay un video reproduciéndose, para dejarle toda la banda.
  */
-export function VideoThumb({ src, className, pausado = false }: {
+export function VideoThumb({ src, poster, className, pausado = false }: {
   src: string;
+  /** Portada ya generada (WebP de ~18 KB). Si falta o falla, se cae al video. */
+  poster?: string | null;
   className?: string;
   pausado?: boolean;
 }) {
   const cont = useRef<HTMLDivElement>(null);
   const [cerca, setCerca] = useState(false);
+  const [posterFallo, setPosterFallo] = useState(false);
 
   useEffect(() => {
     const el = cont.current;
@@ -32,6 +35,22 @@ export function VideoThumb({ src, className, pausado = false }: {
     io.observe(el);
     return () => io.disconnect();
   }, []);
+
+  // Camino rápido: una imagen de 18 KB en vez de bajar trozos de un mp4 de
+  // ~260 MB. Si la portada no existe todavía (o falla), se usa el video como
+  // antes: la tarjeta nunca se queda vacía.
+  if (poster && !posterFallo) {
+    return (
+      <img
+        src={poster}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        onError={() => setPosterFallo(true)}
+        className={className}
+      />
+    );
+  }
 
   // Sólo pide el archivo si está cerca de la pantalla Y no hay nada reproduciéndose.
   const cargar = cerca && !pausado;
