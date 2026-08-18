@@ -1,67 +1,224 @@
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { toast } from 'sonner';
+
+function getFilenameFromUrl(url: string, fallback = 'archivo.bin'): string {
+  try {
+    const u = new URL(url);
+    const last = u.pathname.split('/').filter(Boolean).pop();
+    return last ? decodeURIComponent(last) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onloadend = () => {
+      const result = String(r.result || '');
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    r.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    r.readAsDataURL(blob);
+  });
+}
+
 /**
- * Descarga un archivo remoto de verdad, con progreso.
+ * Sanitiza nombre de archivo para filesystem Android/iOS/web.
+ * Quita caracteres ilegales y colapsa espacios.
+ */
+export function sanitizeFilename(name: string): string {
+  // eslint-disable-next-line no-control-regex
+  return name.replace(/[\/\\<>:"|?*\x00-\x1F]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+export function extFromUrl(url: string, fallback = ''): string {
+  try {
+    const u = new URL(url);
+    const seg = u.pathname.split('/').pop() || '';
+    const dot = seg.lastIndexOf('.');
+    if (dot < 0) return fallback;
+    const ext = seg.slice(dot + 1).toLowerCase();
+    return ext && ext.length <= 5 ? '.' + ext : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export interface DescargaResult {
+  /** URI local (Capacitor) o objectURL (web). Disponible para reabrir desde toast/botón. */
+  uri: string | null;
+  filename: string;
+  mime: string | null;
+}
+
+/**
+ * Descarga archivo. Capacitor: Filesystem.writeFile -> Directory.External (sin permisos).
+ * Web: blob + <a download>. Retorna URI para reabrir más tarde (Share / blob).
  *
- * POR QUÉ NO BASTA <a download>: el atributo `download` sólo funciona en archivos
- * del mismo origen. Los videos viven en Cloudflare R2 (otro dominio), así que el
- * navegador ignoraba el atributo y abría el video en una pestaña en vez de
- * guardarlo. R2 sí manda `Access-Control-Allow-Origin: *`, así que podemos
- * traerlo con fetch y entregarlo como blob — eso el navegador sí lo guarda.
- *
- * `onProgreso` recibe 0..1, o null mientras no se sepa el tamaño total.
+ * @param url URL pública del archivo
+ * @param filename Nombre con que se guarda en disco
+ * @param label Etiqueta corta para el toast (ej: "Recibo", "Comprobante")
  */
 export async function descargarArchivo(
   url: string,
-  nombreArchivo: string,
+  filename?: string,
+  label: string = 'Archivo',
+): Promise<DescargaResult> {
+  const finalName = filename || getFilenameFromUrl(url);
+
+  if (Capacitor.isNativePlatform()) {
+    const tid = toast.loading(`Descargando ${label.toLowerCase()}…`);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const data = await blobToBase64(blob);
+      const write = await Filesystem.writeFile({
+        path: finalName,
+        data,
+        directory: Directory.External,
+        recursive: true,
+      });
+      toast.success(`${label} descargado`, { id: tid, duration: 2500 });
+      return { uri: write.uri, filename: finalName, mime: blob.type || null };
+    } catch (e) {
+      toast.error(`No se pudo descargar ${label.toLowerCase()}`, {
+        id: tid,
+        description: (e as Error).message,
+      });
+      throw e;
+    }
+  }
+
+  // Web
+  const tid = toast.loading(`Descargando ${label.toLowerCase()}…`);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = finalName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success(`${label} descargado`, { id: tid, duration: 2500 });
+    return { uri: objectUrl, filename: finalName, mime: blob.type || null };
+  } catch (e) {
+    toast.error(`No se pudo descargar ${label.toLowerCase()}`, {
+      id: tid,
+      description: (e as Error).message,
+    });
+    throw e;
+  }
+}
+
+/**
+ * Verifica si archivo ya existe en Filesystem (Capacitor only).
+ * Devuelve DescargaResult listo para state, o null si no existe / web.
+ *
+ * Se usa al montar la fila para restaurar el estado "ya descargado"
+ * después de cerrar y reabrir la app.
+ */
+export async function checkArchivoLocal(filename: string, mime?: string | null): Promise<DescargaResult | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  try {
+    const stat = await Filesystem.stat({
+      path: filename,
+      directory: Directory.External,
+    });
+    if (stat.type !== 'file') return null;
+    const uri = await Filesystem.getUri({
+      path: filename,
+      directory: Directory.External,
+    });
+    return { uri: uri.uri, filename, mime: mime ?? null };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Abre archivo localmente. Capacitor -> Share sheet (visor PDF/imagen).
+ * Web -> nueva pestaña con objectURL.
+ */
+export async function abrirArchivoLocal(uri: string, filename: string, mime?: string | null): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await Share.share({
+        url: uri,
+        title: filename,
+        dialogTitle: 'Abrir con',
+        ...(mime ? { text: mime } : {}),
+      });
+    } catch (e) {
+      const msg = (e as Error).message || '';
+      if (msg.toLowerCase().includes('cancel')) return;
+      toast.error('No se pudo abrir el archivo', { description: msg });
+    }
+    return;
+  }
+  window.open(uri, '_blank', 'noopener,noreferrer');
+}
+
+/**
+ * Igual que `descargarArchivo` en web, pero informando el avance.
+ *
+ * Se usa para los VIDEOS del festival, que pesan cientos de MB: sin progreso el
+ * botón parece colgado durante minutos. Lee el cuerpo por trozos para poder ir
+ * contando; el resto (blob + <a download>) es idéntico.
+ *
+ * En la app móvil (Capacitor) no aplica: ahí se delega en `descargarArchivo`,
+ * que guarda con Filesystem y ofrece abrir el archivo.
+ *
+ * `onProgreso` recibe 0..1, o null mientras el servidor no diga el tamaño.
+ */
+export async function descargarConProgreso(
+  url: string,
+  filename: string,
   onProgreso?: (avance: number | null) => void,
-  signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`No se pudo descargar (HTTP ${res.status})`);
-
-  const total = Number(res.headers.get('content-length') || 0);
-  let recibido = 0;
-  const partes: BlobPart[] = [];
-
-  // Sin body legible (navegador viejo): se cae al blob directo, sin progreso.
-  if (!res.body) {
-    guardar(await res.blob(), nombreArchivo);
+  if (Capacitor.isNativePlatform()) {
+    await descargarArchivo(url, filename, 'Video');
     return;
   }
 
-  const lector = res.body.getReader();
-  for (;;) {
-    const { done, value } = await lector.read();
-    if (done) break;
-    if (value) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`No se pudo descargar (HTTP ${res.status})`);
+
+  const total = Number(res.headers.get('content-length') || 0);
+  const tipo = res.headers.get('content-type') || 'video/mp4';
+
+  let blob: Blob;
+  if (!res.body) {
+    blob = await res.blob(); // navegador sin streams: sin progreso, pero descarga
+  } else {
+    const lector = res.body.getReader();
+    const partes: BlobPart[] = [];
+    let recibido = 0;
+    for (;;) {
+      const { done, value } = await lector.read();
+      if (done) break;
+      if (!value) continue;
       partes.push(value);
       recibido += value.length;
       onProgreso?.(total ? recibido / total : null);
     }
+    blob = new Blob(partes, { type: tipo });
   }
 
-  guardar(new Blob(partes, { type: res.headers.get('content-type') || 'video/mp4' }), nombreArchivo);
-}
-
-function guardar(blob: Blob, nombreArchivo: string) {
-  const href = URL.createObjectURL(blob);
+  const objectUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = href;
-  a.download = nombreArchivo;
+  a.href = objectUrl;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  // Liberar la memoria del blob: un video son cientos de MB.
-  setTimeout(() => URL.revokeObjectURL(href), 60_000);
-}
-
-/** Nombre de archivo seguro: sin acentos ni caracteres que Windows rechaza. */
-export function nombreSeguro(...partes: (string | null | undefined)[]): string {
-  return partes
-    .filter(Boolean)
-    .join(' - ')
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[\/:*?"<>|]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  // Un video son cientos de MB: liberar la memoria del blob al rato.
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }

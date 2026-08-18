@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { descargarArchivo, nombreSeguro } from '@/lib/utils/descargarArchivo';
+import { descargarConProgreso, sanitizeFilename } from '@/lib/utils/descargarArchivo';
 import { toast } from 'sonner';
 import { X, Lock, Download } from 'lucide-react';
 import type { VideoItem } from '@/types/domain';
@@ -146,9 +146,9 @@ export function VideoModal({ video, onClose, preview = false, unlockPrice, onUnl
                 onClick={async () => {
                   setAvance(-1);
                   try {
-                    await descargarArchivo(
+                    await descargarConProgreso(
                       directUrl,
-                      `${nombreSeguro(video.agrupacion, video.nombre_de_la_obra)}.mp4`,
+                      sanitizeFilename(`${video.agrupacion ?? 'Danzarte'} - ${video.nombre_de_la_obra ?? 'video'}`) + '.mp4',
                       (p) => setAvance(p ?? -1),
                     );
                     toast.success('Video descargado.');
