@@ -194,6 +194,26 @@ function sesionEsSuperAdmin(): bool
     return false;
 }
 
+/**
+ * Exige SUPER admin, o corta con 403.
+ *
+ * Hermano de requireAdmin(), pero apoyado en sesionEsSuperAdmin() para que la
+ * SUPERVISIÓN no lo rompa: mientras un super admin supervisa a otra persona la
+ * sesión activa es la del supervisado, y quien opera sigue siendo él.
+ *
+ * Existe porque esconder una pestaña en el front NO es una protección: sin este
+ * gate, cualquiera que supiera la URL del endpoint podría pedir los datos.
+ */
+function requireSuperAdmin(): array
+{
+    $user = requireAuth();
+    if (!sesionEsSuperAdmin()) {
+        sendJson(['error' => 'Requiere permisos de super administrador'], 403);
+        exit;
+    }
+    return $user;
+}
+
 function requireMethod(string $method): void
 {
     if ($_SERVER['REQUEST_METHOD'] !== strtoupper($method)) {

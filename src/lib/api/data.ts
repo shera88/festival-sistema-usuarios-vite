@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { Bootstrap, Inscripcion, KardexRow, Nota, Year, YearNotas, VideosResponse } from '@/types/domain';
+import type { Bootstrap, Inscripcion, KardexRow, Nota, Year, YearNotas, VideosResponse, NominadosResponse } from '@/types/domain';
 
 export const dataApi = {
   bootstrap: () => api.get<Bootstrap>('/bootstrap.php'),
@@ -15,6 +15,10 @@ export const dataApi = {
 
   videos: () =>
     api.get<VideosResponse>('/videos.php'),
+
+  /** Nominados por bloque. Solo super admin (el servidor lo exige, no solo la UI). */
+  nominados: (year = '2026') =>
+    api.get<NominadosResponse>(`/nominados.php?year=${year}`),
 
   /** Inicia el checkout de una membresía (videos | paquete) → URL de pago de WooCommerce. */
   membresiaCheckout: (tipo: 'videos' | 'paquete' = 'videos') =>

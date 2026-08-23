@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, Trophy, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol } from '@/lib/roles';
 
@@ -26,6 +26,11 @@ export function TabsNav() {
     // Solo admins de pagos (Yacu / Shera / Briza) ven el dashboard admin.
     ...(user?.es_admin
       ? [{ to: '/admin/pagos', label: 'Admin Pagos', color: 'var(--green)', icon: ShieldCheck }]
+      : []),
+    // Nominados: SOLO super admins, y por ahora nadie más. El backend lo exige
+    // igual (nominados.php), esto solo evita mostrar una pestaña que daría 403.
+    ...(user?.es_super_admin
+      ? [{ to: '/nominados', label: 'Nominados', color: 'var(--gold)', icon: Trophy }]
       : []),
   ];
 

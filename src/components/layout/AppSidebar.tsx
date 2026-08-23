@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, Trophy, type LucideIcon } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol } from '@/lib/roles';
@@ -47,6 +47,9 @@ export function AppSidebar({ open, onClose }: Props) {
         ...(pagosVisibleParaRol(user) ? [{ to: '/pagos', label: 'Pagos', icon: CreditCard }] : []),
         // Solo admins de pagos (Yacu / Shera / Briza).
         ...(user?.es_admin ? [{ to: '/admin/pagos', label: 'Admin Pagos', icon: ShieldCheck }] : []),
+        // Nominados: SOLO super admins. En el cajón sí va, porque es la unica
+        // via para llegar desde el telefono (la barra inferior no lleva admin).
+        ...(user?.es_super_admin ? [{ to: '/nominados', label: 'Nominados', icon: Trophy }] : []),
       ],
     },
     // Formularios: además del permiso de edición, el de Kárdex se filtra por rol

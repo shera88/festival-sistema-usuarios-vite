@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, Trophy, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol } from '@/lib/roles';
 
@@ -21,6 +21,11 @@ export function BottomNav() {
     { to: '/videos', label: 'Videos', icon: Video, color: 'var(--purple)' },
     // Pagos solo para representantes/directores/coreógrafos (staff). NO bailarines.
     ...(pagosVisibleParaRol(user) ? [{ to: '/pagos', label: 'Pagos', icon: CreditCard, color: 'var(--green)' }] : []),
+    // Nominados: SOLO super admins. A diferencia de Admin Pagos —que a
+    // propósito no está acá— este sí va en el teléfono, como acceso rápido.
+    ...(user?.es_super_admin
+      ? [{ to: '/nominados', label: 'Nomin.', icon: Trophy, color: 'var(--gold)' }]
+      : []),
   ];
 
   return (

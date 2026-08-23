@@ -413,3 +413,26 @@ export interface AdminAgrupacionDetalleRes {
   compromisos: CompromisoDeuda[];
   historial: PagoHistorial[];
 }
+
+/** Una agrupación nominada. NO trae lugar ni nota a propósito: ver nominados.php. */
+export interface NominadoItem {
+  n: number;
+  agrupacion: string;
+  obra: string;
+  genero: string;
+  /** Logo de la agrupación. Dato público: no dice nada del puesto. */
+  logo?: string | null;
+}
+
+/** Un bloque de premiación con sus nominados, ya mezclados por el servidor. */
+export interface NominadosBloque {
+  label: string;
+  genero: string;
+  items: NominadoItem[];
+}
+
+export interface NominadosResponse {
+  ano: string;
+  total: number;
+  bloques: NominadosBloque[];
+}

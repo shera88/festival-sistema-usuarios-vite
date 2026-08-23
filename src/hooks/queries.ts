@@ -149,6 +149,16 @@ export function useVideos(enabled: boolean) {
   });
 }
 
+/** Nominados por bloque. El orden llega YA mezclado del servidor: no reordenar acá,
+ *  y no cachear entre sesiones distintas de super admin. */
+export function useNominados(enabled: boolean) {
+  return useQuery({
+    queryKey: ['nominados'],
+    queryFn: () => dataApi.nominados(),
+    enabled,
+  });
+}
+
 export function usePagos(year: Year, enabled: boolean) {
   return useQuery({
     queryKey: ['pagos', year],

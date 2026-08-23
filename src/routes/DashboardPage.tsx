@@ -31,6 +31,10 @@ const PerfilPage = lazy(() =>
 const AdminPagosTab = lazy(() =>
   import('./tabs/AdminPagosTab').then((m) => ({ default: m.AdminPagosTab })),
 );
+// Solo la abren los super admins: no vale la pena en el bundle inicial.
+const NominadosTab = lazy(() =>
+  import('./tabs/NominadosTab').then((m) => ({ default: m.NominadosTab })),
+);
 
 function RouteFallback() {
   return (
@@ -83,6 +87,8 @@ export function DashboardPage() {
             <Route path="videos" element={<VideosTab />} />
             <Route path="pagos" element={<PagosTab />} />
             <Route path="admin/pagos" element={<AdminPagosTab />} />
+            {/* La guarda vive dentro del componente, como en admin/pagos. */}
+            <Route path="nominados" element={<NominadosTab />} />
             <Route path="inscripcion" element={<InscripcionPage />} />
             <Route
               path="kardex-form"
