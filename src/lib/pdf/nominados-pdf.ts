@@ -64,7 +64,9 @@ export async function descargarNominadosPdf(
 
   auto.autoTable({
     startY: 68,
-    showHead: 'firstPage',
+    // En todas las páginas, no sólo en la primera: una hoja suelta sin la fila
+    // N°/AGRUPACION/OBRA/GENERO no se entiende.
+    showHead: 'everyPage',
     rowPageBreak: 'avoid',
     margin: { top: 40, bottom: 42, left: 40, right: 40 },
     head: [COLUMNAS],
@@ -84,6 +86,24 @@ export async function descargarNominadosPdf(
         halign: i === '0' ? 'center' : 'left',
       }]),
     ),
+    // La aclaración se repite al pie de CADA página. El título y la leyenda de
+    // arriba salen sólo en la primera, y este PDF circula recortado y reenviado:
+    // una hoja suelta muestra filas numeradas sin contexto, y esa numeración
+    // correlativa se lee como un podio. Es exactamente lo que no es.
+    didDrawPage: () => {
+      const alto = doc.internal.pageSize.getHeight();
+      const ancho = doc.internal.pageSize.getWidth();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(120);
+      doc.text(
+        `NOMINADOS · FESTIVAL DANZARTE ${opts.ano} · el N° es correlativo, NO es un puesto: el orden es aleatorio`,
+        ancho / 2,
+        alto - 24,
+        { align: 'center' },
+      );
+      doc.setTextColor(0);
+    },
   });
 
   const url = URL.createObjectURL(doc.output('blob'));

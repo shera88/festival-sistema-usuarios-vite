@@ -31,7 +31,9 @@ const PerfilPage = lazy(() =>
 const AdminPagosTab = lazy(() =>
   import('./tabs/AdminPagosTab').then((m) => ({ default: m.AdminPagosTab })),
 );
-// Solo la abren los super admins: no vale la pena en el bundle inicial.
+// Lazy como los formularios. Ojo: NO es por jspdf — ese ya entra por import()
+// dentro de nominados-pdf.ts y no está en este chunk. Es por la vista en sí,
+// que ahora la abre todo el portal y no hace falta hasta que se entra a ella.
 const NominadosTab = lazy(() =>
   import('./tabs/NominadosTab').then((m) => ({ default: m.NominadosTab })),
 );
@@ -87,7 +89,7 @@ export function DashboardPage() {
             <Route path="videos" element={<VideosTab />} />
             <Route path="pagos" element={<PagosTab />} />
             <Route path="admin/pagos" element={<AdminPagosTab />} />
-            {/* La guarda vive dentro del componente, como en admin/pagos. */}
+            {/* Abierta a todo el portal: ver NominadosTab y nominados.php. */}
             <Route path="nominados" element={<NominadosTab />} />
             <Route path="inscripcion" element={<InscripcionPage />} />
             <Route

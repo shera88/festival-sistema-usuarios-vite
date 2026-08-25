@@ -16,7 +16,7 @@ export const dataApi = {
   videos: () =>
     api.get<VideosResponse>('/videos.php'),
 
-  /** Nominados por bloque. Solo super admin (el servidor lo exige, no solo la UI). */
+  /** Nominados por bloque. Abierto a toda sesión del portal; sin lugar ni nota. */
   nominados: (year = '2026') =>
     api.get<NominadosResponse>(`/nominados.php?year=${year}`),
 

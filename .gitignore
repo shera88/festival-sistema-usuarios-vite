@@ -93,3 +93,7 @@ scripts/thumbs/salida/
 
 __pycache__/
 *.pyc
+
+# Respaldos que deja el deploy manual de PHP (el original vive en git).
+php-backend/*.bak
+scripts/deploy/_*.py

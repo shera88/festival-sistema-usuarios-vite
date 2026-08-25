@@ -149,8 +149,8 @@ export function useVideos(enabled: boolean) {
   });
 }
 
-/** Nominados por bloque. El orden llega YA mezclado del servidor: no reordenar acá,
- *  y no cachear entre sesiones distintas de super admin. */
+/** Nominados por bloque. El orden llega YA mezclado del servidor: no reordenar acá.
+ *  La mezcla es determinista, así que un refetch no le reacomoda la lista a nadie. */
 export function useNominados(enabled: boolean) {
   return useQuery({
     queryKey: ['nominados'],

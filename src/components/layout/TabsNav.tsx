@@ -27,11 +27,10 @@ export function TabsNav() {
     ...(user?.es_admin
       ? [{ to: '/admin/pagos', label: 'Admin Pagos', color: 'var(--green)', icon: ShieldCheck }]
       : []),
-    // Nominados: SOLO super admins, y por ahora nadie más. El backend lo exige
-    // igual (nominados.php), esto solo evita mostrar una pestaña que daría 403.
-    ...(user?.es_super_admin
-      ? [{ to: '/nominados', label: 'Nominados', color: 'var(--gold)', icon: Trophy }]
-      : []),
+    // Nominados: visible para TODO el portal, bailarines incluidos. No trae
+    // lugar ni nota y el orden viene mezclado del servidor, así que no adelanta
+    // ningún resultado antes de la premiación (ver nominados.php).
+    { to: '/nominados', label: 'Nominados', color: 'var(--gold)', icon: Trophy },
   ];
 
   return (

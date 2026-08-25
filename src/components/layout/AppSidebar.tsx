@@ -47,9 +47,9 @@ export function AppSidebar({ open, onClose }: Props) {
         ...(pagosVisibleParaRol(user) ? [{ to: '/pagos', label: 'Pagos', icon: CreditCard }] : []),
         // Solo admins de pagos (Yacu / Shera / Briza).
         ...(user?.es_admin ? [{ to: '/admin/pagos', label: 'Admin Pagos', icon: ShieldCheck }] : []),
-        // Nominados: SOLO super admins. En el cajón sí va, porque es la unica
-        // via para llegar desde el telefono (la barra inferior no lleva admin).
-        ...(user?.es_super_admin ? [{ to: '/nominados', label: 'Nominados', icon: Trophy }] : []),
+        // Nominados: visible para todo el portal. Sin lugar ni nota y mezclado
+        // en el servidor, no adelanta ningun resultado (ver nominados.php).
+        { to: '/nominados', label: 'Nominados', icon: Trophy },
       ],
     },
     // Formularios: además del permiso de edición, el de Kárdex se filtra por rol

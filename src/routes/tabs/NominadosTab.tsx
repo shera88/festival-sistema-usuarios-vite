@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
 import { Trophy, FileDown, Loader2 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
 import { useNominados } from '@/hooks/queries';
 import { descargarNominadosPdf } from '@/lib/pdf/nominados-pdf';
 import type { NominadosBloque, NominadoItem } from '@/types/domain';
@@ -12,11 +10,12 @@ import type { NominadosBloque, NominadoItem } from '@/types/domain';
  * Lo que NO se ve, y es a propósito: el lugar y la nota. Dentro de cada bloque
  * las agrupaciones vienen MEZCLADAS desde el servidor y numeradas después de
  * mezclar, así el orden no delata quién ganó qué. No reordenar acá, ni ordenar
- * la tabla por ninguna columna.
+ * la tabla por ninguna columna, ni agregar una columna de nota o de puesto.
  *
- * Reservado a SUPER ADMIN. Esta guarda solo esconde la pestaña; la protección
- * de verdad la hace el backend (nominados.php → requireSuperAdmin), porque
- * esconder una vista no impide pedir el endpoint a mano.
+ * ABIERTA A TODO EL PORTAL (2026-08-24). Antes era sólo super admin; ahora la
+ * ve cualquier persona con sesión iniciada. No hace falta guarda de rol acá
+ * porque la respuesta ya no trae nada reservado — y el backend igual exige
+ * sesión (nominados.php → requireAuth), que es donde vive la protección real.
  */
 
 /** Color de la franja según el género, igual que la planilla oficial. */
@@ -33,8 +32,6 @@ const ETIQUETA_GENERO: Record<string, string> = {
 };
 
 export function NominadosTab() {
-  const { user } = useAuth();
-  if (!user?.es_super_admin) return <Navigate to="/calificaciones" replace />;
   return <NominadosContent />;
 }
 
