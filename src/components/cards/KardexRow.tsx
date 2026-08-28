@@ -56,6 +56,7 @@ export function KardexRow({
   const [previewHiResLoaded, setPreviewHiResLoaded] = useState(false);
   const [credPreviewOpen, setCredPreviewOpen] = useState(false);
   const [regenerandoCred, setRegenerandoCred] = useState(false);
+  const [generandoCert, setGenerandoCert] = useState(false);
   // Rotación de foto (giro efímero previsualizado por CSS; se persiste al Guardar).
   const [rot, setRot] = useState(0);
   const [savingRot, setSavingRot] = useState(false);
@@ -97,6 +98,37 @@ export function KardexRow({
   const wa = whatsappLink(row.telefono);
   const fotoOpt = webpProxy(row.foto, 96);
   const hasIdKardex = !!row.id_kardex;
+
+  /**
+   * Certificado de participación, generado EN EL NAVEGADOR.
+   *
+   * No pasa por n8n ni por Storage: se dibuja el arte en un canvas y se baja el
+   * PDF al instante. Así no hace falta pregenerar ~1500 archivos ni esperar a
+   * que la persona aparezca en un lote — el que entra a su kárdex se lo lleva.
+   *
+   * El módulo va por import() dinámico porque arrastra jspdf y qrcode (~400 KB):
+   * no tiene sentido que los cargue todo el que abre el portal.
+   */
+  const handleCertificado = async () => {
+    if (generandoCert) return;
+    setGenerandoCert(true);
+    try {
+      const { descargarCertificado } = await import('@/lib/pdf/certificado-pdf');
+      await descargarCertificado({
+        nombre,
+        agrupacion: row.agrupacion || '',
+        idKardex: row.id_kardex ?? null,
+      });
+    } catch (e) {
+      setInfoMsg({
+        title: 'No se pudo generar el certificado',
+        body: e instanceof Error ? e.message : 'Intente de nuevo en un momento.',
+      });
+      setInfoOpen(true);
+    } finally {
+      setGenerandoCert(false);
+    }
+  };
   const canRotar = canEdit && !locked && hasIdKardex && !!row.foto;
 
   // Fila PROPIA de un usuario solo-lectura (bailarín): puede cambiar SU foto de
@@ -105,6 +137,12 @@ export function KardexRow({
   const ciUser = soloDigitos(user?.numero_de_carnet);
   const isOwnRow = ciUser !== '' && soloDigitos(row.ci) === ciUser;
   const canOwnFoto = !canManage && isOwnRow && isCurrentYear && hasIdKardex && !locked;
+  /** Datos personales (teléfono, correo, CI): el staff los ve todos; el
+   *  bailarín, sólo los suyos. */
+  const verDatosSensibles = canManage || isOwnRow;
+  /** El certificado lo baja cada quien: el bailarín SÓLO el suyo. El staff
+   *  puede bajar el de cualquiera de su agrupación, que es como reparte. */
+  const puedeBajarCertificado = canManage || isOwnRow;
 
   async function handleOwnFotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -435,7 +473,7 @@ export function KardexRow({
             (antes se desparramaban sueltos, con el switch cayendo a la izquierda). */}
         <div className="flex w-full items-center justify-end gap-2 sm:w-auto sm:gap-3">
 
-        {wa && (
+        {wa && verDatosSensibles && (
           <a
             href={wa}
             target="_blank"
@@ -560,9 +598,19 @@ export function KardexRow({
 
           {/* Detalles */}
           <div className="space-y-1.5 px-4 py-3 text-[11px]">
-            <Detail label="Teléfono" value={row.telefono} />
-            <Detail label="Correo" value={row.correo_electronico} />
-            <Detail label="CI" value={row.ci} />
+            {/* Teléfono, correo y CI son datos personales, y el CI ADEMÁS es la
+                contraseña con la que se entra al portal. Un usuario de sólo
+                lectura (bailarín) los ve únicamente en SU propia fila: si no,
+                abrir el kárdex a toda la agrupación le entregaría la clave de
+                cada uno de sus compañeros. El staff sí los ve todos, que es lo
+                que necesita para gestionar. */}
+            {verDatosSensibles ? (
+              <>
+                <Detail label="Teléfono" value={row.telefono} />
+                <Detail label="Correo" value={row.correo_electronico} />
+                <Detail label="CI" value={row.ci} />
+              </>
+            ) : null}
             <Detail label="Ciudad" value={row.ciudad} />
             <Detail label="Edad" value={row.edad} />
             <Detail label="Estado" value={row.estado} />
@@ -611,6 +659,7 @@ export function KardexRow({
               // Año actual (2026): credencial real desde Storage (preview + descarga);
               // certificado aún no disponible → mensaje.
               <div className="mt-2 flex flex-wrap gap-2 pt-1">
+                {puedeBajarCertificado && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -621,20 +670,21 @@ export function KardexRow({
                 >
                   Credencial
                 </button>
+                )}
+                {puedeBajarCertificado && (
                 <button
                   type="button"
+                  disabled={generandoCert}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setInfoMsg({
-                      title: 'Certificado',
-                      body: 'Los certificados se entregarán al finalizar el festival.',
-                    });
-                    setInfoOpen(true);
+                    void handleCertificado();
                   }}
-                  className="rounded-md border border-fuchsia/40 bg-fuchsia/10 px-2.5 py-1 text-[11px] font-medium text-fuchsia transition hover:bg-fuchsia/20"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-fuchsia/40 bg-fuchsia/10 px-2.5 py-1 text-[11px] font-medium text-fuchsia transition hover:bg-fuchsia/20 disabled:opacity-50"
                 >
-                  Certificado
+                  {generandoCert && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {generandoCert ? 'Generando…' : 'Certificado'}
                 </button>
+                )}
               </div>
             ) : (row.enlace_del_credencial || row.enlace_del_certificado) ? (
               // Años pasados: enlaces históricos (Google Doc / PDF) tal cual.

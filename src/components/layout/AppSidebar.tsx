@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, Trophy, type LucideIcon } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 import { useAuth } from '@/hooks/useAuth';
-import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol } from '@/lib/roles';
+import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol, kardexGestionParaRol } from '@/lib/roles';
 import { INSCRIPCION_ABIERTA } from '@/lib/flags';
 
 interface Props {
@@ -60,7 +60,9 @@ export function AppSidebar({ open, onClose }: Props) {
           items: FORM_ITEMS.filter(
             (i) =>
               (INSCRIPCION_ABIERTA || i.to !== '/inscripcion') &&
-              (i.to !== '/kardex-form' || kardexVisibleParaRol(user)),
+              // El formulario de kárdex es de gestión: el bailarín ve la lista
+              // pero no da de alta a nadie.
+              (i.to !== '/kardex-form' || kardexGestionParaRol(user)),
           ),
         }]
       : []),

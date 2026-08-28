@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { kardexApi } from '@/lib/api/kardex';
 import { webpProxy } from '@/lib/utils/img';
 import { useAuth } from '@/hooks/useAuth';
+import { kardexGestionParaRol } from '@/lib/roles';
 import type { AgrupacionMeta } from '@/routes/tabs/KardexTab';
 
 interface Props {
@@ -57,12 +58,19 @@ export function KardexGroup({ year, agrupacion, logo, rows, meta }: Props) {
   // El super admin hace todo: edita/rota/verifica/elimina en cualquier
   // agrupación, incluso si está cerrada (el backend aplica el mismo bypass).
   const isSuperAdmin = !!user?.es_super_admin;
-  // canManage: representante/coreógrafo/director y staff de kárdex (puede_editar).
-  // Los logins de kárdex BAILARIN (puede_editar=false) son solo lectura.
-  const canManage = puedeEditar || isSuperAdmin;
+  // canManage: SOLO el staff de la agrupación (encargado, director, coreógrafo).
+  //
+  // Antes esto era `puedeEditar || isSuperAdmin`, dando por hecho que un
+  // bailarín llegaba con `puede_editar=false`. NO es así: al iniciar sesión como
+  // PARTICIPANTE el flag vuelve en `true`. Mientras el kárdex era solo del staff
+  // daba igual — nadie más entraba. Ahora que lo ve todo el mundo, ese `||`
+  // le habría dado a cada bailarín permiso para editar, verificar y eliminar a
+  // sus compañeros. El discriminador correcto es el ROL.
+  const esStaff = kardexGestionParaRol(user);
+  const canManage = (esStaff && puedeEditar) || isSuperAdmin;
   const cerrada = (meta?.estado_credenciales ?? '').toLowerCase() === 'completo';
   const isCurrentYear = year === '2026';
-  const canEdit = isCurrentYear && ((puedeEditar && !cerrada) || isSuperAdmin);
+  const canEdit = isCurrentYear && ((esStaff && puedeEditar && !cerrada) || isSuperAdmin);
   const canClose = canManage && isCurrentYear && !cerrada && !!meta?.id_agrupacion;
   const canReopen = canManage && isCurrentYear && cerrada && !!meta?.id_agrupacion;
 
