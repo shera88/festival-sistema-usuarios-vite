@@ -34,9 +34,8 @@ export interface SearchResult {
   id: string;
   id_contacto: string;
   nombre: string;
-  carnet: string | null;
-  telefono: string | null;
-  email: string | null;
+  // Sin carnet, teléfono ni correo a propósito: search-participants.php es
+  // público (lo usa la pantalla de login) y el carnet es la contraseña.
   ciudad: string | null;
   rol: string | null;
   foto: string | null;
@@ -435,4 +434,78 @@ export interface NominadosResponse {
   ano: string;
   total: number;
   bloques: NominadosBloque[];
+}
+
+/** Una obra de la ronda final, con su resultado. Solo para super admin. */
+export interface GanadorItem {
+  id_inscripcion: string;
+  n?: number;
+  pos?: number;
+  agrupacion: string;
+  obra: string;
+  categoria: string;
+  modalidad: string;
+  division: string;
+  subdivision: string;
+  genero: string;
+  nota: number;
+  jurados: number;
+  /** PRIMER | SEGUNDO | TERCER, o null si no alcanzo placa. */
+  lugar: string | null;
+  sin_lugar: boolean;
+  logo?: string | null;
+}
+
+export interface GanadoresBloque {
+  label: string;
+  genero: string;
+  items: GanadorItem[];
+}
+
+/** Un cuadro por genero: TODOS los de la ronda final, de mayor a menor nota. */
+export interface GanadoresCuadro {
+  clave: string;
+  titulo: string;
+  total: number;
+  items: GanadorItem[];
+}
+
+export interface GanadoresResponse {
+  ano: string;
+  total: number;
+  bloques: GanadoresBloque[];
+  absolutos: GanadoresCuadro[];
+}
+
+/** Lo que puso UN jurado en la ronda final. Solo super admin. */
+export interface CalificacionFinal {
+  id_jurado: string | null;
+  jurado: string;
+  foto?: string | null;
+  tematica: number | null;
+  interpretacion: number | null;
+  coreografia: number | null;
+  dificultad: number | null;
+  total: number | null;
+  comentario: string | null;
+}
+
+export interface GanadorDetalle {
+  obra: {
+    id_inscripcion: string;
+    agrupacion: string;
+    obra: string;
+    categoria: string;
+    modalidad: string;
+    division: string;
+    subdivision: string;
+    coreografo: string | null;
+    director: string | null;
+    dia: string | null;
+    dia_final: string | null;
+    logo?: string | null;
+  };
+  nota: number | null;
+  jurados: number;
+  calificaciones: CalificacionFinal[];
 }

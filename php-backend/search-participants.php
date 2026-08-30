@@ -19,7 +19,7 @@ $rows = supabase()->rpc('search_login_users', ['p_query' => $q]);
 // cuya agrupación matchee el texto. Merge + dedupe por id_contacto.
 $porAgrupacion = supabase()->selectRaw(
     'festival_contactos_global',
-    'select=id_contacto,numero_de_carnet,nombre_y_apellido,telefono,correo_electronico,ciudad,imagen_contacto,id_agrupacion,nombre_agrupacion,enlace_del_logo,rol_primario,es_representante,es_director,es_coreografo,id_original_representante,id_original_director,id_original_coreografo'
+    'select=id_contacto,nombre_y_apellido,ciudad,imagen_contacto,id_agrupacion,nombre_agrupacion,enlace_del_logo,rol_primario,es_representante,es_director,es_coreografo,id_original_representante,id_original_director,id_original_coreografo'
     . '&nombre_agrupacion=ilike.' . rawurlencode('*' . $q . '*')
     . '&limit=15'
 );
@@ -36,14 +36,17 @@ foreach ($porAgrupacion as $r) {
     $rows[] = $r;
 }
 
+// Este endpoint NO pide sesión: es el buscador de la pantalla de login, así que
+// cualquiera en internet puede llamarlo. Por eso no puede devolver el carnet:
+// desde la migración 003 el carnet ES la contraseña, y publicarlo junto al
+// nombre equivale a regalar la credencial. Tampoco teléfono ni correo, que no
+// los pinta nadie: el buscador sólo muestra foto, nombre, rol y agrupación.
+// Si alguna vista necesita esos datos, que los pida a un endpoint con sesión.
 $normalized = array_map(function ($c) {
     return [
         'id'                          => $c['id_contacto'] ?? null,
         'id_contacto'                 => $c['id_contacto'] ?? null,
         'nombre'                      => $c['nombre_y_apellido'] ?? null,
-        'carnet'                      => $c['numero_de_carnet'] ?? null,
-        'telefono'                    => $c['telefono'] ?? null,
-        'email'                       => $c['correo_electronico'] ?? null,
         'ciudad'                      => $c['ciudad'] ?? null,
         'rol'                         => $c['rol_primario'] ?? null,
         'foto'                        => $c['imagen_contacto'] ?? null,

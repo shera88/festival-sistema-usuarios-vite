@@ -105,7 +105,7 @@ export function LoginPage() {
 
         <h2 className="text-center text-xl font-semibold text-text-90 mb-1">Mi Cuenta</h2>
         <p className="text-center text-sm text-text-45 mb-6">
-          Ingrese con su carnet o teléfono
+          Ingrese con su número de carnet
         </p>
 
         {error && (
