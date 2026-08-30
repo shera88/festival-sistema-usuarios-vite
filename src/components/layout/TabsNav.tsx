@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, Trophy, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, Trophy, Crown, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol } from '@/lib/roles';
 
@@ -31,6 +31,11 @@ export function TabsNav() {
     // lugar ni nota y el orden viene mezclado del servidor, así que no adelanta
     // ningún resultado antes de la premiación (ver nominados.php).
     { to: '/nominados', label: 'Nominados', color: 'var(--gold)', icon: Trophy },
+    // Ganadores: los resultados REALES, con lugar y nota. SOLO super admin —
+    // lo contrario de Nominados, que es publico justamente porque los esconde.
+    ...(user?.es_super_admin
+      ? [{ to: '/ganadores', label: 'Ganadores', color: 'var(--gold)', icon: Crown }]
+      : []),
   ];
 
   return (

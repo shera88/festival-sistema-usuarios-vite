@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, Trophy, type LucideIcon } from 'lucide-react';
+import { FilePlus, FileText, IdCard, X, ClipboardList, Users, Award, CalendarClock, Video, CreditCard, ShieldCheck, Trophy, Crown, type LucideIcon } from 'lucide-react';
 import logoUrl from '@/assets/logo-danzarte.png';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol, kardexGestionParaRol } from '@/lib/roles';
@@ -50,6 +50,9 @@ export function AppSidebar({ open, onClose }: Props) {
         // Nominados: visible para todo el portal. Sin lugar ni nota y mezclado
         // en el servidor, no adelanta ningun resultado (ver nominados.php).
         { to: '/nominados', label: 'Nominados', icon: Trophy },
+        // Ganadores: los resultados REALES, con lugar y nota. SOLO super admin —
+        // lo contrario de Nominados, que es publico justamente porque los esconde.
+        ...(user?.es_super_admin ? [{ to: '/ganadores', label: 'Ganadores', icon: Crown }] : []),
       ],
     },
     // Formularios: además del permiso de edición, el de Kárdex se filtra por rol

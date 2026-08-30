@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, Trophy, type LucideIcon } from 'lucide-react';
+import { ClipboardList, Users, Award, CalendarClock, Video, CreditCard, Trophy, Crown, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { pagosVisibleParaRol, inscripcionesVisibleParaRol, kardexVisibleParaRol } from '@/lib/roles';
 
@@ -24,6 +24,11 @@ export function BottomNav() {
     // Nominados: visible para todo el portal, a diferencia de Admin Pagos —que
     // a propósito no está acá—. No adelanta ningún resultado (ver nominados.php).
     { to: '/nominados', label: 'Nomin.', icon: Trophy, color: 'var(--gold)' },
+    // Ganadores: los resultados REALES, con lugar y nota. SOLO super admin —
+    // lo contrario de Nominados, que es publico justamente porque los esconde.
+    ...(user?.es_super_admin
+      ? [{ to: '/ganadores', label: 'Ganad.', icon: Crown, color: 'var(--gold)' }]
+      : []),
   ];
 
   return (

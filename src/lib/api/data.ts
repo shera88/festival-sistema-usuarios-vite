@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { Bootstrap, Inscripcion, KardexRow, Nota, Year, YearNotas, VideosResponse, NominadosResponse } from '@/types/domain';
+import type { Bootstrap, Inscripcion, KardexRow, Nota, Year, YearNotas, VideosResponse, NominadosResponse, GanadoresResponse, GanadorDetalle } from '@/types/domain';
 
 export const dataApi = {
   bootstrap: () => api.get<Bootstrap>('/bootstrap.php'),
@@ -19,6 +19,14 @@ export const dataApi = {
   /** Nominados por bloque. Abierto a toda sesión del portal; sin lugar ni nota. */
   nominados: (year = '2026') =>
     api.get<NominadosResponse>(`/nominados.php?year=${year}`),
+
+  /** Resultados reales del festival. SOLO super admin (el servidor lo exige). */
+  ganadores: (year = '2026') =>
+    api.get<GanadoresResponse>(`/ganadores.php?year=${year}`),
+
+  /** Notas de la ronda final de UNA obra, jurado por jurado. SOLO super admin. */
+  ganadorDetalle: (id: string) =>
+    api.get<GanadorDetalle>(`/ganador-detalle.php?id=${encodeURIComponent(id)}`),
 
   /** Inicia el checkout de una membresía (videos | paquete) → URL de pago de WooCommerce. */
   membresiaCheckout: (tipo: 'videos' | 'paquete' = 'videos') =>

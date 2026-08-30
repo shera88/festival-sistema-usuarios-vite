@@ -37,6 +37,10 @@ const AdminPagosTab = lazy(() =>
 const NominadosTab = lazy(() =>
   import('./tabs/NominadosTab').then((m) => ({ default: m.NominadosTab })),
 );
+// Solo la abren los super admins: fuera del bundle inicial.
+const GanadoresTab = lazy(() =>
+  import('./tabs/GanadoresTab').then((m) => ({ default: m.GanadoresTab })),
+);
 
 function RouteFallback() {
   return (
@@ -91,6 +95,7 @@ export function DashboardPage() {
             <Route path="admin/pagos" element={<AdminPagosTab />} />
             {/* Abierta a todo el portal: ver NominadosTab y nominados.php. */}
             <Route path="nominados" element={<NominadosTab />} />
+            <Route path="ganadores" element={<GanadoresTab />} />
             <Route path="inscripcion" element={<InscripcionPage />} />
             <Route
               path="kardex-form"

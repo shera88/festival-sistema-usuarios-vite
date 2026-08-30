@@ -158,6 +158,25 @@ export function useNominados(enabled: boolean) {
     enabled,
   });
 }
+/** Resultados del festival (super admin). El orden ya viene resuelto del
+ *  servidor: por nota en los cuadros, por planilla en las categorias. */
+export function useGanadores(enabled: boolean) {
+  return useQuery({
+    queryKey: ['ganadores'],
+    queryFn: () => dataApi.ganadores(),
+    enabled,
+  });
+}
+/** Detalle de una obra. `id` null = modal cerrado, no se pide nada. */
+export function useGanadorDetalle(id: string | null) {
+  return useQuery({
+    queryKey: ['ganador-detalle', id],
+    queryFn: () => dataApi.ganadorDetalle(id as string),
+    enabled: !!id,
+  });
+}
+
+
 
 export function usePagos(year: Year, enabled: boolean) {
   return useQuery({
