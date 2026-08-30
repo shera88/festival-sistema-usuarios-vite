@@ -80,9 +80,13 @@ export function VideosTab() {
   const unlockPrice = membresia?.reservo
     ? MEMBRESIA_VIDEOS.precioReserva
     : MEMBRESIA_VIDEOS.precioRegular;
+  // Quien reservó en el kárdex paga 40 y la oferta no lo toca: ya paga menos.
+  // El resto paga la oferta si está abierta, y si no, el precio regular.
   const paquetePrice = membresia?.paquete_reservo
     ? MEMBRESIA_PAQUETE.precioReserva
-    : MEMBRESIA_PAQUETE.precioRegular;
+    : (MEMBRESIA_PAQUETE.precioOferta ?? MEMBRESIA_PAQUETE.precioRegular);
+  // Se tacha el precio regular siempre que se esté pagando menos que él.
+  const paqueteTachado = paquetePrice < MEMBRESIA_PAQUETE.precioRegular;
 
   async function handleUnlock(tipo: 'videos' | 'paquete' = 'videos') {
     if (unlocking) return;
@@ -220,17 +224,19 @@ export function VideosTab() {
               <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-text-white">
                 Paquete Completo 2026
                 <span className="rounded-full border border-[rgba(251,191,36,0.45)] bg-[rgba(251,191,36,0.14)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[var(--amber-accent)]">
-                  Oferta{membresia.paquete_reservo ? ` −${Math.round((1 - MEMBRESIA_PAQUETE.precioReserva / MEMBRESIA_PAQUETE.precioRegular) * 100)}%` : ''}
+                  Oferta{paqueteTachado ? ` −${Math.round((1 - paquetePrice / MEMBRESIA_PAQUETE.precioRegular) * 100)}%` : ''}
                 </span>
               </p>
               <p className="mt-0.5 text-xs text-text-65">
-                Accedé a TODOS los videos del festival, no solo los tuyos.
+                Acceda a TODOS los videos del festival, no solo a los suyos.
               </p>
-              {membresia.paquete_reservo && (
-                <p className="mt-1 text-[11px] font-semibold text-[var(--amber-accent)]">
-                  Precio de preventa · por tiempo limitado
-                </p>
-              )}
+              {paqueteTachado && (
+                  <p className="mt-1 text-[11px] font-semibold text-[var(--amber-accent)]">
+                    {membresia.paquete_reservo
+                      ? 'Precio de preventa · por tiempo limitado'
+                      : 'Oferta especial · hasta que termine la premiación'}
+                  </p>
+                )}
             </div>
             <button
               type="button"
@@ -243,9 +249,9 @@ export function VideosTab() {
               ) : (
                 <>
                   Comprar ·{' '}
-                  {membresia.paquete_reservo && (
-                    <s className="mr-1 font-normal opacity-60">{MEMBRESIA_PAQUETE.precioRegular} Bs</s>
-                  )}
+                  {paqueteTachado && (
+                      <s className="mr-1 font-normal opacity-60">{MEMBRESIA_PAQUETE.precioRegular} Bs</s>
+                    )}
                   {paquetePrice} Bs
                 </>
               )}

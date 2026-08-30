@@ -122,8 +122,12 @@ try {
 $payUrl = rtrim($wc['site_url'], '/') . '/checkout/order-pay/' . (int)$order['id']
         . '/?pay_for_order=true&key=' . rawurlencode((string)($order['order_key'] ?? ''));
 
+// El precio se devuelve TAL COMO lo calculo WooCommerce, no como una constante
+// de aca: si el producto entra en oferta (hoy sale_price 70 sobre 80), esto lo
+// refleja solo. Una constante duplicada es la forma segura de terminar mostrando
+// un precio y cobrando otro.
 sendJson([
     'pay_url'  => $payUrl,
     'order_id' => (int)$order['id'],
-    'precio'   => 80,
+    'precio'   => (float)($order['total'] ?? 0),
 ]);

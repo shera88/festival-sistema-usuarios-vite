@@ -158,6 +158,8 @@ $payUrl = rtrim($wc['site_url'], '/') . '/checkout/order-pay/' . (int)$order['id
 sendJson([
     'pay_url'  => $payUrl,
     'order_id' => (int)$order['id'],
-    'precio'   => $reservo ? $precioReserva : $precioRegular,
+    // Lo que Woo cobro de verdad, no la constante de arriba: con el paquete en
+    // oferta (sale_price 70) las dos cosas ya no coinciden.
+    'precio'   => (float)($order['total'] ?? ($reservo ? $precioReserva : $precioRegular)),
     'tipo'     => $tipo,
 ]);

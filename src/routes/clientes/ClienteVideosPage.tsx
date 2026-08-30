@@ -28,6 +28,11 @@ export function ClienteVideosPage() {
   const [activo, setActivo] = useState<VideoItem | null>(null);
   const [comprando, setComprando] = useState(false);
 
+  // Un cliente nunca reservó en el kárdex, así que o paga la oferta o el precio
+  // regular. El tachado sale del mismo dato, no de un texto suelto.
+  const precioPaquete = MEMBRESIA_PAQUETE.precioOferta ?? MEMBRESIA_PAQUETE.precioRegular;
+  const hayOferta = precioPaquete < MEMBRESIA_PAQUETE.precioRegular;
+
   /**
    * Crea la orden en WooCommerce y manda a pagar.
    *
@@ -131,13 +136,28 @@ export function ClienteVideosPage() {
             Con el Paquete Completo ve las {todos.length} presentaciones del XVIII Festival
             Danzarte 2026. Sin la membresía puede ver una vista previa de cada una.
           </p>
+          {hayOferta && (
+            <p className="mt-1.5 text-[12px] font-semibold" style={{ color: 'var(--gold)' }}>
+              Oferta especial · hasta que termine la premiación
+            </p>
+          )}
           <button
             type="button"
             onClick={comprar}
             disabled={comprando}
             className="mt-3 inline-flex items-center justify-center rounded-lg bg-[linear-gradient(135deg,var(--cyan),var(--fuchsia))] px-5 py-2.5 text-[12px] font-semibold uppercase tracking-wide text-white shadow-lg transition hover:opacity-95 disabled:opacity-50"
           >
-            {comprando ? 'Abriendo el pago…' : `Comprar por Bs ${MEMBRESIA_PAQUETE.precioRegular}`}
+            {comprando ? (
+              'Abriendo el pago…'
+            ) : (
+              <>
+                Comprar por{' '}
+                {hayOferta && (
+                  <s className="mx-1 font-normal opacity-60">Bs {MEMBRESIA_PAQUETE.precioRegular}</s>
+                )}
+                Bs {precioPaquete}
+              </>
+            )}
           </button>
         </div>
       )}
@@ -223,7 +243,7 @@ export function ClienteVideosPage() {
         video={activo}
         onClose={() => setActivo(null)}
         preview={activo?.bloqueado ?? false}
-        unlockPrice={MEMBRESIA_PAQUETE.precioRegular}
+        unlockPrice={precioPaquete}
         onUnlock={comprar}
         unlocking={comprando}
       />
