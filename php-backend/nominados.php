@@ -9,7 +9,7 @@ declare(strict_types=1);
  * deducir quién ganó qué antes de la premiación.
  *
  * Tres cosas lo garantizan, y hacen falta las tres:
- *   1. El lugar y la nota no salen en la respuesta. Se calculan acá adentro
+ *   1. El lugar y la nota no salen en la respuesta. Se calculan aquí adentro
  *      sólo para decidir QUIÉNES entran, y se descartan.
  *   2. El orden dentro de cada bloque se MEZCLA, y la numeración se asigna
  *      DESPUÉS de mezclar. Si se enviara en orden de nota, el primero de la
@@ -45,10 +45,14 @@ declare(strict_types=1);
 
 require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
+require_once __DIR__ . '/_lib/auth-cliente.php';
 
 handlePreflight();
 requireMethod('GET');
-requireAuth();
+// Participante O cliente de membresía: los dos ven lo mismo aquí. Esta lista ya
+// va mezclada y sin el lugar justamente para poder mostrarse afuera, así que
+// abrirla al comprador de la membresía no expone nada nuevo.
+requireParticipanteOCliente();
 
 $year = preg_replace('/\D/', '', (string)($_GET['year'] ?? '2026'));
 if ($year !== '2026') {           // la ronda final sólo existe en 2026
@@ -123,7 +127,7 @@ function nomLugarPorNota(?float $nota): ?string
  * Sigue cumpliendo lo único que importa: el orden no guarda relación con la
  * nota. Y es estable en el tiempo, así que no se reacomoda al recargar.
  *
- * Si se cambia la semilla o la fórmula acá, hay que cambiarla igual en
+ * Si se cambia la semilla o la fórmula aquí, hay que cambiarla igual en
  * sql/nominados_publico.sql del repo de la landing, o los dos vuelven a diferir.
  */
 function nomMezclar(array $items, string $semilla, string $etiqueta): array
@@ -346,7 +350,7 @@ foreach ($obras as $o) {
     if (!isset($bloques[$etiqueta])) {
         $bloques[$etiqueta] = ['label' => $etiqueta, 'genero' => $genero, 'items' => []];
     }
-    // A partir de acá el LUGAR y la NOTA ya cumplieron su función y se tiran.
+    // A partir de aquí el LUGAR y la NOTA ya cumplieron su función y se tiran.
     $bloques[$etiqueta]['items'][] = [
         'agrupacion' => nomLimpiar($o['agrupacion'] ?? ''),
         'obra'       => nomLimpiar($o['nombre_de_la_obra'] ?? ''),
