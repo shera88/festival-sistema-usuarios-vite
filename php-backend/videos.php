@@ -40,7 +40,8 @@ $membresia = estadoMembresia($user);
 //  - Membresía de Videos pagada → los videos de SU agrupación, desbloqueados.
 //  - Ninguna → los de su agrupación, bloqueados (upsell).
 if (!empty($membresia['paquete_pagada'])) {
-    $qs = "url_video=not.is.null&select=$select2026&order=dia.asc,orden.asc&limit=3000";
+    // Cualquiera de los dos videos: hay obras que sólo tienen el de la final.
+        $qs = "or=(url_video.not.is.null,url_video_final.not.is.null)&select=$select2026&order=dia.asc,orden.asc&limit=3000";
     $rows = supabase()->selectRaw('registro_de_inscripcion_2026', $qs);
     if (count($rows) > 0) {
         foreach ($rows as &$r) { $r['bloqueado'] = false; }
@@ -50,7 +51,7 @@ if (!empty($membresia['paquete_pagada'])) {
 } else {
     $filter2026 = buildContextFilter($user, true);
     if ($filter2026) {
-        $qs = $filter2026 . "&url_video=not.is.null&select=$select2026&limit=300";
+        $qs = $filter2026 . "&or=(url_video.not.is.null,url_video_final.not.is.null)&select=$select2026&limit=300";
         $rows = supabase()->selectRaw('registro_de_inscripcion_2026', $qs);
         if (count($rows) > 0) {
             $bloqueado = !$membresia['pagada'];

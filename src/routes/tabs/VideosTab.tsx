@@ -13,21 +13,14 @@ import { toast } from 'sonner';
 import { dataApi } from '@/lib/api/data';
 import { MEMBRESIA_VIDEOS, MEMBRESIA_PAQUETE } from '@/lib/membresia';
 import type { VideoItem } from '@/types/domain';
+import { DIAS_VISIBLES, conFinales } from '@/lib/videos-finales';
 
 function norm(s: string | null | undefined): string {
   return (s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
-/* Botones de filtro rápido por día.
-   Las noches FINALES (sábado y domingo) todavía no se publican, así que sus
-   botones no aparecen. Para mostrarlos cuando llegue el momento: poner
-   MOSTRAR_NOCHES_FINALES en true. No hay que tocar nada más. */
-const MOSTRAR_NOCHES_FINALES = false;
-const DIAS_CLASIFICATORIOS = ['MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES'] as const;
-const DIAS_FINALES = ['SABADO', 'DOMINGO'] as const;
-const DIAS_VISIBLES: readonly string[] = MOSTRAR_NOCHES_FINALES
-  ? [...DIAS_CLASIFICATORIOS, ...DIAS_FINALES]
-  : DIAS_CLASIFICATORIOS;
+/* Los días con botón de filtro rápido y la publicación de las noches finales
+   viven en @/lib/videos-finales, que comparten los dos portales. */
 
 /** Etiqueta bonita para el botón (los datos vienen sin tilde y en mayúsculas). */
 const ETIQUETA_DIA: Record<string, string> = {
@@ -44,28 +37,6 @@ function diaClave(d: string | null | undefined): string {
   return (d ?? '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
-/**
- * Añade los videos de las NOCHES FINALES como entradas propias.
- *
- * Una obra que llegó a la final tiene DOS videos: el de la noche en que bailó
- * (`url_video`) y el de la final (`url_video_final`), que es otra presentación.
- * Mientras las finales no estén habilitadas esta función no agrega nada, así que
- * esos videos no se ven aunque ya estén subidos.
- */
-function conFinales(items: VideoItem[]): VideoItem[] {
-  if (!MOSTRAR_NOCHES_FINALES) return items;
-  const finales = items
-    .filter((v) => (v.url_video_final ?? '').trim() !== '' && (v.dia_final ?? '').trim() !== '')
-    .map((v) => ({
-      ...v,
-      // La entrada de la final se identifica por su propio día y orden.
-      id_inscripcion: `${v.id_inscripcion}-final`,
-      url_video: v.url_video_final as string,
-      dia: v.dia_final as string,
-      orden: v.orden_final ?? v.orden,
-    }));
-  return [...items, ...finales];
-}
 
 export function VideosTab() {
   const { user } = useAuth();

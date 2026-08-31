@@ -33,9 +33,12 @@ $select = 'id_inscripcion,orden,dia,agrupacion,enlace_del_logo,nombre_de_la_obra
     . 'url_video_final,dia_final,orden_final';
 
 $videos = [];
+// Entra la obra que tenga CUALQUIERA de los dos videos. 21 obras del festival
+// sólo tienen el de la noche final —no bailaron clasificatoria o no se subió—
+// y con el filtro viejo, que exigía url_video, quedaban invisibles.
 $rows = supabase()->selectRaw(
     'registro_de_inscripcion_2026',
-    "url_video=not.is.null&select=$select&order=dia.asc,orden.asc&limit=3000"
+    "or=(url_video.not.is.null,url_video_final.not.is.null)&select=$select&order=dia.asc,orden.asc&limit=3000"
 );
 
 if (is_array($rows) && count($rows) > 0) {

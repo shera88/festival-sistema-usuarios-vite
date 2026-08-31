@@ -9,6 +9,7 @@ import { clientesApi } from '@/lib/api/clientes';
 import { useVideosCliente } from '@/hooks/queries-clientes';
 import { dayOrderIndex } from '@/lib/utils/days';
 import { MEMBRESIA_PAQUETE } from '@/lib/membresia';
+import { conFinales } from '@/lib/videos-finales';
 import type { VideoItem } from '@/types/domain';
 
 /**
@@ -75,7 +76,12 @@ export function ClienteVideosPage() {
     return () => window.clearInterval(id);
   }, [pagado, volviendoDePagar, refrescar]);
 
-  const todos: VideoItem[] = useMemo(() => data?.videos?.['2026'] ?? [], [data]);
+  // Los videos de las noches finales (sábado y domingo) son presentaciones
+  // distintas de las clasificatorias, así que entran como entradas propias.
+  const todos: VideoItem[] = useMemo(
+    () => conFinales(data?.videos?.['2026'] ?? []),
+    [data],
+  );
 
   const dias = useMemo(() => {
     const s = new Set<string>();
