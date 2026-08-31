@@ -7,7 +7,7 @@ import { AuthGuard } from '@/components/auth/AuthGuard';
 import { ClienteAuthProvider } from '@/hooks/ClienteAuthProvider';
 import { ClienteGuard } from '@/components/auth/ClienteGuard';
 import { ClienteLoginPage } from '@/routes/ClienteLoginPage';
-import { ClienteRegistroPage } from '@/routes/ClienteRegistroPage';
+import { ClienteCompraPage } from '@/routes/clientes/ClienteCompraPage';
 import { ClienteShell } from '@/routes/clientes/ClienteShell';
 import { ClienteVideosPage } from '@/routes/clientes/ClienteVideosPage';
 import { ClienteNominadosPage } from '@/routes/clientes/ClienteNominadosPage';
@@ -39,7 +39,10 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/clientes/login" element={<ClienteLoginPage />} />
-            <Route path="/clientes/registro" element={<ClienteRegistroPage />} />
+            {/* Pantalla promocional + checkout. Es la URL que se enlaza desde el
+                header del festival, por eso se conserva el nombre /registro. */}
+            <Route path="/clientes/registro" element={<ClienteCompraPage />} />
+            <Route path="/clientes/comprar" element={<Navigate to="/clientes/registro" replace />} />
             <Route
               path="/clientes"
               element={

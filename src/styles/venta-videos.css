@@ -1,0 +1,215 @@
+/* ============================================================
+   Estilo de la web del festival, traído al portal SOLO para la
+   página de venta de la membresía de videos.
+   ============================================================
+
+   Esta pantalla es la continuación de festivaldanzarte.com: la persona llega
+   desde el header del sitio y no tiene por qué notar que cambió de aplicación.
+   Por eso usa el lenguaje visual del landing (fondo cósmico, títulos con
+   degradado, tarjetas de vidrio, botones pastilla) y no el del panel.
+
+   TODO cuelga de `.fdz-venta`. Nada de esto se filtra al resto del portal, que
+   conserva sus propios tokens: es una isla, no un cambio de tema global.
+*/
+
+.fdz-venta {
+  position: relative;
+  isolation: isolate;
+  background-color: #08051e;
+  font-weight: 300;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+
+  --venta-cyan: #00e5ff;
+  --venta-fuchsia: #ff1fa8;
+  --venta-violeta: #a33ccb;
+}
+
+/* Fondo cósmico: nebulosas + estrellas. Fijo, no scrollea. Mismo tratamiento
+   que el body del landing, pero acotado a este contenedor. */
+.fdz-venta::before,
+.fdz-venta::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.fdz-venta::before {
+  background:
+    radial-gradient(ellipse 60% 40% at 18% 22%, rgba(255, 31, 168, 0.12), transparent 65%),
+    radial-gradient(ellipse 50% 35% at 82% 78%, rgba(0, 229, 255, 0.1), transparent 65%),
+    radial-gradient(ellipse 80% 50% at 50% 110%, rgba(99, 32, 255, 0.08), transparent 70%);
+}
+
+.fdz-venta::after {
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.5) 0.5px, transparent 1px),
+    radial-gradient(circle at 47% 72%, rgba(255, 255, 255, 0.4) 0.5px, transparent 1px),
+    radial-gradient(circle at 78% 33%, rgba(255, 255, 255, 0.6) 0.5px, transparent 1px),
+    radial-gradient(circle at 90% 92%, rgba(255, 255, 255, 0.4) 0.5px, transparent 1px),
+    radial-gradient(circle at 25% 88%, rgba(255, 255, 255, 0.5) 0.5px, transparent 1px),
+    radial-gradient(circle at 60% 10%, rgba(255, 255, 255, 0.3) 0.5px, transparent 1px),
+    radial-gradient(circle at 35% 55%, rgba(255, 255, 255, 0.4) 0.5px, transparent 1px);
+  background-size: 400px 400px, 520px 520px, 360px 360px, 480px 480px, 440px 440px, 300px 300px,
+    600px 600px;
+  opacity: 0.55;
+}
+
+/* ---------- Tipografía de marca ---------- */
+
+.fdz-venta .venta-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+  color: var(--venta-cyan);
+}
+
+/* Títulos con el degradado del landing. El drop-shadow es lo que le da el
+   brillo de neón sobre el fondo oscuro; sin él el degradado se ve apagado. */
+/* `font-weight` y `letter-spacing` van explícitos: tokens.css tiene una regla
+   global para h1 (peso 200, tracking -0.03em) que le gana a las utilidades de
+   Tailwind y dejaba el título fino y con el interletrado al revés. */
+.fdz-venta .venta-titulo {
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: linear-gradient(90deg, #ff1f9f 0%, #d232f7 50%, #00fbff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 22px rgba(255, 31, 168, 0.28))
+    drop-shadow(0 0 26px rgba(0, 229, 255, 0.2));
+}
+
+/* ---------- Superficies ---------- */
+
+.fdz-venta .venta-card {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.045) 0%,
+    rgba(255, 255, 255, 0.012) 60%,
+    rgba(255, 31, 168, 0.018) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 16px 40px -24px rgba(255, 31, 168, 0.18),
+    0 2px 10px -4px rgba(0, 229, 255, 0.08);
+}
+
+/* La tarjeta del precio lleva un halo de marca. Es la única de la página que lo
+   tiene: es la que decide la compra, y el halo es lo que la separa del resto sin
+   necesidad de hacerla más grande ni más brillante. */
+.fdz-venta .venta-card-oferta {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 31, 168, 0.12),
+    0 28px 70px -30px rgba(255, 31, 168, 0.4),
+    0 10px 40px -20px rgba(0, 229, 255, 0.22);
+}
+
+/* ---------- Controles ---------- */
+
+.fdz-venta .venta-input {
+  width: 100%;
+  min-height: 2.75rem; /* 44px: el mínimo táctil */
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75rem 1rem;
+  /* 16px, NO 14: Safari de iPhone amplía la página al enfocar cualquier campo
+     que tenga menos de 16px, y como el viewport no fija maximum-scale (bien,
+     por accesibilidad) no lo deshace al salir. La página queda ampliada y con
+     desborde horizontal en medio de la compra. */
+  font-size: 16px;
+  font-weight: 300;
+  color: #fff;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.fdz-venta .venta-input-con-boton {
+  padding-right: 3.25rem;
+}
+
+.fdz-venta .venta-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.fdz-venta .venta-input:focus {
+  outline: none;
+  border-color: var(--venta-cyan);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.fdz-venta .venta-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  /* 0.72, no 0.45: a 10px y en versalitas, un blanco al 45% sobre este fondo da
+     ~3,2:1, por debajo del 4,5:1 exigible. Es la etiqueta que dice qué va en
+     cada campo; si no se lee, el formulario se llena a ciegas. */
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* Botón pastilla de marca, igual que los CTA del landing. */
+.fdz-venta .venta-btn {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.875rem 1.5rem;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #fff;
+  background: linear-gradient(90deg, #ff1fa8 0%, #a33ccb 50%, #00e5ff 100%);
+  box-shadow: 0 10px 32px -10px rgba(255, 31, 168, 0.45);
+  transition:
+    transform 180ms ease,
+    filter 180ms ease;
+}
+
+.fdz-venta .venta-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.fdz-venta .venta-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Anillo de foco. SIN `border-radius: inherit`: eso le imponía el radio del
+   PADRE a cada elemento enfocado —los campos perdían sus esquinas redondeadas y
+   los botones pastilla se volvían rectángulos—. El radio de cada control lo
+   define el control, y el anillo lo sigue solo. */
+.fdz-venta a:focus-visible,
+.fdz-venta button:focus-visible,
+.fdz-venta input:focus-visible {
+  outline: 2px solid var(--venta-cyan);
+  outline-offset: 2px;
+}
+
+/* El landing anima con transform; quien pidió menos movimiento no lo recibe. */
+@media (prefers-reduced-motion: reduce) {
+  .fdz-venta .venta-btn:hover:not(:disabled) {
+    transform: none;
+  }
+  .fdz-venta * {
+    transition-duration: 0.01ms !important;
+  }
+}
