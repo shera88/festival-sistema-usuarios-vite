@@ -97,17 +97,19 @@ function Logo({ nombre, logo }: { nombre: string; logo?: string | null }) {
   );
 }
 
-/** Nota + cuántos jurados la formaron. Con menos de 3 el promedio no es
- *  representativo, así que se avisa en vez de mostrarla a secas. */
+/**
+ * Sólo la nota.
+ *
+ * Cuántos jurados la formaron NO se muestra en la lista: repetido 179 veces es
+ * ruido, y con listas largas invita a comparar obras por el número de jurados
+ * en vez de por la nota. El dato sigue estando —y con el desglose completo— al
+ * abrir la obra.
+ */
 function Nota({ o }: { o: GanadorItem }) {
-  const pocos = o.jurados < 3;
   return (
     <span className="shrink-0 text-right">
       <span className="block text-[15px] font-bold tabular-nums" style={{ color: 'var(--gold)' }}>
         {o.nota}
-      </span>
-      <span className={`block text-[9px] uppercase tracking-wide ${pocos ? 'text-amber-300' : 'text-text-45'}`}>
-        {o.jurados} {o.jurados === 1 ? 'jurado' : 'jurados'}
       </span>
     </span>
   );
@@ -238,7 +240,7 @@ export function GanadoresView({
 
       {/* Las dos vistas, con el mismo par de pestañas que usa jurados. */}
       <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl border border-glass-border bg-glass-bg p-1">
-        {([['categoria', 'Por categoría'], ['genero', 'Por género'], ['festival', 'Festival']] as const).map(([v, txt]) => (
+        {([['categoria', 'Por categoría'], ['genero', 'Por género'], ['festival', 'General']] as const).map(([v, txt]) => (
           <button
             key={v}
             type="button"
@@ -487,9 +489,6 @@ export function GanadoresView({
                       style={{ color: MEDALLAS[i].solid }}
                     >
                       {o.nota}
-                    </p>
-                    <p className="text-[8px] text-text-45 sm:text-[10px]">
-                      {o.jurados} jurado{o.jurados === 1 ? '' : 's'}
                     </p>
                   </div>
                 );
