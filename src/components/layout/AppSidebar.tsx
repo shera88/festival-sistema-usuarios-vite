@@ -50,9 +50,13 @@ export function AppSidebar({ open, onClose }: Props) {
         // Nominados: visible para todo el portal. Sin lugar ni nota y mezclado
         // en el servidor, no adelanta ningun resultado (ver nominados.php).
         { to: '/nominados', label: 'Nominados', icon: Trophy },
-        // Ganadores: los resultados REALES, con lugar y nota. SOLO super admin —
-        // lo contrario de Nominados, que es publico justamente porque los esconde.
-        ...(user?.es_super_admin ? [{ to: '/ganadores', label: 'Ganadores', icon: Crown }] : []),
+        // Ganadores: los resultados REALES, con lugar y nota. Cerrado a super admin
+        // hasta que la organización los publique; desde ese momento lo ve cualquier
+        // participante. El interruptor vive en el servidor (_lib/publicacion.php) y
+        // llega por me.php — acá sólo se lee.
+        ...(user?.es_super_admin || user?.ganadores_publicados
+          ? [{ to: '/ganadores', label: 'Ganadores', icon: Crown }]
+          : []),
       ],
     },
     // Formularios: además del permiso de edición, el de Kárdex se filtra por rol

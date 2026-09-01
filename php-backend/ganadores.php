@@ -33,10 +33,19 @@ require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
 require __DIR__ . '/_lib/premiacion.php';
 require __DIR__ . '/_lib/ganadores-data.php';
+require_once __DIR__ . '/_lib/publicacion.php';
 
 handlePreflight();
 requireMethod('GET');
-requireSuperAdmin();
+
+// Mientras no se publiquen, esto sigue siendo SOLO super admin, igual que antes.
+// El día que se publiquen, lo ve cualquier participante con sesión iniciada —
+// pero sigue haciendo falta sesión: no es un endpoint abierto a internet.
+if (ganadoresPublicos()) {
+    requireAuth();
+} else {
+    requireSuperAdmin();
+}
 
 $year = preg_replace('/\D/', '', (string)($_GET['year'] ?? '2026'));
 

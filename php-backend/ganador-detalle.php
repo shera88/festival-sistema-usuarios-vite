@@ -8,10 +8,16 @@ declare(strict_types=1);
  * (temática, interpretación, coreografía, dificultad), su total y el comentario
  * que dejó.
  *
- * SOLO SUPER ADMIN, y gateado en el servidor. Esto es lo más sensible de todo
- * el portal: el detalle no sólo dice cuánto sacó una obra, dice quién le puso
- * qué. Si se filtra, se puede reconstruir el criterio de cada jurado — y eso no
- * lo ve ni el propio participante.
+ * Gateado en el servidor, con el MISMO interruptor que ganadores.php
+ * (_lib/publicacion.php). Mientras no se publiquen los resultados es sólo super
+ * admin; una vez publicados lo abre cualquier participante o cliente con sesión,
+ * porque la organización pidió que el desglose se vea igual que lo ve un super
+ * admin.
+ *
+ * Lo que eso significa, para que quede escrito: publicado esto, cualquiera con
+ * sesión puede ver QUÉ NOTA PUSO CADA JURADO —con su nombre— a cada obra, y su
+ * comentario. Es lo más sensible del portal y no hay mezcla ni recorte que lo
+ * proteja: la única defensa es el gate. Se abre porque se pidió expresamente.
  *
  * Ojo al agregar campos: acá NO hay mezcla ni ocultamiento que proteja nada,
  * como sí pasa en nominados.php. La única defensa es el gate.
@@ -19,10 +25,19 @@ declare(strict_types=1);
 
 require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/supabase.php';
+require_once __DIR__ . '/_lib/auth-cliente.php';   // requireParticipanteOCliente()
+require_once __DIR__ . '/_lib/publicacion.php';
 
 handlePreflight();
 requireMethod('GET');
-requireSuperAdmin();
+
+// Publicado: participante O cliente (son dos sesiones distintas, y la del área
+// de clientes no satisface requireAuth()). Sin publicar: sólo super admin.
+if (ganadoresPublicos()) {
+    requireParticipanteOCliente();
+} else {
+    requireSuperAdmin();
+}
 
 $id = trim((string)($_GET['id'] ?? ''));
 if ($id === '') {

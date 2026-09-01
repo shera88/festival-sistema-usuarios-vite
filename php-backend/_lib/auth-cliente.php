@@ -13,6 +13,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/session-cliente.php';
+require_once __DIR__ . '/publicacion.php';
 require_once __DIR__ . '/supabase.php';
 
 /** Normaliza el correo para comparar. Debe coincidir con el índice único
@@ -102,13 +103,13 @@ function requireParticipanteOCliente(): void
 /**
  * ¿Se muestran ya los GANADORES fuera de la organización?
  *
- * Apagado a propósito y por defecto: el payload de ganadores trae el LUGAR y la
- * NOTA de cada obra. Si esto se enciende antes de la premiación, se arruina la
- * premiación. Se cambia a true a mano el día que la organización lo pida.
+ * Ya no decide aquí: delega en `ganadoresPublicos()` de _lib/publicacion.php,
+ * que es el interruptor único para participantes y clientes a la vez. Se
+ * conserva el nombre porque clientes/ganadores.php lo llama por él.
  */
 function ganadoresVisiblesParaClientes(): bool
 {
-    return false;
+    return ganadoresPublicos();
 }
 
 /** Los campos del cliente que pueden viajar al navegador. Nunca password_hash

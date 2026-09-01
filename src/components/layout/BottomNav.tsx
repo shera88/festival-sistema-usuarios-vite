@@ -24,9 +24,11 @@ export function BottomNav() {
     // Nominados: visible para todo el portal, a diferencia de Admin Pagos —que
     // a propósito no está acá—. No adelanta ningún resultado (ver nominados.php).
     { to: '/nominados', label: 'Nomin.', icon: Trophy, color: 'var(--gold)' },
-    // Ganadores: los resultados REALES, con lugar y nota. SOLO super admin —
-    // lo contrario de Nominados, que es publico justamente porque los esconde.
-    ...(user?.es_super_admin
+    // Ganadores: los resultados REALES, con lugar y nota. Cerrado a super admin
+    // hasta que la organización los publique; desde ese momento lo ve cualquier
+    // participante. El interruptor vive en el servidor (_lib/publicacion.php) y
+    // llega por me.php — acá sólo se lee.
+    ...(user?.es_super_admin || user?.ganadores_publicados
       ? [{ to: '/ganadores', label: 'Ganad.', icon: Crown, color: 'var(--gold)' }]
       : []),
   ];

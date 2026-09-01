@@ -24,6 +24,10 @@ export interface User {
   es_admin?: boolean;
   /** True si el usuario REAL es super admin (admin_usuarios.super_admin) → puede supervisar. */
   es_super_admin?: boolean;
+  /** ¿Ya se publicaron los ganadores? La manda el servidor (me.php), que la lee
+   *  del interruptor único de _lib/publicacion.php. No se duplica acá: con dos
+   *  copias, una se enciende y la otra no, y aparece una pestaña que da 403. */
+  ganadores_publicados?: boolean;
   /** True si la sesión está supervisando a otra persona (impersonar.php). */
   impersonando?: boolean;
   /** Nombre del usuario real mientras supervisa (banner "Supervisando como…"). */

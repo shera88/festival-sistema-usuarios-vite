@@ -12,7 +12,9 @@ import { ApiError } from '@/lib/api/client';
  * `publicado: false` y aquí se muestra el aviso. No es un error ni una falta de
  * permisos: los resultados todavía no salieron.
  *
- * El desglose por jurado va apagado (`verDetalle={false}`): ese endpoint es de
+ * El desglose por jurado se abre junto con los ganadores: ganador-detalle.php
+ * usa la misma bandera de _lib/publicacion.php y acepta la sesión de cliente vía
+ * requireParticipanteOCliente(). Antes iba apagado porque ese endpoint era de
  * super admin y un cliente no tiene por qué abrirlo.
  */
 export function ClienteGanadoresPage() {
@@ -61,7 +63,7 @@ export function ClienteGanadoresPage() {
       bloques={data?.bloques ?? []}
       cuadros={data?.absolutos ?? []}
       total={data?.total ?? 0}
-      verDetalle={false}
+      verDetalle
     />
   );
 }

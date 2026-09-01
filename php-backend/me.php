@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/_lib/auth.php';
 require __DIR__ . '/_lib/context.php';
+require_once __DIR__ . '/_lib/publicacion.php';
 
 handlePreflight();
 requireMethod('GET');
@@ -26,5 +27,10 @@ $idReal = $impersonando
 $user['es_super_admin'] = esSuperAdmin($idReal);
 $user['impersonando'] = $impersonando;
 $user['real_user_nombre'] = $impersonando ? ($_SESSION['real_user']['nombre_y_apellido'] ?? null) : null;
+
+// La misma bandera que gobierna el endpoint, para que el frontend sepa si debe
+// mostrar la pestaña. Se manda desde el servidor y no se duplica en el cliente:
+// con dos copias, una se enciende y la otra no, y aparece una pestaña que da 403.
+$user['ganadores_publicados'] = ganadoresPublicos();
 
 sendJson(['user' => $user]);
